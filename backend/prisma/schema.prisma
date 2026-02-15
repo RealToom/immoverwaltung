@@ -1,0 +1,314 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Company (Hausverwaltung) ───────────────────────────────
+model Company {
+  id        Int      @id @default(autoincrement())
+  name      String
+  slug      String   @unique
+  address   String   @default("")
+  taxNumber String   @default("") @map("tax_number")
+  website   String   @default("")
+  currency    String   @default("EUR")
+  language    String   @default("de")
+  dateFormat  String   @default("DD.MM.YYYY") @map("date_format")
+  itemsPerPage Int     @default(25) @map("items_per_page")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users              User[]
+  properties         Property[]
+  tenants            Tenant[]
+  contracts          Contract[]
+  maintenanceTickets MaintenanceTicket[]
+  transactions       Transaction[]
+  rentPayments       RentPayment[]
+
+  @@map("companies")
+}
+
+// ─── User (Benutzer) ────────────────────────────────────────
+model User {
+  id                  Int       @id @default(autoincrement())
+  email               String    @unique
+  passwordHash        String    @map("password_hash")
+  name                String
+  role                UserRole  @default(VERWALTER)
+  phone               String    @default("")
+  bio                 String    @default("")
+  notificationPrefs   Json      @default("{}") @map("notification_prefs")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until")
+  companyId           Int       @map("company_id")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+// ─── RefreshToken ────────────────────────────────────────────
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  userId    Int      @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+enum UserRole {
+  ADMIN
+  VERWALTER
+  BUCHHALTER
+  READONLY
+}
+
+// ─── Property (Immobilie) ───────────────────────────────────
+model Property {
+  id        Int            @id @default(autoincrement())
+  name      String
+  address   String
+  status    PropertyStatus @default(AKTIV)
+  companyId Int            @map("company_id")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  units              Unit[]
+  documents          Document[]
+  contracts          Contract[]
+  maintenanceTickets MaintenanceTicket[]
+  transactions       Transaction[]
+
+  @@map("properties")
+}
+
+enum PropertyStatus {
+  AKTIV
+  WARTUNG
+}
+
+// ─── Unit (Einheit) ─────────────────────────────────────────
+model Unit {
+  id         Int        @id @default(autoincrement())
+  number     String
+  floor      Int
+  area       Float
+  rent       Float
+  status     UnitStatus @default(FREI)
+  propertyId Int        @map("property_id")
+  tenantId   Int?       @unique @map("tenant_id")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  property           Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tenant             Tenant?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  contracts          Contract[]
+  maintenanceTickets MaintenanceTicket[]
+
+  @@unique([propertyId, number])
+  @@map("units")
+}
+
+enum UnitStatus {
+  VERMIETET
+  FREI
+  WARTUNG
+}
+
+// ─── Tenant (Mieter) ────────────────────────────────────────
+model Tenant {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String
+  phone     String   @default("")
+  moveIn    DateTime @map("move_in")
+  companyId Int      @map("company_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  unit      Unit?
+  contracts Contract[]
+
+  @@map("tenants")
+}
+
+// ─── Contract (Vertrag) ─────────────────────────────────────
+model Contract {
+  id           Int            @id @default(autoincrement())
+  type         ContractType
+  startDate    DateTime       @map("start_date")
+  endDate      DateTime?      @map("end_date")
+  noticePeriod Int            @map("notice_period")
+  monthlyRent  Float          @map("monthly_rent")
+  deposit      Float          @default(0)
+  status       ContractStatus @default(ENTWURF)
+  nextReminder DateTime?      @map("next_reminder")
+  reminderType ReminderType?  @map("reminder_type")
+  notes        String?
+  tenantId     Int            @map("tenant_id")
+  propertyId   Int            @map("property_id")
+  unitId       Int            @map("unit_id")
+  companyId    Int            @map("company_id")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  property     Property      @relation(fields: [propertyId], references: [id])
+  unit         Unit          @relation(fields: [unitId], references: [id])
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  rentPayments RentPayment[]
+
+  @@map("contracts")
+}
+
+enum ContractType {
+  WOHNRAUM
+  GEWERBE
+  STAFFEL
+  INDEX
+}
+
+enum ContractStatus {
+  AKTIV
+  GEKUENDIGT
+  AUSLAUFEND
+  ENTWURF
+}
+
+enum ReminderType {
+  KUENDIGUNGSFRIST
+  VERTRAGSVERLAENGERUNG
+  MIETANPASSUNG
+  KAUTIONSRUECKZAHLUNG
+}
+
+// ─── MaintenanceTicket (Wartungsauftrag) ─────────────────────
+model MaintenanceTicket {
+  id         Int                 @id @default(autoincrement())
+  title      String
+  description String             @default("")
+  category   MaintenanceCategory
+  priority   MaintenancePriority
+  status     MaintenanceStatus   @default(OFFEN)
+  unitLabel  String              @default("Allgemein") @map("unit_label")
+  reportedBy String              @map("reported_by")
+  assignedTo String?             @map("assigned_to")
+  dueDate    DateTime?           @map("due_date")
+  cost       Float?
+  notes      String?
+  propertyId Int                 @map("property_id")
+  unitId     Int?                @map("unit_id")
+  companyId  Int                 @map("company_id")
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+
+  property Property @relation(fields: [propertyId], references: [id])
+  unit     Unit?    @relation(fields: [unitId], references: [id])
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("maintenance_tickets")
+}
+
+enum MaintenanceCategory {
+  SANITAER
+  ELEKTRIK
+  HEIZUNG
+  GEBAEUDE
+  AUSSENANLAGE
+  SONSTIGES
+}
+
+enum MaintenancePriority {
+  NIEDRIG
+  MITTEL
+  HOCH
+  DRINGEND
+}
+
+enum MaintenanceStatus {
+  OFFEN
+  IN_BEARBEITUNG
+  WARTEND
+  ERLEDIGT
+}
+
+// ─── Document (Dokument) ────────────────────────────────────
+model Document {
+  id         Int      @id @default(autoincrement())
+  name       String
+  fileType   String   @map("file_type")
+  fileSize   String   @map("file_size")
+  filePath   String?  @map("file_path")
+  propertyId Int      @map("property_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@map("documents")
+}
+
+// ─── Transaction (Transaktion) ──────────────────────────────
+model Transaction {
+  id          Int             @id @default(autoincrement())
+  date        DateTime
+  description String
+  type        TransactionType
+  amount      Float
+  category    String          @default("")
+  propertyId  Int?            @map("property_id")
+  companyId   Int             @map("company_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  property Property? @relation(fields: [propertyId], references: [id])
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}
+
+enum TransactionType {
+  EINNAHME
+  AUSGABE
+}
+
+// ─── RentPayment (Mietzahlung) ──────────────────────────────
+model RentPayment {
+  id         Int               @id @default(autoincrement())
+  month      DateTime          // 1. des Monats (z.B. 2026-01-01)
+  amountDue  Float             @map("amount_due")
+  amountPaid Float             @default(0) @map("amount_paid")
+  status     RentPaymentStatus @default(AUSSTEHEND)
+  dueDate    DateTime          @map("due_date")
+  paidDate   DateTime?         @map("paid_date")
+  contractId Int               @map("contract_id")
+  companyId  Int               @map("company_id")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  contract Contract @relation(fields: [contractId], references: [id])
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, month])
+  @@map("rent_payments")
+}
+
+enum RentPaymentStatus {
+  PUENKTLICH
+  VERSPAETET
+  AUSSTEHEND
+}
