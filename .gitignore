@@ -23,6 +23,3 @@ nul
 
 # Uploads (user data, not source code)
 backend/uploads/
-
-# cozy-estate-central has its own git repo
-cozy-estate-central/
