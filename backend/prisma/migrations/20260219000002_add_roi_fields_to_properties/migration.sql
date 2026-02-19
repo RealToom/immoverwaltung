@@ -1,0 +1,2 @@
+ALTER TABLE "properties" ADD COLUMN "purchase_price" DOUBLE PRECISION;
+ALTER TABLE "properties" ADD COLUMN "equity" DOUBLE PRECISION;

@@ -1,0 +1,28 @@
+# Secrets
+.env
+*.env.local
+
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+nul
+
+# IDE / Tools
+.playwright-mcp/
+.claude/
+
+# Uploads (user data, not source code)
+backend/uploads/
+
+# cozy-estate-central has its own git repo
+cozy-estate-central/

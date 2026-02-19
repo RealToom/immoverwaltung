@@ -1,0 +1,65 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: immoverwaltung-db
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: immoverwaltung
+      POSTGRES_USER: immo
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD muss in .env gesetzt sein}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U immo -d immoverwaltung"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: immoverwaltung-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://immo:${DB_PASSWORD:?DB_PASSWORD muss in .env gesetzt sein}@postgres:5432/immoverwaltung?schema=public"
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET muss in .env gesetzt sein}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET muss in .env gesetzt sein}
+      PORT: "3001"
+      NODE_ENV: production
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS muss in .env gesetzt sein}
+      SEED_DB: ${SEED_DB:-false}
+      UPLOAD_DIR: /app/uploads
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@immoverwalt.de}
+    volumes:
+      - uploads_data:/app/uploads
+    entrypoint: ["sh", "docker-entrypoint.sh"]
+    # Port nur intern erreichbar (nginx leitet weiter)
+    expose:
+      - "3001"
+
+  frontend:
+    build: ./cozy-estate-central
+    container_name: immoverwaltung-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # SSL-Zertifikate einbinden (z.B. via Certbot: /etc/letsencrypt/live/DOMAIN/)
+      # Vor dem ersten Start: certbot certonly --standalone -d DOMAIN
+      - ${SSL_CERT_PATH:-./ssl}:/etc/nginx/ssl:ro
+
+volumes:
+  postgres_data:
+  uploads_data:
