@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { prisma } from "../lib/prisma.js";
 import { logger } from "../lib/logger.js";
 import { deleteOldAuditLogs } from "./audit.service.js";
+import { startImapSync, stopImapSync } from "./imap-sync.service.js";
 
 /**
  * DSGVO Art. 17 / Art. 5(1)(e) - Aufbewahrungsfristen
@@ -76,6 +77,7 @@ export function startRetentionCleanup(): void {
     }, CLEANUP_INTERVAL_MS);
 
     logger.info("Aufbewahrungsfristen-Cleanup gestartet (Intervall: 1h)");
+    startImapSync();
 }
 
 export function stopRetentionCleanup(): void {
@@ -83,4 +85,5 @@ export function stopRetentionCleanup(): void {
         clearInterval(cleanupTimer);
         cleanupTimer = null;
     }
+    stopImapSync();
 }

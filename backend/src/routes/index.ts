@@ -17,6 +17,7 @@ import { companyRouter } from "./company.routes.js";
 import { bankRouter } from "./bank.routes.js";
 import { userRouter } from "./user.routes.js";
 import { calendarRouter } from "./calendar.routes.js";
+import { emailAccountRouter } from "./email-account.routes.js";
 
 const router = Router();
 
@@ -41,5 +42,6 @@ router.use("/company", requireAuth, tenantGuard, companyRouter);
 router.use("/bank-accounts", requireAuth, tenantGuard, bankRouter);
 router.use("/users", requireAuth, tenantGuard, userRouter);
 router.use("/calendar", requireAuth, tenantGuard, calendarRouter);
+router.use("/email-accounts", requireAuth, tenantGuard, emailAccountRouter);
 
 export { router as apiRouter };
