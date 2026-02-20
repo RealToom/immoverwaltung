@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { isEncryptionEnabled, encryptFile, decryptFile, getOriginalExt } from "../lib/crypto.js";
+import { isEncryptionEnabled, encryptFile, decryptFile, getOriginalExt, encryptString, decryptString } from "../lib/crypto.js";
 
 let tmpDir: string;
 let testFile: string;
@@ -45,5 +45,21 @@ describe("getOriginalExt", () => {
     expect(getOriginalExt("/uploads/abc.pdf.enc")).toBe(".pdf");
     expect(getOriginalExt("/uploads/doc.docx.enc")).toBe(".docx");
     expect(getOriginalExt("/uploads/img.png.enc")).toBe(".png");
+  });
+});
+
+describe("encryptString / decryptString", () => {
+  it("round-trips a string correctly", () => {
+    const original = "SuperGeheimesPasswort123!";
+    const encrypted = encryptString(original);
+    expect(encrypted).not.toBe(original);
+    const decrypted = decryptString(encrypted);
+    expect(decrypted).toBe(original);
+  });
+
+  it("produces different ciphertext each time (random IV)", () => {
+    const enc1 = encryptString("test");
+    const enc2 = encryptString("test");
+    expect(enc1).not.toBe(enc2);
   });
 });
