@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
 import { env } from "../config/env.js";
 import { AppError, NotFoundError } from "../lib/errors.js";
+import { sendTempPasswordEmail } from "./email.service.js";
 import type { UserRole } from "@prisma/client";
 
 function sanitize(user: Record<string, unknown>) {
@@ -137,7 +138,7 @@ export async function resetUserPassword(companyId: number, id: number) {
   if (!existing) throw new NotFoundError("Benutzer", id);
 
   const newPassword = generatePassword();
-  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const passwordHash = await bcrypt.hash(newPassword, env.BCRYPT_COST);
 
   await prisma.user.update({
     where: { id },
@@ -146,6 +147,14 @@ export async function resetUserPassword(companyId: number, id: number) {
       failedLoginAttempts: 0,
       lockedUntil: null,
     },
+  });
+
+  // Send email with temporary password (non-blocking, fails silently if SMTP not configured)
+  const appUrl = process.env.CORS_ORIGINS?.split(",")[0] ?? "http://localhost";
+  void sendTempPasswordEmail(existing.email, {
+    name: existing.name,
+    temporaryPassword: newPassword,
+    appUrl,
   });
 
   return { temporaryPassword: newPassword };

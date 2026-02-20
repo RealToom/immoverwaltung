@@ -1,6 +1,71 @@
-/# Immoverwaltung - Local Docker Deployment Guide
+# Immoverwaltung - Docker Deployment Guide
 
 Anleitung zum Hosten der gesamten App (Frontend + Backend + Datenbank) per Docker auf einem anderen PC.
+
+---
+
+---
+
+## Produktions-Checkliste
+
+Vor dem ersten Go-Live alle Punkte abhaken:
+
+### Pflicht (ohne diese laeuft docker-compose nicht hoch)
+
+- [ ] `ENCRYPTION_KEY` generieren und setzen:
+  ```bash
+  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  ```
+- [ ] `DB_PASSWORD` — starkes, einzigartiges Passwort (mind. 20 Zeichen)
+- [ ] `JWT_ACCESS_SECRET` + `JWT_REFRESH_SECRET` generieren (je 48+ Bytes):
+  ```bash
+  # Linux/Mac:
+  openssl rand -base64 48
+  # Windows PowerShell:
+  [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Max 256 }) -as [byte[]])
+  ```
+- [ ] `CORS_ORIGINS` — exakte HTTPS-URL des Frontends (z.B. `https://verwaltung.meine-firma.de`)
+- [ ] SSL-Zertifikate vorhanden (Let's Encrypt empfohlen, siehe unten)
+
+### Empfohlen
+
+- [ ] `ANTHROPIC_API_KEY` setzen — aktiviert KI-Belegscan (optional, kann leer bleiben)
+- [ ] `BCRYPT_COST=12` — Standard, bei sehr starken Servern auf 13 erhoehen
+- [ ] `SEED_DB=false` — nur beim allerersten Start auf `true` setzen
+- [ ] SMTP-Daten konfigurieren — aktiviert E-Mail-Benachrichtigungen + Passwort-Reset-E-Mails
+- [ ] Automatisches Backup einrichten (Cronjob, siehe Abschnitt "Backup")
+- [ ] Monitoring einrichten (UptimeRobot: GET `/health` alle 5 Min, Alert bei Status != 200)
+- [ ] Firewall: nur Port 80 + 443 freigeben (DB-Port 5432 ist bereits an 127.0.0.1 gebunden)
+
+### SSL-Zertifikat mit Let's Encrypt (Certbot)
+
+```bash
+# Einmalig: Certbot installieren und Zertifikat ausstellen
+# (Port 80 muss fuer die Challenge erreichbar sein - frontend noch nicht starten)
+sudo apt install certbot
+sudo certbot certonly --standalone -d verwaltung.meine-firma.de
+
+# In .env setzen:
+SSL_CERT_PATH=/etc/letsencrypt/live/verwaltung.meine-firma.de
+
+# Auto-Renewal pruefen (Certbot richtet Cronjob ein):
+sudo certbot renew --dry-run
+
+# Nach Renewal: nginx neu laden
+docker compose exec frontend nginx -s reload
+```
+
+### Backup-Cronjob einrichten
+
+```bash
+# Script ausfuehrbar machen
+chmod +x scripts/backup.sh
+
+# Cronjob einrichten (taeglich 3 Uhr):
+crontab -e
+# Zeile hinzufuegen:
+0 3 * * * /opt/immoverwaltung/scripts/backup.sh /opt/backups >> /var/log/immoverwaltung-backup.log 2>&1
+```
 
 ---
 
