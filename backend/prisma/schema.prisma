@@ -354,3 +354,19 @@ enum RentPaymentStatus {
   VERSPAETET
   AUSSTEHEND
 }
+
+// ─── AuditLog (DSGVO Art. 5 - Nachweisbarkeit) ──────────────
+// Keine FK-Constraints → Logs bleiben erhalten auch wenn User/Company gelöscht wird
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  action    String   // DOCUMENT_UPLOAD, DOCUMENT_DOWNLOAD, DOCUMENT_DELETE, PASSWORD_CHANGE, etc.
+  userId    Int?     @map("user_id")
+  companyId Int?     @map("company_id")
+  ip        String?
+  details   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([companyId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

@@ -13,6 +13,9 @@ import {
   Mail,
   Phone,
   Loader2,
+  Shield,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -39,6 +42,8 @@ import {
   useCompanySettings,
   useUpdateCompanySettings,
 } from "@/hooks/api/useSettings";
+import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Theme = "light" | "dark" | "system";
 
@@ -168,6 +173,35 @@ const SettingsPage = () => {
 
   const profile = profileData?.data;
 
+  // ─── Password Change ─────────────────────────────────────
+  const { logout } = useAuth();
+  const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [pwLoading, setPwLoading] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (pwForm.newPassword !== pwForm.confirmPassword) {
+      toast({ title: "Fehler", description: "Die neuen Passwörter stimmen nicht überein.", variant: "destructive" });
+      return;
+    }
+    setPwLoading(true);
+    try {
+      await api("/api/auth/me/password", {
+        method: "PATCH",
+        body: { currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword },
+      });
+      toast({ title: "Passwort geändert", description: "Sie werden zur Anmeldung weitergeleitet." });
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setTimeout(() => logout(), 1500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Passwort konnte nicht geändert werden.";
+      toast({ title: "Fehler", description: msg, variant: "destructive" });
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <header className="flex h-16 items-center gap-3 border-b border-border/60 bg-card px-6">
@@ -186,6 +220,7 @@ const SettingsPage = () => {
             <TabsTrigger value="benachrichtigungen" className="gap-1.5"><Bell className="h-4 w-4" /> Benachrichtigungen</TabsTrigger>
             <TabsTrigger value="darstellung" className="gap-1.5"><Moon className="h-4 w-4" /> Darstellung</TabsTrigger>
             <TabsTrigger value="app" className="gap-1.5"><Settings className="h-4 w-4" /> App</TabsTrigger>
+            <TabsTrigger value="sicherheit" className="gap-1.5"><Shield className="h-4 w-4" /> Sicherheit</TabsTrigger>
           </TabsList>
 
           {/* Profile Tab */}
@@ -495,6 +530,82 @@ const SettingsPage = () => {
               </>
             )}
           </TabsContent>
+          {/* Sicherheit Tab */}
+          <TabsContent value="sicherheit" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Passwort ändern</CardTitle>
+                <CardDescription>
+                  Nach der Änderung werden alle aktiven Sitzungen beendet. Sie müssen sich erneut anmelden.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 max-w-md">
+                <div className="space-y-2">
+                  <Label>Aktuelles Passwort</Label>
+                  <div className="relative">
+                    <Input
+                      type={showCurrent ? "text" : "password"}
+                      value={pwForm.currentPassword}
+                      onChange={(e) => setPwForm((p) => ({ ...p, currentPassword: e.target.value }))}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowCurrent((v) => !v)}
+                    >
+                      {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Neues Passwort</Label>
+                  <div className="relative">
+                    <Input
+                      type={showNew ? "text" : "password"}
+                      value={pwForm.newPassword}
+                      onChange={(e) => setPwForm((p) => ({ ...p, newPassword: e.target.value }))}
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowNew((v) => !v)}
+                    >
+                      {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Mind. 8 Zeichen, 1 Groß-/Kleinbuchstabe, 1 Ziffer</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Neues Passwort bestätigen</Label>
+                  <Input
+                    type="password"
+                    value={pwForm.confirmPassword}
+                    onChange={(e) => setPwForm((p) => ({ ...p, confirmPassword: e.target.value }))}
+                  />
+                  {pwForm.confirmPassword && pwForm.newPassword !== pwForm.confirmPassword && (
+                    <p className="text-xs text-destructive">Passwörter stimmen nicht überein</p>
+                  )}
+                </div>
+                <div className="flex justify-end pt-2">
+                  <Button
+                    onClick={handleChangePassword}
+                    disabled={
+                      pwLoading ||
+                      !pwForm.currentPassword ||
+                      !pwForm.newPassword ||
+                      pwForm.newPassword !== pwForm.confirmPassword
+                    }
+                  >
+                    {pwLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+                    Passwort ändern
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
         </Tabs>
       </main>
     </div>

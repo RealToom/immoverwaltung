@@ -38,6 +38,9 @@
 | N5 | Health-Endpoint gibt Timestamp preis | Timestamp entfernt aus `/health` Response | `app.ts` |
 | N1a | Keine HSTS-Header | `helmet({ hsts: { maxAge: 31536000, includeSubDomains, preload } })` | `app.ts` |
 | N1b | Kein Referrer-Policy-Header | `helmet({ referrerPolicy: { policy: "no-referrer" } })` | `app.ts` |
+| N2 | `SameSite=Lax` auf Refresh-Cookie | Auf `SameSite=Strict` gesetzt (Frontend + API gleiche Domain via nginx) | `controllers/auth.controller.ts` |
+| N4 | Keine Magic-Bytes-Validierung | `file-type` prüft Dateiinhalt nach Multer-Upload; bei Nichtübereinstimmung wird Datei gelöscht + 400 zurückgegeben | `controllers/document.controller.ts` |
+| N6 | Audit-Logs nur in Pino (kein DB-Persistenz) | `AuditLog` Prisma-Model + `audit.service.ts`; Logs werden in DB gespeichert (90-Tage-Retention via retention.service.ts) | `services/audit.service.ts`, `document.controller.ts` |
 
 ---
 
@@ -51,28 +54,10 @@
 - **Loesung:** nginx mit certbot oder Caddy mit automatischem Let's Encrypt. DEPLOYMENT.md beschreibt den Aufbau.
 - **Aufwand:** Deployment-abhaengig
 
-#### N2: Keine CSRF-Protection
-- **Betrifft:** `POST /auth/refresh`
-- **Risiko:** Refresh-Token ist httpOnly Cookie mit `SameSite=Lax`. API-Endpunkte selbst sind durch Bearer-Token geschuetzt und damit nicht CSRF-angreifbar. Nur der Refresh-Endpunkt ist theoretisch betroffen.
-- **Loesung:** `SameSite=Strict` setzen (verhindert auch legitime Cross-Origin-Flows), oder CSRF-Token implementieren.
-- **Aufwand:** Mittel (2-4 Stunden)
-
 #### N3: npm audit Schwachstellen
 - **Betrifft:** `node_modules/`
 - **Loesung:** Regelmaessig `npm audit` ausfuehren und Patches einspielen.
 - **Aufwand:** Laufend
-
-#### N4: Keine Magic-Bytes-Validierung bei Datei-Uploads
-- **Betrifft:** `middleware/upload.ts`
-- **Risiko:** MIME-Typ wird aus dem Content-Type-Header des Multipart-Requests gelesen (Client-seitig). Angreifer kann MIME-Typ faelschen. Dateien werden aber mit UUID + sicherer Endung gespeichert und nie ausgefuehrt.
-- **Loesung:** `file-type` npm-Paket zur Pruefung der Magic Bytes (Datei-Signatur) installieren.
-- **Aufwand:** Gering (1-2 Stunden)
-
-#### N6: Audit-Logs nicht in DB persistiert
-- **Betrifft:** `controllers/document.controller.ts`
-- **Risiko:** Audit-Logs gehen beim Container-Neustart verloren (DSGVO Art. 5 - Nachweisbarkeit).
-- **Loesung:** `AuditLog` Prisma-Model anlegen, Logs in DB speichern + Retention-Policy (90 Tage).
-- **Aufwand:** Mittel (3-4 Stunden)
 
 ---
 
@@ -89,8 +74,9 @@
 
 ## Notizen
 
+- **2026-02-20:** Security-Hardening Runde 3 abgeschlossen (N2, N4, N6 behoben; SameSite=Strict, Magic-Bytes, Audit-Log-DB, Passwort-Ändern-Feature).
 - **2026-02-20:** Security-Hardening Runde 2 abgeschlossen (S1-S12, N5, N1a, N1b behoben).
-- Alle HOCH- und MITTEL-Prioritaet Items sind behoben.
+- Alle HOCH-, MITTEL- und NIEDRIG-Prioritaet Items (ausser N1/N3) sind behoben.
 - Prisma bietet Schutz gegen SQL-Injection durch parametrisierte Queries.
 - Multi-Tenancy-Isolation via `companyId` + `tenantGuard` korrekt implementiert.
 - Refresh-Token-Rotation: Token-Reuse loescht alle Tokens des Users (Sicherheitsmassnahme).

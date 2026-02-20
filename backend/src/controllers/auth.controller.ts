@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import * as authService from "../services/auth.service.js";
-import type { RegisterInput, LoginInput, UpdateProfileInput, UpdateNotificationPrefsInput } from "../schemas/auth.schema.js";
+import { createAuditLog } from "../services/audit.service.js";
+import type { RegisterInput, LoginInput, UpdateProfileInput, UpdateNotificationPrefsInput, ChangePasswordInput } from "../schemas/auth.schema.js";
 
 const REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
 const isProduction = process.env.NODE_ENV === "production";
@@ -9,7 +10,7 @@ function setRefreshCookie(res: Response, token: string): void {
   const securePart = isProduction ? " Secure;" : "";
   res.setHeader(
     "Set-Cookie",
-    `refreshToken=${token}; HttpOnly;${securePart} SameSite=Lax; Path=/api/auth; Max-Age=${REFRESH_COOKIE_MAX_AGE / 1000}`
+    `refreshToken=${token}; HttpOnly;${securePart} SameSite=Strict; Path=/api/auth; Max-Age=${REFRESH_COOKIE_MAX_AGE / 1000}`
   );
 }
 
@@ -17,7 +18,7 @@ function clearRefreshCookie(res: Response): void {
   const securePart = isProduction ? " Secure;" : "";
   res.setHeader(
     "Set-Cookie",
-    `refreshToken=; HttpOnly;${securePart} SameSite=Lax; Path=/api/auth; Max-Age=0`
+    `refreshToken=; HttpOnly;${securePart} SameSite=Strict; Path=/api/auth; Max-Age=0`
   );
 }
 
@@ -121,4 +122,21 @@ export async function updateNotificationPrefsHandler(req: Request, res: Response
   const prefs = await authService.updateNotificationPrefs(req.user!.id, data);
 
   res.json({ data: prefs });
+}
+
+export async function changePasswordHandler(req: Request, res: Response) {
+  const { currentPassword, newPassword } = req.body as ChangePasswordInput;
+
+  await authService.changePassword(req.user!.id, currentPassword, newPassword);
+
+  void createAuditLog("PASSWORD_CHANGE", {
+    userId: req.user!.id,
+    companyId: req.user!.companyId,
+    ip: req.ip,
+  }, { selfChange: true });
+
+  // Refresh-Cookie löschen → User muss sich neu anmelden
+  clearRefreshCookie(res);
+
+  res.json({ data: { message: "Passwort erfolgreich geaendert. Bitte neu anmelden." } });
 }

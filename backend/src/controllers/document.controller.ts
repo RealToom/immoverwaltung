@@ -1,9 +1,12 @@
 import path from "node:path";
+import fs from "node:fs";
 import type { Request, Response } from "express";
+import { fileTypeFromFile } from "file-type";
 import * as documentService from "../services/document.service.js";
 import { BadRequestError } from "../lib/errors.js";
 import { decryptFile, getOriginalExt } from "../lib/crypto.js";
 import { logger } from "../lib/logger.js";
+import { createAuditLog } from "../services/audit.service.js";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -28,16 +31,13 @@ function setSecureFileHeaders(res: Response): void {
   res.setHeader("X-Frame-Options", "DENY");
 }
 
-// ─── DSGVO Audit Log (Pino structured logging) ─────────────────
+// ─── DSGVO Audit Log (DB + Pino) ───────────────────────────────
 function auditLog(action: string, req: Request, details: Record<string, unknown> = {}): void {
-  logger.info({
-    audit: true,
-    action,
-    userId: req.user?.id,
-    companyId: req.companyId,
-    ip: req.ip,
-    ...details,
-  }, `AUDIT: ${action}`);
+  const ctx = { userId: req.user?.id, companyId: req.companyId, ip: req.ip };
+  // Pino-Log für Echtzeit-Monitoring
+  logger.info({ audit: true, action, ...ctx, ...details }, `AUDIT: ${action}`);
+  // DB-Persistenz für DSGVO-Nachweisbarkeit (nicht-blockierend)
+  void createAuditLog(action, ctx, details);
 }
 
 // ─── Dateiname-Sanitization ────────────────────────────────────
@@ -59,9 +59,27 @@ export async function listByTenant(req: Request, res: Response): Promise<void> {
   res.json({ data: documents });
 }
 
+// Erlaubte MIME-Typen für Magic-Bytes-Validierung
+const ALLOWED_MIMES = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "image/jpeg",
+  "image/png",
+]);
+
 export async function upload(req: Request, res: Response): Promise<void> {
   if (!req.file) {
     throw new BadRequestError("Keine Datei hochgeladen");
+  }
+
+  // Magic-Bytes-Validierung: MIME-Typ aus Dateiinhalt prüfen (unabhängig vom Client)
+  const detected = await fileTypeFromFile(req.file.path);
+  if (!detected || !ALLOWED_MIMES.has(detected.mime)) {
+    try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+    throw new BadRequestError(
+      "Dateiinhalt entspricht nicht dem erlaubten Typ. Erlaubt: PDF, DOCX, XLSX, JPG, PNG"
+    );
   }
 
   const ext = path.extname(req.file.originalname).toLowerCase();

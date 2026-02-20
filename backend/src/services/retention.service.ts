@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { prisma } from "../lib/prisma.js";
 import { logger } from "../lib/logger.js";
+import { deleteOldAuditLogs } from "./audit.service.js";
 
 /**
  * DSGVO Art. 17 / Art. 5(1)(e) - Aufbewahrungsfristen
@@ -58,6 +59,9 @@ export function startRetentionCleanup(): void {
     Promise.all([
         cleanupExpiredDocuments(),
         cleanupExpiredRefreshTokens(),
+        deleteOldAuditLogs(90).then((count) => {
+            if (count > 0) logger.info({ count }, "[DSGVO-CLEANUP] Alte Audit-Logs geloescht (>90 Tage)");
+        }),
     ]).catch((err) => logger.error({ err }, "[CLEANUP] Fehler beim initialen Cleanup"));
 
     // Dann stuendlich
@@ -65,6 +69,9 @@ export function startRetentionCleanup(): void {
         Promise.all([
             cleanupExpiredDocuments(),
             cleanupExpiredRefreshTokens(),
+            deleteOldAuditLogs(90).then((count) => {
+                if (count > 0) logger.info({ count }, "[DSGVO-CLEANUP] Alte Audit-Logs geloescht (>90 Tage)");
+            }),
         ]).catch((err) => logger.error({ err }, "[CLEANUP] Fehler beim periodischen Cleanup"));
     }, CLEANUP_INTERVAL_MS);
 

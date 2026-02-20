@@ -7,6 +7,7 @@ import {
   loginSchema,
   updateProfileSchema,
   updateNotificationPrefsSchema,
+  changePasswordSchema,
 } from "../schemas/auth.schema.js";
 import {
   registerHandler,
@@ -17,6 +18,7 @@ import {
   updateMeHandler,
   getNotificationPrefsHandler,
   updateNotificationPrefsHandler,
+  changePasswordHandler,
 } from "../controllers/auth.controller.js";
 
 const router = Router();
@@ -42,6 +44,15 @@ router.patch(
   requireAuth,
   validate({ body: updateNotificationPrefsSchema }),
   updateNotificationPrefsHandler
+);
+
+// Passwort ändern (rate-limited wie Login)
+router.patch(
+  "/me/password",
+  requireAuth,
+  authLimiter,
+  validate({ body: changePasswordSchema }),
+  changePasswordHandler
 );
 
 export { router as authRouter };

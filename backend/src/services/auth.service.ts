@@ -248,6 +248,32 @@ export async function getNotificationPrefs(userId: number) {
   return { ...DEFAULT_NOTIFICATION_PREFS, ...stored };
 }
 
+export async function changePassword(
+  userId: number,
+  currentPassword: string,
+  newPassword: string
+) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) {
+    throw new AppError(404, "Benutzer nicht gefunden");
+  }
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) {
+    throw new UnauthorizedError("Aktuelles Passwort ist falsch");
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, env.BCRYPT_COST);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash },
+  });
+
+  // Alle Refresh-Tokens widerrufen → erzwingt Re-Login auf allen Geräten
+  await prisma.refreshToken.deleteMany({ where: { userId } });
+}
+
 export async function updateNotificationPrefs(
   userId: number,
   data: Record<string, unknown>
