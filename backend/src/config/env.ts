@@ -20,4 +20,12 @@ export const env = {
   get SMTP_PASS() { return process.env.SMTP_PASS || ""; },
   get SMTP_FROM() { return process.env.SMTP_FROM || "noreply@immoverwalt.de"; },
   get ENCRYPTION_KEY() { return process.env.ENCRYPTION_KEY || ""; },  // 32-byte hex for AES-256 (DSGVO Art. 32)
+  // Bcrypt cost factor: 12+ empfohlen (OWASP 2026), konfigurierbar für künftige Hardware
+  get BCRYPT_COST() {
+    const cost = parseInt(process.env.BCRYPT_COST || "12", 10);
+    if (cost < 10 || cost > 15) throw new Error("BCRYPT_COST muss zwischen 10 und 15 liegen");
+    return cost;
+  },
+  // Anthropic API Key für KI-Belegscan (optional — Feature deaktiviert wenn nicht gesetzt)
+  get ANTHROPIC_API_KEY() { return process.env.ANTHROPIC_API_KEY || ""; },
 };

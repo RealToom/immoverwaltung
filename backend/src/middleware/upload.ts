@@ -5,13 +5,14 @@ import crypto from "node:crypto";
 import type { Request } from "express";
 import { env } from "../config/env.js";
 
-const ALLOWED_MIMES = new Set([
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "image/jpeg",
-  "image/png",
-]);
+// Whitelist: MIME-Typ → sichere Dateiendung (nie vom Client übernehmen)
+const MIME_TO_EXT: Record<string, string> = {
+  "application/pdf": ".pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+  "image/jpeg": ".jpg",
+  "image/png": ".png",
+};
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -34,13 +35,14 @@ const storage = multer.diskStorage({
     cb(null, dir);
   },
   filename(_req, file, cb) {
-    const ext = path.extname(file.originalname);
+    // Immer sichere Endung aus MIME-Whitelist verwenden — nie vom Client übernehmen
+    const ext = MIME_TO_EXT[file.mimetype] ?? ".bin";
     cb(null, `${crypto.randomUUID()}${ext}`);
   },
 });
 
 function fileFilter(_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) {
-  if (ALLOWED_MIMES.has(file.mimetype)) {
+  if (MIME_TO_EXT[file.mimetype]) {
     cb(null, true);
   } else {
     cb(new Error("Nicht unterstuetzter Dateityp. Erlaubt: PDF, DOCX, XLSX, JPG, PNG"));

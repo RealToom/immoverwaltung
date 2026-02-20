@@ -19,6 +19,22 @@ process.on("uncaughtException", (err) => {
 });
 
 async function main(): Promise<void> {
+  // Security-Validierungen beim Start
+  const isProd = env.NODE_ENV === "production";
+
+  if (!env.ENCRYPTION_KEY || env.ENCRYPTION_KEY.length < 64) {
+    if (isProd) {
+      logger.error("ENCRYPTION_KEY nicht gesetzt oder ungültig — Dokumente werden UNVERSCHLÜSSELT gespeichert. In Production PFLICHT!");
+      process.exit(1);
+    } else {
+      logger.warn("ENCRYPTION_KEY nicht gesetzt — Dokumente werden unverschlüsselt gespeichert (nur in Development akzeptabel)");
+    }
+  }
+
+  if (!env.ANTHROPIC_API_KEY) {
+    logger.warn("ANTHROPIC_API_KEY nicht gesetzt — KI-Belegscan-Feature ist deaktiviert");
+  }
+
   // Fail fast wenn DB nicht erreichbar
   try {
     await prisma.$queryRaw`SELECT 1`;

@@ -16,7 +16,7 @@ describe("GET /health", () => {
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("ok");
     expect(res.body.db).toBe("ok");
-    expect(res.body).toHaveProperty("timestamp");
+    // timestamp entfernt (Security: verhindert Server-Timing-Analyse)
   });
 
   it("antwortet mit 503 wenn DB nicht erreichbar", async () => {

@@ -23,3 +23,14 @@ export const apiLimiter = rateLimit({
   // Upload-Routen haben ihr eigenes Limit (multer begrenzt Dateigröße)
   skip: (req) => req.method === "GET",
 });
+
+// Strikter Limiter fuer sensitive Admin-Aktionen (Passwort-Reset, Account-Entsperren)
+export const adminActionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 Minuten
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Zu viele Admin-Aktionen. Bitte versuchen Sie es in 15 Minuten erneut.",
+  },
+});

@@ -13,7 +13,7 @@ export const createTransactionSchema = z.object({
   date: z.coerce.date(),
   description: z.string().min(1).max(500),
   type: z.enum(["EINNAHME", "AUSGABE"]),
-  amount: z.number().positive(),
+  amount: z.number().positive().multipleOf(0.01, { message: "Betrag maximal 2 Dezimalstellen (Cent-genau)" }),
   category: z.string().max(200).optional(),
   propertyId: z.number().int().positive().nullable().optional(),
 });

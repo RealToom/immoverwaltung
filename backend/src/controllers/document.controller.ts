@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import * as documentService from "../services/document.service.js";
 import { BadRequestError } from "../lib/errors.js";
 import { decryptFile, getOriginalExt } from "../lib/crypto.js";
+import { logger } from "../lib/logger.js";
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -19,18 +20,33 @@ const MIME_MAP: Record<string, string> = {
   ".png": "image/png",
 };
 
-// ─── DSGVO Audit Log ──────────────────────────────────────────
+// ─── Security Headers für Datei-Responses ─────────────────────
+function setSecureFileHeaders(res: Response): void {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("X-Frame-Options", "DENY");
+}
+
+// ─── DSGVO Audit Log (Pino structured logging) ─────────────────
 function auditLog(action: string, req: Request, details: Record<string, unknown> = {}): void {
-  const entry = {
-    timestamp: new Date().toISOString(),
+  logger.info({
+    audit: true,
     action,
     userId: req.user?.id,
     companyId: req.companyId,
     ip: req.ip,
     ...details,
-  };
-  // Structured log for audit trail (Art. 5 DSGVO - Nachweisbarkeit)
-  console.log(`[AUDIT] ${JSON.stringify(entry)}`);
+  }, `AUDIT: ${action}`);
+}
+
+// ─── Dateiname-Sanitization ────────────────────────────────────
+function sanitizeName(raw: string): string {
+  return raw
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")  // Gefährliche Zeichen ersetzen
+    .replace(/\.{2,}/g, ".")                   // Doppelpunkte (Path-Traversal) bereinigen
+    .trim()
+    .slice(0, 255);
 }
 
 export async function list(req: Request, res: Response): Promise<void> {
@@ -49,7 +65,8 @@ export async function upload(req: Request, res: Response): Promise<void> {
   }
 
   const ext = path.extname(req.file.originalname).toLowerCase();
-  const name = (req.body.name as string) || req.file.originalname;
+  const rawName = (req.body.name as string) || req.file.originalname;
+  const name = sanitizeName(rawName) || "Dokument";
 
   const propertyId = req.params.propertyId ? Number(req.params.propertyId) : undefined;
   const tenantId = req.params.tenantId ? Number(req.params.tenantId) : undefined;
@@ -100,18 +117,22 @@ export async function download(req: Request, res: Response): Promise<void> {
     documentName: doc.name,
   });
 
+  setSecureFileHeaders(res);
+
   // Handle encrypted files - decrypt in memory, stream to response
   if (doc.isEncrypted) {
     const decrypted = decryptFile(doc.filePath);
     const ext = getOriginalExt(doc.filePath);
     const mime = MIME_MAP[ext] || "application/octet-stream";
+    const safeName = sanitizeName(doc.name);
     res.setHeader("Content-Type", mime);
-    res.setHeader("Content-Disposition", `attachment; filename="${doc.name}"`);
+    res.setHeader("Content-Length", decrypted.length);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
     res.send(decrypted);
     return;
   }
 
-  res.download(doc.filePath, doc.name);
+  res.download(doc.filePath, sanitizeName(doc.name));
 }
 
 export async function preview(req: Request, res: Response): Promise<void> {
@@ -126,13 +147,18 @@ export async function preview(req: Request, res: Response): Promise<void> {
     documentName: doc.name,
   });
 
+  setSecureFileHeaders(res);
+
+  const safeName = sanitizeName(doc.name);
+
   // Handle encrypted files - decrypt in memory, stream to response
   if (doc.isEncrypted) {
     const decrypted = decryptFile(doc.filePath);
     const ext = getOriginalExt(doc.filePath);
     const contentType = MIME_MAP[ext] || "application/octet-stream";
     res.setHeader("Content-Type", contentType);
-    res.setHeader("Content-Disposition", `inline; filename="${doc.name}"`);
+    res.setHeader("Content-Length", decrypted.length);
+    res.setHeader("Content-Disposition", `inline; filename="${safeName}"`);
     res.send(decrypted);
     return;
   }
@@ -140,7 +166,7 @@ export async function preview(req: Request, res: Response): Promise<void> {
   const ext = path.extname(doc.filePath).toLowerCase();
   const contentType = MIME_MAP[ext] || "application/octet-stream";
   res.setHeader("Content-Type", contentType);
-  res.setHeader("Content-Disposition", `inline; filename="${doc.name}"`);
+  res.setHeader("Content-Disposition", `inline; filename="${safeName}"`);
   res.sendFile(path.resolve(doc.filePath));
 }
 

@@ -1,5 +1,7 @@
 import bcrypt from "bcrypt";
+import { randomBytes } from "node:crypto";
 import { prisma } from "../lib/prisma.js";
+import { env } from "../config/env.js";
 import { AppError, NotFoundError } from "../lib/errors.js";
 import type { UserRole } from "@prisma/client";
 
@@ -9,13 +11,24 @@ function sanitize(user: Record<string, unknown>) {
 }
 
 function generatePassword(): string {
-  const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#";
-  let pw = "";
-  for (let i = 0; i < 12; i++) {
-    pw += chars[Math.floor(Math.random() * chars.length)];
-  }
-  // Ensure complexity: uppercase + lowercase + digit always present
-  return pw.replace(/.$/, "X").replace(/..$/, "9").replace(/...$/, "a");
+  const lower  = "abcdefghijkmnpqrstuvwxyz";
+  const upper  = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const special = "!@#$";
+  const all = lower + upper + digits + special;
+
+  // Cryptographically secure random bytes (Node.js crypto module)
+  const bytes = randomBytes(12);
+  const pwArr = Array.from(bytes, (b) => all[b % all.length]);
+
+  // Guarantee at least one of each character class at fixed positions
+  const pos = Array.from(randomBytes(4), (b) => b % 12);
+  pwArr[pos[0]] = lower[randomBytes(1)[0] % lower.length];
+  pwArr[pos[1]] = upper[randomBytes(1)[0] % upper.length];
+  pwArr[pos[2]] = digits[randomBytes(1)[0] % digits.length];
+  pwArr[pos[3]] = special[randomBytes(1)[0] % special.length];
+
+  return pwArr.join("");
 }
 
 export async function listUsers(companyId: number) {
@@ -50,7 +63,7 @@ export async function createUser(
     throw new AppError(409, "E-Mail wird bereits verwendet");
   }
 
-  const passwordHash = await bcrypt.hash(data.password, 10);
+  const passwordHash = await bcrypt.hash(data.password, env.BCRYPT_COST);
 
   const user = await prisma.user.create({
     data: {

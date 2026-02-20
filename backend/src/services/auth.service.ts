@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { env } from "../config/env.js";
 import {
   signAccessToken,
   signRefreshToken,
@@ -41,7 +42,7 @@ export async function register(
 
   const slug = slugify(companyName);
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, env.BCRYPT_COST);
 
   const user = await prisma.user.create({
     data: {
