@@ -8,5 +8,6 @@ export function tenantGuard(req: Request, _res: Response, next: NextFunction): v
   }
 
   req.companyId = req.user.companyId;
+  req.userId = req.user.id;
   next();
 }

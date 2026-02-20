@@ -16,6 +16,7 @@ import { companyRouter } from "./company.routes.js";
 
 import { bankRouter } from "./bank.routes.js";
 import { userRouter } from "./user.routes.js";
+import { calendarRouter } from "./calendar.routes.js";
 
 const router = Router();
 
@@ -39,5 +40,6 @@ router.use("/dashboard", requireAuth, tenantGuard, dashboardRouter);
 router.use("/company", requireAuth, tenantGuard, companyRouter);
 router.use("/bank-accounts", requireAuth, tenantGuard, bankRouter);
 router.use("/users", requireAuth, tenantGuard, userRouter);
+router.use("/calendar", requireAuth, tenantGuard, calendarRouter);
 
 export { router as apiRouter };
