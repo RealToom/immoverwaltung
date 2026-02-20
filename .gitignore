@@ -21,5 +21,8 @@ nul
 .playwright-mcp/
 .claude/
 
+# Git worktrees
+.worktrees/
+
 # Uploads (user data, not source code)
 backend/uploads/
