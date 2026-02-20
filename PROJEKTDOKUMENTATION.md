@@ -1,7 +1,7 @@
 # Immoverwaltung - Projektdokumentation
 
-> **Letzte Aktualisierung:** 2026-02-19
-> **Status:** Nebenkostenabrechnung (F6) + ROI-Dashboard (F9) implementiert
+> **Letzte Aktualisierung:** 2026-02-20
+> **Status:** Production-Ready — alle Security-Items behoben, CI/CD, Backup, Passwort-Ändern, AuditLog-DB
 
 ## Roadmap / Zukünftige Features
 
@@ -49,6 +49,38 @@
 ---
 
 ## Changelog
+
+### 2026-02-20: Production-Readiness + Security-Hardening Runde 3
+
+**Production-Readiness:**
+- `docker-compose.yml`: `ENCRYPTION_KEY` jetzt Pflicht (`:?`), neue Env-Vars `ANTHROPIC_API_KEY` + `BCRYPT_COST`, Log-Rotation (json-file, max 10 MB, 3-5 Dateien), Resource-Limits (Memory/CPU) für alle 3 Container
+- `backend/.env.example`: `ANTHROPIC_API_KEY` + `BCRYPT_COST` dokumentiert
+- `email.service.ts`: `sendTempPasswordEmail()` — sendet HTML-E-Mail mit temporärem Passwort nach Admin-Reset
+- `user.service.ts`: Passwort-Reset ruft E-Mail non-blocking auf (stumm bei fehlendem SMTP)
+- `.github/workflows/ci.yml`: GitHub Actions CI — Backend (tsc + 19 Tests mit PG service), Frontend (tsc + 9 Tests), Docker-Build-Validierung auf master-Push
+- `scripts/backup.sh`: Automatisierter `pg_dump` (gzip, Zeitstempel, 30-Tage-Retention, Container-Health-Check)
+- `DEPLOYMENT.md`: Produktions-Checkliste (Pflichtfelder, Secret-Generierung, SSL/Certbot, Backup-Cron, Monitoring)
+
+**Security N2 — SameSite=Strict:**
+- `auth.controller.ts`: Refresh-Cookie von `SameSite=Lax` auf `SameSite=Strict` (Frontend + API gleiche Domain via nginx)
+
+**Security N4 — Magic-Bytes-Validierung:**
+- `document.controller.ts`: `fileTypeFromFile()` prüft Dateiinhalt nach Multer-Upload; bei ungültigem Typ wird Datei gelöscht + 400 zurückgegeben
+
+**Security N6 — Audit-Log in Datenbank (DSGVO Art. 5):**
+- Neues Prisma-Model `AuditLog` + Migration `20260220000001_add_audit_logs`
+- `audit.service.ts`: `createAuditLog()` (non-blocking, Pino-Fallback), `deleteOldAuditLogs(90)` für Retention
+- `retention.service.ts`: stündliche Audit-Log-Bereinigung (> 90 Tage) integriert
+- `document.controller.ts`: Audit-Events landen jetzt in Pino **und** persistent in DB
+
+**Passwort-Ändern-Feature:**
+- `auth.schema.ts`: `changePasswordSchema` (currentPassword + newPassword mit Komplexitätsprüfung)
+- `auth.service.ts`: `changePassword()` — bcrypt verify, Hash neu, alle Refresh-Tokens widerrufen
+- `auth.controller.ts`: `changePasswordHandler` — löscht Cookie nach Erfolg
+- `auth.routes.ts`: `PATCH /api/auth/me/password` (requireAuth + authLimiter)
+- `Settings.tsx`: neuer Tab "Sicherheit" — Formular mit Show/Hide-Toggle, Bestätigungsfeld, Auto-Logout nach Erfolg
+
+---
 
 ### 2026-02-19: Benutzerverwaltungs-Panel (Admin)
 
@@ -184,8 +216,11 @@
 | Logging | Pino + pino-http | 10.x / 11.x |
 | Tests | vitest + supertest | 3.x / 7.x |
 | File-Upload | multer | 1.x |
+| File-Validierung | file-type | 21.x (Magic Bytes) |
 | E-Mail | nodemailer | 6.x |
+| KI-Scan | Anthropic Claude Haiku | Vision-API |
 | Dev-Server | tsx (watch mode) | 4.x |
+| CI/CD | GitHub Actions | - |
 
 ### Multi-Tenancy
 
@@ -282,28 +317,35 @@ immoverwaltung/
 | Login | `/login` | API | Login + Registrierung mit JWT Auth |
 | Dashboard | `/` | API | 4 KPI-Karten, Immobilien-Tabelle, Schnellaktionen, Aktivitaets-Feed |
 | Immobilien | `/properties` | API | Liste/Grid-Ansicht, Suche, Statusfilter, Belegungsstatistik |
-| Immobilien-Detail | `/properties/:id` | API | Tabs: Einheiten, Mieter, Dokumente |
+| Immobilien-Detail | `/properties/:id` | API | Tabs: Einheiten, Dokumente, Nebenkosten (allocatable Ausgaben + Jahresabrechnung) |
 | Mieter | `/tenants` | API | Mieterliste, Suche, Immobilien-Filter, Mieter-Hinzufuegen-Dialog |
 | Vertraege | `/contracts` | API | Vertragsliste, Filter (Status/Typ/Objekt), Erinnerungen, Vertrag-Anlegen-Dialog |
-| Wartung | `/maintenance` | API | Ticket-Liste, Erstellen-Dialog, Detail-Bearbeitung (Status/Zugewiesen/Kosten/Notizen), Prioritaeten |
-| Finanzen | `/finances` | API | Einnahmen/Ausgaben-Charts, Transaktionsliste, KPIs, Zeitraum-Filter, Mieteingangsquote |
+| Wartung | `/maintenance` | API | Ticket-Liste, Erstellen-Dialog, Detail-Bearbeitung (alle Felder editierbar), Prioritaeten |
+| Finanzen | `/finances` | API | Tabs: Übersicht (Charts, KPIs, Transaktionen, KI-Belegscan), Rendite (Brutto/Netto/EK pro Objekt) |
 | Berichte | `/reports` | API | Belegung, Umsatz, Umsatz/qm, Wartungskosten (Charts) |
 | Benachrichtigungen | `/notifications` | API | Vertrags- & Ticket-Benachrichtigungen, Filter nach Typ/Dringlichkeit |
 | Bankanbindung | `/bank` | Mock/API | Bankkonten verwalten, Transaktions-Import (CSV), Kontostand-Übersicht |
-| Einstellungen | `/settings` | API | Profil, E-Mail/Push-Benachrichtigungen, Theme (localStorage), App-Konfiguration, Firmendaten |
+| Benutzerverwaltung | `/users` | API | CRUD Benutzer, Rollen, Passwort-Reset, Account-Entsperren (ADMIN only) |
+| Einstellungen | `/settings` | API | Profil, Benachrichtigungen, Darstellung (Theme), App-Config, Firmendaten, **Sicherheit (Passwort ändern)** |
 
 ### Backend (abgeschlossen)
 
-- [x] PostgreSQL via Docker + Prisma Schema (12 Models inkl. RentPayment + UnitType Enum)
+- [x] PostgreSQL via Docker + Prisma Schema (13 Models + UnitType Enum inkl. AuditLog, RentPayment)
 - [x] REST-API mit Express 5
-- [x] JWT-Authentifizierung (Access + Refresh Token)
+- [x] JWT-Authentifizierung (Access + Refresh Token, SameSite=Strict)
 - [x] CRUD fuer alle Entitaeten (Properties, Units, Tenants, Contracts, Maintenance, Documents)
 - [x] Dashboard-Stats & Finance-Endpunkte
 - [x] Multi-Tenancy (Shared DB + companyId)
 - [x] Seed-Daten mit allen Mock-Daten aus dem Frontend
-- [x] Datei-Upload (Dokumente) - multer + diskStorage, Upload/Download/Preview/Delete
-- [x] E-Mail-Benachrichtigungen - nodemailer SMTP, event-basiert (Vertraege, Wartung, Finanzen)
+- [x] Datei-Upload (Dokumente) - multer + diskStorage, Magic-Bytes-Validierung, Upload/Download/Preview/Delete
+- [x] E-Mail-Benachrichtigungen - nodemailer SMTP (Vertraege, Wartung, Finanzen, Passwort-Reset)
 - [x] Mieter-Dokumente - Dokumente koennen direkt an Mieter angehaengt werden (Schufa, Mietvertrag etc.)
+- [x] Benutzerverwaltung - CRUD + Passwort-Reset + Account-Entsperren (ADMIN)
+- [x] Passwort-Ändern - PATCH /me/password (alle Refresh-Tokens widerrufen bei Erfolg)
+- [x] KI-Belegscan - POST /finance/scan via Claude Haiku Vision
+- [x] Nebenkostenabrechnung - PATCH /transactions/:id (allocatable) + GET /utility-statement
+- [x] ROI-Dashboard - GET /finance/roi (Brutto/Netto/EK-Rendite)
+- [x] DSGVO Audit-Log in DB (AuditLog Model, 90-Tage-Retention)
 - [ ] PDF-Export (Berichte)
 
 ### Frontend-Backend-Integration (Phase 2 - abgeschlossen)
@@ -322,30 +364,36 @@ immoverwaltung/
 - [x] Keine verbleibenden Mock-Daten (Darstellungs-Tab nutzt localStorage — geraetespezifisch)
 - [x] Phase 7: Dokument-Preview (Blob-basiert mit Auth), Ticket-Bearbeitung, Unit-Typen, Adress-Aufspaltung
 
-### Security-Haertung (abgeschlossen)
+### Security-Haertung (abgeschlossen — alle LOW+ Items behoben)
 
-- [x] Rate-Limiting auf Auth-Endpunkten (max 10 Anfragen/15 Min pro IP)
-- [x] Rate-Limiting auf allen Schreib-Endpunkten (`apiLimiter`: 200 Req/min pro IP)
-- [x] Passwort-Komplexitaet (mind. 1 Gross-/Kleinbuchstabe + 1 Ziffer)
-- [x] CORS aus Umgebungsvariable (`CORS_ORIGINS`, Fallback auf localhost)
-- [x] Strukturiertes JSON-Logging mit Pino + pino-http
-- [x] RBAC: `requireRole()` Middleware auf allen Schreib-Endpunkten
-- [x] Account-Lockout nach 10 Fehlversuchen (30 Min Sperre)
-- [x] Refresh-Token in DB mit Rotation + Revocation bei Logout + automatische Bereinigung abgelaufener Tokens
-- [x] `as never` Type-Casts entfernt, typisierte Interfaces in Services
+- [x] Rate-Limiting: `authLimiter` (10 Req/15min) auf Auth, `apiLimiter` (200 Req/min) auf Schreib-Endpunkten, `adminActionLimiter` (5 Req/15min) auf Admin-Aktionen
+- [x] Passwort-Komplexitaet + bcrypt-Cost konfigurierbar (Default 12)
+- [x] CORS aus Env (`CORS_ORIGINS`), Wildcard verboten in Production
+- [x] Pino strukturiertes JSON-Logging (inkl. pino-http)
+- [x] RBAC: `requireRole()` auf allen Schreib-Endpunkten
+- [x] Account-Lockout: 10 Fehlversuche → 30 Min Sperre
+- [x] Refresh-Token: DB-gespeichert, Rotation, Revocation, automatische Bereinigung, SameSite=Strict
+- [x] Passwort-Aenderung widerruft alle Refresh-Tokens (Re-Login auf allen Geraeten)
+- [x] ENCRYPTION_KEY Pflichtfeld in Production (Startup-Validierung)
+- [x] Security-Headers: HSTS, Referrer-Policy, X-Content-Type-Options, X-Frame-Options (Pino + nginx)
+- [x] Dateiname-Sanitization, Extension aus MIME-Whitelist (nie vom Client), Magic-Bytes-Validierung
+- [x] Betrag Cent-genau (`.multipleOf(0.01)`), Health ohne Timestamp
+- [x] DSGVO Audit-Log: Pino + DB-Persistenz (AuditLog Model, 90-Tage-Retention)
+- [x] Kryptografisch sichere Passwort-Generierung (`crypto.randomBytes()`)
 
 ### Production-Hardening (abgeschlossen)
 
-- [x] Datenbankmigrationen vervollstaendigt (Phase-7-Aenderungen in Migration erfasst)
-- [x] `Document.companyId` - direkte Multi-Tenancy-Absicherung statt fragiler Join-Kette
-- [x] Graceful Shutdown (SIGTERM/SIGINT Handler, 10s Timeout)
-- [x] `unhandledRejection` / `uncaughtException` Handler - kein stiller Absturz
-- [x] DB-Check beim Start (fail-fast: `SELECT 1` vor `app.listen`)
-- [x] Health-Endpoint prueft aktiv DB-Verbindung (503 bei DB-Ausfall)
-- [x] HTTPS in nginx konfiguriert (HTTP→HTTPS Redirect, TLS 1.2/1.3, HSTS)
-- [x] nginx Security Headers (X-Content-Type-Options, X-Frame-Options, CSP, HSTS, Referrer-Policy)
-- [x] React ErrorBoundary in main.tsx (kein weisser Bildschirm bei Frontend-Fehlern)
-- [x] docker-compose Secrets mit `:?` Syntax (fehlende Werte brechen Start ab)
+- [x] Datenbankmigrationen vervollstaendigt (alle Schema-Aenderungen in Migrations)
+- [x] `Document.companyId` - direkte Multi-Tenancy-Absicherung
+- [x] Graceful Shutdown (SIGTERM/SIGINT, 10s Timeout), unhandledRejection Handler
+- [x] DB-Check beim Start (fail-fast), Health-Endpoint prueft DB-Verbindung (503)
+- [x] HTTPS nginx (HTTP→HTTPS, TLS 1.3, HSTS), SSL-Zertifikat-Volume-Mount
+- [x] React ErrorBoundary (kein weisser Bildschirm), ThemeProvider ausserhalb ErrorBoundary
+- [x] docker-compose: ENCRYPTION_KEY Pflicht, Log-Rotation, Resource-Limits, ANTHROPIC_API_KEY + BCRYPT_COST
+- [x] GitHub Actions CI: Backend-Tests + TSC + Frontend-Tests + TSC + Docker-Build
+- [x] Backup-Script: `scripts/backup.sh` (pg_dump, gzip, 30-Tage-Retention, Cronjob-ready)
+- [x] E-Mail Passwort-Reset: `sendTempPasswordEmail()` nach Admin-Reset
+- [x] DEPLOYMENT.md: Produktions-Checkliste (Secrets, SSL/Certbot, Backup-Cron, Monitoring)
 - [x] 19 Backend Unit-Tests (errors, jwt, crypto, health via vitest + supertest)
 - [x] 9 Frontend Unit-Tests (ErrorBoundary, ApiError via vitest + @testing-library)
 
@@ -466,6 +514,19 @@ immoverwaltung/
 | lastSync | DateTime | string (ISO) | Letzte Synchronisation |
 | companyId | Int (FK) | - | Multi-Tenancy |
 
+### AuditLog (DSGVO Art. 5 — Nachweisbarkeit)
+| Feld | Typ (DB) | Beschreibung |
+|------|----------|--------------|
+| id | Int (autoincrement) | Eindeutige ID |
+| action | String | DOCUMENT_UPLOAD, DOCUMENT_DOWNLOAD, DOCUMENT_DELETE, PASSWORD_CHANGE, ... |
+| userId | Int? | Ausführender Benutzer (keine FK → bleibt auch nach User-Löschung) |
+| companyId | Int? | Firma (keine FK → kein Cascade) |
+| ip | String? | IP-Adresse des Anfragenden |
+| details | Json | Kontext (documentId, fileName, propertyId, ...) |
+| createdAt | DateTime | Zeitstempel |
+
+Retention: automatische Löschung nach 90 Tagen via `retention.service.ts` (stündlich).
+
 ### Enum-Mapping (Backend -> Frontend)
 
 | Backend (DB) | Frontend (UI) | Kontext |
@@ -493,15 +554,16 @@ Vollstaendige Mapping-Tabellen in `src/lib/mappings.ts`.
 
 Base-URL: `http://localhost:3001/api`
 
-### Auth (oeffentlich)
+### Auth (oeffentlich / geschuetzt)
 | Method | Pfad | Beschreibung |
 |--------|------|--------------|
 | POST | /api/auth/register | Registrierung (erstellt Firma + Admin) |
 | POST | /api/auth/login | Login, gibt Access+Refresh Token |
-| POST | /api/auth/refresh | Access Token erneuern |
-| POST | /api/auth/logout | Abmelden |
+| POST | /api/auth/refresh | Access Token erneuern (rate-limited) |
+| POST | /api/auth/logout | Abmelden (widerruft Refresh-Token) |
 | GET | /api/auth/me | Eigenes Profil abrufen |
 | PATCH | /api/auth/me | Profil aktualisieren |
+| PATCH | /api/auth/me/password | Passwort aendern (rate-limited, widerruft alle Tokens) |
 | GET | /api/auth/me/notifications | Benachrichtigungs-Einstellungen |
 | PATCH | /api/auth/me/notifications | Benachrichtigungen aktualisieren |
 
@@ -560,6 +622,16 @@ Jeweils: GET /, GET /:id, POST /, PATCH /:id, DELETE /:id
 | POST | /api/bank-accounts/:id/sync | Bankkonto synchronisieren (Mock) |
 | POST | /api/bank-accounts/import | CSV-Transaktionen importieren |
 
+### Users (geschuetzt — ADMIN)
+| Method | Pfad | Beschreibung |
+|--------|------|--------------|
+| GET | /api/users | Alle Firmen-Benutzer (ADMIN + VERWALTER) |
+| POST | /api/users | Benutzer anlegen (ADMIN) |
+| PATCH | /api/users/:id | Name/Rolle/Telefon aendern (ADMIN) |
+| DELETE | /api/users/:id | Benutzer loeschen (ADMIN; nicht sich selbst, nicht letzter Admin) |
+| POST | /api/users/:id/reset-password | Temp-Passwort generieren + E-Mail (ADMIN, rate-limited) |
+| POST | /api/users/:id/unlock | Account-Sperre aufheben (ADMIN, rate-limited) |
+
 ### Dashboard + Finance (geschuetzt)
 | Method | Pfad | Beschreibung |
 |--------|------|--------------|
@@ -571,7 +643,11 @@ Jeweils: GET /, GET /:id, POST /, PATCH /:id, DELETE /:id
 | GET | /api/finance/expense-breakdown | Ausgaben gruppiert nach Kategorie |
 | GET | /api/finance/transactions | Transaktionsliste |
 | POST | /api/finance/transactions | Transaktion anlegen |
+| PATCH | /api/finance/transactions/:id | allocatable + category setzen (BUCHHALTER+) |
 | GET | /api/finance/rent-collection | Mieteingangsquote (pro Monat % puenktlich/verspaetet/ausstehend) |
+| GET | /api/finance/utility-statement | Nebenkostenabrechnung nach Wohnflaeche (?propertyId&year) |
+| GET | /api/finance/roi | Renditekennzahlen pro Immobilie (?year) |
+| POST | /api/finance/scan | KI-Belegscan via Claude Haiku Vision |
 
 ---
 
@@ -626,6 +702,13 @@ Jeweils: GET /, GET /:id, POST /, PATCH /:id, DELETE /:id
 | 2026-02-18 | Phase 7: Seed-Daten erweitert (32 Einheiten: 24 Wohnungen + 8 Stellplaetze/Garagen) |
 | 2026-02-18 | Production-Hardening T1: Migrationen, Document.companyId, Graceful Shutdown, DB-Check, Security Headers, ErrorBoundary |
 | 2026-02-18 | Production-Hardening T2: Pino Logging, HTTPS nginx, apiLimiter, RefreshToken-Cleanup, 28 Unit-Tests (vitest) |
+| 2026-02-19 | Security-Hardening Runde 2: adminActionLimiter, CORS-Wildcard-Block, crypto.randomBytes, BCRYPT_COST, MIME-Whitelist, Security-Headers Downloads, Dateiname-Sanitization, ENCRYPTION_KEY Validation, HSTS+Referrer-Policy |
+| 2026-02-19 | KI-Belegscan: POST /api/finance/scan (Claude Haiku Vision), Scan-Button in Finances.tsx |
+| 2026-02-19 | F6 Nebenkostenabrechnung: allocatable, PATCH /transactions/:id, GET /utility-statement, PropertyDetail Nebenkosten-Tab |
+| 2026-02-19 | F9 ROI-Dashboard: purchasePrice+equity auf Property, GET /finance/roi, Finanzen Rendite-Tab |
+| 2026-02-19 | Benutzerverwaltung: /api/users CRUD + reset-password + unlock, Users.tsx (ADMIN-only) |
+| 2026-02-20 | Production-Readiness: docker-compose (ENCRYPTION_KEY Pflicht, Log-Rotation, Resource-Limits), CI/CD GitHub Actions, scripts/backup.sh, sendTempPasswordEmail(), DEPLOYMENT.md Checkliste |
+| 2026-02-20 | Security-Hardening Runde 3: SameSite=Strict, Magic-Bytes (file-type), AuditLog-DB (N2/N4/N6), Passwort-Ändern Feature |
 
 ---
 
@@ -647,24 +730,29 @@ Jeweils: GET /, GET /:id, POST /, PATCH /:id, DELETE /:id
 
 ## 8.1 Production-Deployment Checkliste
 
-Docker-Deployment ist eingerichtet (siehe `DEPLOYMENT.md`). Status der einzelnen Punkte:
+Docker-Deployment ist eingerichtet (siehe `DEPLOYMENT.md` für vollständige Checkliste + Certbot-Anleitung).
 
-### Erledigt durch Docker-Setup
+### Erledigt
 
-- [x] **CORS_ORIGINS setzen** - In `.env` konfigurierbar, `.env.example` dokumentiert es. Docker-Compose uebergibt es ans Backend.
-- [x] **NODE_ENV=production** - Docker-Compose setzt `NODE_ENV=production` automatisch. Morgan `combined`, Error-Handler ohne Stacks, Cookie `Secure` Flag aktiv.
-- [x] **Secure + HttpOnly Cookies** - Funktioniert automatisch da `NODE_ENV=production` in Docker gesetzt.
-- [x] **Reverse Proxy** - nginx im Frontend-Container leitet `/api/*` ans Backend weiter. Backend ist nicht direkt erreichbar.
-- [x] **DB nicht oeffentlich erreichbar** - Port 5432 nur auf `127.0.0.1` gebunden. DB-Passwort ueber `.env` konfigurierbar.
-- [x] **Backup-Strategie** - `pg_dump` Befehl in DEPLOYMENT.md dokumentiert.
-- [x] **Logging in Production** - Morgan `combined` Format auf stdout. Docker faengt Logs (`docker compose logs`).
+- [x] **CORS_ORIGINS** - In `.env` Pflicht, Wildcard in Production verboten
+- [x] **NODE_ENV=production** - Docker-Compose setzt es automatisch (Cookie Secure-Flag, Error-Handler ohne Stack)
+- [x] **Secure + HttpOnly + SameSite=Strict Cookies** - automatisch in Production
+- [x] **Reverse Proxy** - nginx leitet `/api/*` ans Backend weiter (Backend nicht direkt erreichbar)
+- [x] **DB nicht oeffentlich erreichbar** - Port 5432 nur auf `127.0.0.1` gebunden
+- [x] **ENCRYPTION_KEY Pflicht** - docker-compose bricht bei fehlendem Key ab
+- [x] **Log-Rotation** - JSON-File-Driver, max 10 MB / 3-5 Dateien pro Container
+- [x] **Resource-Limits** - Memory + CPU-Limits fuer alle Container
+- [x] **HTTPS nginx** - HTTP→HTTPS Redirect, TLS 1.2/1.3, HSTS, Security-Headers
+- [x] **Automatisierte Backups** - `scripts/backup.sh` (pg_dump, gzip, 30-Tage-Retention)
+- [x] **CI/CD** - GitHub Actions (Tests + Docker-Build bei jedem Push)
+- [x] **DSGVO Audit-Log** - DB-persistent, 90-Tage-Retention automatisch
 
 ### Noch offen (je nach Einsatz)
 
-- [x] **HTTPS** - nginx-Config mit HTTP→HTTPS Redirect (Port 80→443), TLS 1.2/1.3, HSTS. SSL-Zertifikat-Pfad via `SSL_CERT_PATH` Env-Variable (`${SSL_CERT_PATH:-./ssl}:/etc/nginx/ssl:ro`).
-- [ ] **SSL-Zertifikat bereitstellen** - Zertifikat + Key unter `SSL_CERT_PATH` ablegen (z.B. Let's Encrypt via certbot). Pfade in nginx.conf: `ssl_certificate /etc/nginx/ssl/fullchain.pem`.
-- [ ] **Firewall-Regeln** - Nur relevant wenn der PC im oeffentlichen Netz steht. Fuer lokales Netzwerk reicht die Windows/Linux Firewall mit Port 80/443.
-- [ ] **Automatisierte Backups** - Manueller `pg_dump` dokumentiert. Fuer regelmaessige Backups: Cronjob einrichten.
+- [ ] **SSL-Zertifikat** - `certbot certonly --standalone -d DOMAIN`, dann `SSL_CERT_PATH` setzen (Anleitung in DEPLOYMENT.md)
+- [ ] **SMTP konfigurieren** - fuer E-Mail-Benachrichtigungen + Passwort-Reset-E-Mails
+- [ ] **Monitoring** - z.B. UptimeRobot: GET `/health` alle 5 Min, Alert bei Status != 200
+- [ ] **Firewall** - Nur Port 80/443 freigeben (5432 ist bereits gesichert)
 
 ---
 
@@ -676,19 +764,19 @@ Das gesamte Projekt muss sich an die Richtlinien von [https://gdpr.eu/](https://
 
 ## 9. Notizen
 
-- Frontend ist komplett auf Deutsch lokalisiert
+- Frontend komplett auf Deutsch lokalisiert, Dark Mode (next-themes)
 - React Query Hooks mit automatischer Cache-Invalidierung bei Mutationen
 - Seed-Daten: 5 Immobilien, 32 Einheiten (24 Wohnungen + 8 Garagen/Stellplaetze), 17 Mieter, 17 Vertraege, 12 Wartungstickets, 128 Mietzahlungen
-- Frontend Dev-Server laeuft auf Port 8080 (Vite Proxy leitet /api an Port 3001 weiter)
-- Backend Dev-Server laeuft auf Port 3001
-- Dark Mode wird unterstuetzt (next-themes)
-- PostgreSQL laeuft via Docker auf Port 5432
 - Login: admin@immoverwalt.de / Admin123!
+- Frontend Dev-Server Port 8080 (Vite Proxy /api → 3001), Backend Port 3001
+- PostgreSQL via Docker Port 5432
 - Backend starten: `cd backend && docker-compose up -d && npm run db:migrate && npm run db:seed && npm run dev`
-- Frontend starten: `cd cozy-estate-central && npm install && npm run dev`
+- Frontend starten: `cd cozy-estate-central && npm run dev`
 - Backend Tests: `cd backend && npm test` (19 Tests in 4 Suites)
-- Frontend Tests: `cd cozy-estate-central && npm test` (9 Tests in 2 Suites)
-- Backend Test-Coverage: `cd backend && npm run test:coverage`
+- Frontend Tests: `cd cozy-estate-central && npm test` (9 Tests in 3 Suites)
 - API-Client: Automatischer Token-Refresh bei 401, Redirect zu /login bei fehlgeschlagenem Refresh
-- Backend-Enums sind SCREAMING_SNAKE_CASE, Frontend zeigt deutsche Labels (Mapping in src/lib/mappings.ts)
-- Alle Seiten nutzen API-Daten (Theme/autoSave-Toggle bleiben in localStorage)
+- Backend-Enums SCREAMING_SNAKE_CASE, Frontend zeigt deutsche Labels (Mapping in src/lib/mappings.ts)
+- Alle Seiten nutzen API-Daten (nur Theme/autoSave in localStorage)
+- GitHub-Repository: https://github.com/RealToom/immoverwaltung (Monorepo mit backend/ + cozy-estate-central/)
+- CI/CD: GitHub Actions auf jedem Push zu master (Tests + Docker-Build-Validierung)
+- Backup-Script: `scripts/backup.sh` — bereit fuer Cronjob (pg_dump, gzip, 30-Tage-Retention)

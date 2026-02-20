@@ -90,9 +90,15 @@ npm test                      # Unit-Tests ausfuehren (vitest)
 ## Aktueller Status
 
 - Phase 1 (Backend): Abgeschlossen - alle CRUD-Endpunkte implementiert
-- Phase 2 (Frontend-Integration): Abgeschlossen - Login, Properties, PropertyDetail, Tenants, Contracts, Maintenance auf API umgestellt
-- Phase 3 (Mock-Bereinigung): Abgeschlossen - Dashboard, Finances, Reports, Notifications auf API umgestellt
-- Security-Haertung: Abgeschlossen - Rate-Limiting, RBAC, Account-Lockout, Refresh-Token-DB, Passwort-Komplexitaet, CORS env, Pino Logging, Type-Safety
-- Phase 4: Abgeschlossen - Settings auf API (Profil, Benachrichtigungen, Firmendaten, App-Config), RentPayment-Model + Mieteingangsquote-Chart auf API. Keine Mock-Daten mehr.
-- Phase 7: Abgeschlossen - Dokument-Preview (Blob-Auth), Ticket-Bearbeitung (PATCH), Unit-Typen (WOHNUNG/GARAGE/STELLPLATZ), Adresse aufgeteilt (street/zip/city), Multi-Unit pro Mieter
-- Production-Hardening: Abgeschlossen - Migrationen vervollstaendigt, Document.companyId, Graceful Shutdown, unhandledRejection, DB-Check beim Start, Pino Logging, HTTPS+nginx, apiLimiter, RefreshToken-Cleanup, React ErrorBoundary, docker-compose Secrets, 28 Unit-Tests (vitest)
+- Phase 2 (Frontend-Integration): Abgeschlossen - alle Seiten auf API umgestellt, keine Mock-Daten
+- Phase 3 (Mock-Bereinigung): Abgeschlossen
+- Phase 4 (Settings + RentPayment): Abgeschlossen
+- Phase 7 (Dokument-Preview, Ticket-Bearbeitung, Unit-Typen, Adress-Aufspaltung): Abgeschlossen
+- Production-Hardening: Abgeschlossen - Migrationen, Graceful Shutdown, HTTPS+nginx, Tests (19+9)
+- Security-Haertung Runde 1+2: Abgeschlossen - Rate-Limiting (auth/api/admin), RBAC, Account-Lockout, Refresh-Token-DB, Passwort-Komplexitaet, CORS, Pino, HSTS, BCRYPT_COST, MIME-Whitelist, Magic-Bytes, SameSite=Strict, AuditLog-DB
+- KI-Belegscan: Abgeschlossen - POST /api/finance/scan (Claude Haiku Vision)
+- F6 Nebenkostenabrechnung: Abgeschlossen - allocatable, utility-statement
+- F9 ROI-Dashboard: Abgeschlossen - purchasePrice+equity, /finance/roi, Rendite-Tab
+- Benutzerverwaltung: Abgeschlossen - /api/users CRUD + reset-password + unlock, Users.tsx
+- Production-Readiness: Abgeschlossen - docker-compose Haertung, GitHub Actions CI, backup.sh, E-Mail Passwort-Reset, DEPLOYMENT.md Checkliste
+- Passwort-Aendern: Abgeschlossen - PATCH /api/auth/me/password + Settings Sicherheit-Tab
