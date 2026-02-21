@@ -27,9 +27,11 @@ import { useProperty, useUpdateProperty, useCreateUnit, useUpdateUnit } from "@/
 import { useTenants } from "@/hooks/api/useTenants";
 import { useUploadDocument, useDeleteDocument, useDownloadDocument, usePreviewDocument } from "@/hooks/api/useDocuments";
 import { useTransactions, useUpdateTransaction, useUtilityStatement } from "@/hooks/api/useFinance";
+import { useMeters, useCreateMeter, useAddMeterReading, useDeleteMeter } from "@/hooks/api/useMeters";
 import { mapPropertyStatus, mapUnitStatus, mapUnitType, formatDate, formatCurrency } from "@/lib/mappings";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { Gauge } from "lucide-react";
 
 const PREVIEWABLE_TYPES = new Set(["PDF", "JPG", "JPEG", "PNG"]);
 
@@ -45,6 +47,22 @@ const PropertyDetail = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", street: "", zip: "", city: "", status: "", purchasePrice: "", equity: "" });
   const updatePropertyMutation = useUpdateProperty(propertyId);
+
+  // Meter state
+  const { data: metersRes } = useMeters(propertyId);
+  const meters = metersRes ?? [];
+  const [addMeterOpen, setAddMeterOpen] = useState(false);
+  const [newMeter, setNewMeter] = useState({ label: "", type: "STROM", unitId: "" });
+  const [addReadingMeterId, setAddReadingMeterId] = useState<number | null>(null);
+  const [newReading, setNewReading] = useState({ value: "", readAt: new Date().toISOString().slice(0, 10), note: "" });
+  const createMeterMutation = useCreateMeter(propertyId);
+  const addReadingMutation = useAddMeterReading(addReadingMeterId ?? 0, propertyId);
+  const deleteMeterMutation = useDeleteMeter(propertyId);
+
+  const METER_TYPE_LABELS: Record<string, string> = {
+    STROM: "Strom (kWh)", WASSER: "Wasser (m³)", GAS: "Gas (m³)",
+    WAERME: "Wärme (kWh)", SONSTIGES: "Sonstiges",
+  };
 
   // Nebenkosten state
   const [nebenkostenYear, setNebenkostenYear] = useState(new Date().getFullYear());
@@ -394,6 +412,10 @@ const PropertyDetail = () => {
             <TabsTrigger value="nebenkosten" className="gap-1.5">
               <BarChart3 className="h-4 w-4" />
               Nebenkosten
+            </TabsTrigger>
+            <TabsTrigger value="zaehler" className="gap-1.5">
+              <Gauge className="h-4 w-4" />
+              Zähler
             </TabsTrigger>
           </TabsList>
 
@@ -783,8 +805,158 @@ const PropertyDetail = () => {
               )}
             </div>
           </TabsContent>
+
+          {/* Zähler Tab */}
+          <TabsContent value="zaehler">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-heading font-semibold">Zähler & Ablesungen</h3>
+                <Button size="sm" onClick={() => setAddMeterOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1" /> Zähler hinzufügen
+                </Button>
+              </div>
+              {meters.length === 0 ? (
+                <Card className="border border-border/60 shadow-sm">
+                  <CardContent className="py-12 text-center text-muted-foreground">
+                    Noch keine Zähler erfasst.
+                  </CardContent>
+                </Card>
+              ) : (
+                meters.map((meter) => (
+                  <Card key={meter.id} className="border border-border/60 shadow-sm">
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-base">{meter.label}</CardTitle>
+                          <p className="text-sm text-muted-foreground mt-0.5">
+                            {METER_TYPE_LABELS[meter.type] ?? meter.type}
+                            {meter.unit && ` · Einheit ${meter.unit.number}`}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" variant="outline" onClick={() => setAddReadingMeterId(meter.id)}>
+                            <Plus className="h-3 w-3 mr-1" /> Ablesung
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => deleteMeterMutation.mutate(meter.id)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    {meter.readings.length > 0 && (
+                      <CardContent className="pt-0">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Datum</TableHead>
+                              <TableHead className="text-right">Zählerstand</TableHead>
+                              <TableHead className="text-right">Verbrauch</TableHead>
+                              <TableHead>Notiz</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {meter.readings.map((r) => (
+                              <TableRow key={r.id}>
+                                <TableCell>{formatDate(r.readAt)}</TableCell>
+                                <TableCell className="text-right font-mono">{r.value.toLocaleString("de-DE")}</TableCell>
+                                <TableCell className="text-right font-mono text-muted-foreground">
+                                  {r.consumption != null ? `+${r.consumption.toLocaleString("de-DE")}` : "—"}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground">{r.note ?? "—"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    )}
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
         </Tabs>
       </main>
+
+      {/* Add Meter Dialog */}
+      <Dialog open={addMeterOpen} onOpenChange={setAddMeterOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Zähler hinzufügen</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Bezeichnung *</Label>
+              <Input value={newMeter.label} onChange={(e) => setNewMeter((m) => ({ ...m, label: e.target.value }))} placeholder="z.B. Stromzähler EG" />
+            </div>
+            <div className="grid gap-2">
+              <Label>Typ *</Label>
+              <Select value={newMeter.type} onValueChange={(v) => setNewMeter((m) => ({ ...m, type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(METER_TYPE_LABELS).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Einheit (optional)</Label>
+              <Select value={newMeter.unitId} onValueChange={(v) => setNewMeter((m) => ({ ...m, unitId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Hauptzähler (kein Einheitsbezug)" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Hauptzähler</SelectItem>
+                  {property?.units?.map((u: { id: number; number: string }) => (
+                    <SelectItem key={u.id} value={String(u.id)}>Einheit {u.number}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddMeterOpen(false)}>Abbrechen</Button>
+            <Button disabled={!newMeter.label} onClick={() => {
+              createMeterMutation.mutate({
+                label: newMeter.label, type: newMeter.type, propertyId,
+                ...(newMeter.unitId ? { unitId: Number(newMeter.unitId) } : {}),
+              });
+              setAddMeterOpen(false);
+              setNewMeter({ label: "", type: "STROM", unitId: "" });
+            }}>Speichern</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Reading Dialog */}
+      <Dialog open={addReadingMeterId !== null} onOpenChange={(o) => { if (!o) setAddReadingMeterId(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Ablesung erfassen</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Zählerstand *</Label>
+              <Input type="number" value={newReading.value} onChange={(e) => setNewReading((r) => ({ ...r, value: e.target.value }))} placeholder="z.B. 12345.6" />
+            </div>
+            <div className="grid gap-2">
+              <Label>Datum *</Label>
+              <Input type="date" value={newReading.readAt} onChange={(e) => setNewReading((r) => ({ ...r, readAt: e.target.value }))} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Notiz</Label>
+              <Input value={newReading.note} onChange={(e) => setNewReading((r) => ({ ...r, note: e.target.value }))} placeholder="Optional" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddReadingMeterId(null)}>Abbrechen</Button>
+            <Button disabled={!newReading.value} onClick={() => {
+              if (addReadingMeterId === null) return;
+              addReadingMutation.mutate({
+                value: Number(newReading.value),
+                readAt: `${newReading.readAt}T12:00:00Z`,
+                ...(newReading.note ? { note: newReading.note } : {}),
+              });
+              setAddReadingMeterId(null);
+              setNewReading({ value: "", readAt: new Date().toISOString().slice(0, 10), note: "" });
+            }}>Speichern</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Unit Dialog */}
       <Dialog open={addUnitOpen} onOpenChange={setAddUnitOpen}>
