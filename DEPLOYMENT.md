@@ -69,6 +69,98 @@ crontab -e
 
 ---
 
+## Lokaler Test (ohne SSL-Zertifikat)
+
+Für Tests auf dem eigenen PC ohne Domain und SSL-Zertifikat:
+
+```bash
+# 1. Starten (HTTP, Port 8080, Demo-Daten automatisch geladen)
+docker compose -f docker-compose.local.yml up -d --build
+
+# 2. App aufrufen
+# http://localhost:8080
+
+# 3. Login
+# E-Mail: admin@immoverwalt.de
+# Passwort: Admin123!
+
+# 4. Stoppen
+docker compose -f docker-compose.local.yml down
+```
+
+**Unterschiede zur Produktionsversion:**
+- HTTP statt HTTPS (kein SSL nötig)
+- Port 8080 statt 80/443
+- `SEED_DB=true` — Demo-Daten werden beim ersten Start automatisch geladen
+- Vereinfachte Secrets (NICHT für Produktion verwenden!)
+
+---
+
+## Deutsche Cloud — Empfohlene Hoster (DSGVO-konform)
+
+### Hetzner Cloud (empfohlen)
+
+| Paket | vCPU | RAM | Speicher | Preis |
+|-------|------|-----|---------|-------|
+| CX22 | 2 | 4 GB | 40 GB SSD | ~6 €/Monat |
+| CX32 | 4 | 8 GB | 80 GB SSD | ~13 €/Monat |
+
+**Rechenzentren:** Nürnberg, Falkenstein (Deutschland)
+**DSGVO:** Auftragsverarbeitungsvertrag (AVV) verfügbar → Art. 28 DSGVO erfüllt
+**Buchung:** https://www.hetzner.com/cloud
+
+**Firewall in Hetzner Cloud einrichten:**
+1. Hetzner Cloud Console → Firewalls → Firewall erstellen
+2. Eingehende Regeln:
+   - TCP Port 22 (SSH) — nur eigene IP
+   - TCP Port 80 (HTTP)
+   - TCP Port 443 (HTTPS)
+3. Firewall dem Server zuweisen
+
+### IONOS (günstigste Option)
+
+| Paket | vCPU | RAM | Speicher | Preis |
+|-------|------|-----|---------|-------|
+| VPS S | 1 | 2 GB | 40 GB SSD | ~2 €/Monat |
+| VPS M | 2 | 4 GB | 80 GB SSD | ~4 €/Monat |
+
+**Rechenzentren:** Berlin, Karlsruhe (Deutschland)
+**DSGVO:** AVV verfügbar
+**Buchung:** https://www.ionos.de/server/vps
+
+### Deployment-Workflow (beide Anbieter)
+
+```bash
+# Einmalig: Server einrichten
+ssh root@DEINE-SERVER-IP
+
+# Docker installieren (Ubuntu 24.04)
+curl -fsSL https://get.docker.com | sh
+usermod -aG docker $USER
+
+# Repo klonen
+git clone <repo-url> /opt/immoverwaltung
+cd /opt/immoverwaltung
+
+# .env konfigurieren (alle Pflichtfelder aus Produktions-Checkliste setzen)
+cp backend/.env.example backend/.env
+nano backend/.env   # Secrets + CORS_ORIGINS + SSL_CERT_PATH anpassen
+
+# SSL-Zertifikat holen (Let's Encrypt)
+apt install certbot
+certbot certonly --standalone -d deine-domain.de
+# SSL_CERT_PATH=/etc/letsencrypt/live/deine-domain.de in .env setzen
+
+# App starten
+docker compose up -d --build
+
+# Updates deployen (nach git push)
+git pull origin master
+docker compose up -d --build
+```
+
+---
+
 ## Voraussetzungen
 
 - **Docker Desktop** installiert (https://docs.docker.com/desktop/)
