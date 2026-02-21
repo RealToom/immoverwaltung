@@ -1,7 +1,7 @@
 # Immoverwaltung - Projektdokumentation
 
 > **Letzte Aktualisierung:** 2026-02-21
-> **Status:** Production-Ready + Kalender/E-Mail/Anfragen-Integration vollständig implementiert
+> **Status:** Production-Ready + Feature-Backlog vollständig implementiert (Zähler, Wiederkehrend, PDF, Mahnwesen, Übergabeprotokoll, Wartungsplan, Dokumenten-Vorlagen)
 
 ## Roadmap / Zukünftige Features
 
@@ -24,9 +24,10 @@
 - iCal / Google Calendar Integration für Wartungstermine und Besichtigungen
 - Push-Benachrichtigungen für Termine
 
-### 5. Automatisches Mahnwesen
-- Automatischer Abgleich von Mieteingängen (Bank) mit Soll-Mieten (Vertrag)
-- Generierung von Zahlungserinnerungen/Mahnungen bei Verzug
+### 5. Automatisches Mahnwesen ✅ IMPLEMENTIERT
+- `DunningRecord` Model, 3-stufiges Mahnwesen (POST /api/dunning/contracts/:id/send)
+- E-Mail-Versand bei Mahnstufen, PATCH /:id/resolve, Cron AUSSTEHEND → VERSPAETET
+- Frontend: Contracts-Seite, "Mahnung senden"-Button + Badge, useDunning Hook
 
 ### 6. Nebenkostenabrechnung ✅ IMPLEMENTIERT
 - `PATCH /api/finance/transactions/:id` — setzt `allocatable` (und optional `category`)
@@ -49,6 +50,68 @@
 ---
 
 ## Changelog
+
+### 2026-02-21: Feature-Backlog — Zähler, Wiederkehrend, PDF, Mahnwesen, Übergabeprotokoll, Wartungsplan, Vorlagen
+
+**Neue Features:**
+
+**Zählerstände (Meter):**
+- `Meter` + `MeterReading` Prisma-Models (MeterType: STROM/WASSER/GAS/WAERME/SONSTIGES)
+- `GET /api/meters?propertyId=N` — alle Zähler einer Immobilie mit letzten 2 Ablesungen
+- `POST /api/meters`, `DELETE /api/meters/:id`
+- `GET /api/meters/:id/readings` — alle Ablesungen mit Verbrauchsberechnung (consumption = diff)
+- `POST /api/meters/:id/readings`, `DELETE /api/meters/:id/readings/:readingId`
+- Frontend: `useMeters` Hook, PropertyDetail → Tab "Zähler" (Zähler anlegen, Ablesung erfassen, Verbrauchstabelle)
+
+**Wiederkehrende Transaktionen:**
+- `RecurringTransaction` Prisma-Model (RecurringInterval: MONATLICH/VIERTELJAEHRLICH/HALBJAEHRLICH/JAEHRLICH)
+- `GET/POST /api/recurring-transactions`, `PATCH/DELETE /api/recurring-transactions/:id`
+- `processRecurringTransactions()` Cron in `retention.service.ts` (stündlich, Doppelbuchungs-Safe via `lastRun`)
+- Frontend: `useRecurringTransactions` Hook, Finanzen → Tab "Wiederkehrend"
+
+**PDF-Export Nebenkostenabrechnung:**
+- `pdfkit@5.x` installiert (Backend), `createPdfResponse()` Hilfsfunktion in `src/lib/pdf.ts`
+- `GET /api/finance/utility-statement/pdf?propertyId=N&year=Y` — PDF-Blob Response
+- Frontend: "PDF herunterladen"-Button im Nebenkosten-Tab (Blob-Download)
+
+**Mahnwesen:**
+- `DunningRecord` Prisma-Model (DunningStatus: OFFEN/BEZAHLT/STORNIERT), 3-stufiges Mahnwesen
+- `GET /api/dunning`, `POST /api/dunning/contracts/:contractId/send` (Mahnstufe 1–3 + E-Mail), `PATCH /api/dunning/:id/resolve`
+- `markOverduePayments()` Cron: AUSSTEHEND → VERSPAETET nach Fälligkeitsdatum
+- Frontend: `useDunning` Hook, Contracts → "Mahnung senden"-Button + Mahnungs-Badge
+
+**Übergabeprotokoll:**
+- `HandoverProtocol` Prisma-Model (HandoverType: EINZUG/AUSZUG, rooms/meterData als JSON)
+- `GET /api/handover-protocols?unitId=N`, `POST`, `GET /:id`, `DELETE /:id`
+- Frontend: `useHandover` Hook (typed interfaces für RoomEntry/MeterEntry), PropertyDetail → Tab "Protokolle"
+  - 3-Schritte-Dialog: Grunddaten (Typ/Einheit/Mieter) → Räume (GUT/MAENGEL/DEFEKT) → Zählerstände
+  - Protokoll-Liste gefiltert nach Einheiten der Immobilie, Detailansicht mit Raumtabelle
+
+**Wartungsplan:**
+- `MaintenanceSchedule` Prisma-Model (MaintenanceCategory wie MaintenanceTicket, RecurringInterval)
+- `GET /api/maintenance-schedules?propertyId=N`, `POST`, `PATCH /:id`, `DELETE /:id`
+- `processOverdueSchedules()` Cron: bei `nextDue ≤ now` → `MaintenanceTicket` auto-erstellen + nextDue neu berechnen
+- Frontend: `useMaintenanceSchedules` Hook, Maintenance → Tab "Wartungsplan"
+  - Tabelle mit Farbcodierung (rot=überfällig, orange=<30 Tage), Dialog zum Erstellen
+
+**Dokumenten-Vorlagen:**
+- `DocumentTemplate` Prisma-Model (name, category, content als Handlebars-String)
+- `handlebars@4.7.8` installiert (Backend)
+- `GET/POST /api/document-templates`, `PATCH/DELETE /:id`, `POST /:id/render` (PDF-Blob)
+- Handlebars-Validierung beim Erstellen/Updaten (Compile-Check)
+- Frontend: `useDocumentTemplates` Hook + `useRenderDocumentTemplate` (Blob-Download)
+  - `Templates.tsx` neue Seite: Tabelle, Erstellen-Dialog (Handlebars-Editor + Variablen-Hinweis)
+  - "Ausfüllen & PDF"-Dialog: 6 Variablen (tenantName/propertyName/unitNumber/date/amount/landlord)
+  - Sidebar: "Vorlagen" Eintrag (LayoutTemplate-Icon) in secondaryNav
+
+**Neue DB-Models (Migration):** Meter, MeterReading, RecurringTransaction, DunningRecord, HandoverProtocol, MaintenanceSchedule, DocumentTemplate
+
+**Neue npm-Pakete:**
+- `backend`: `pdfkit` (PDF-Generierung), `handlebars` (Template-Engine)
+
+**Nicht implementiert (Roadmap):** Mieter-Portal (öffentliche URL für Mieter, Self-Service Login)
+
+---
 
 ### 2026-02-21: Kalender + E-Mail-Integration + Anfragen-Portal
 
