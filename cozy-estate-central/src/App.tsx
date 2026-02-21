@@ -24,6 +24,7 @@ import UsersPage from "./pages/Users";
 import CalendarPage from "./pages/Calendar";
 import Postfach from "./pages/Postfach";
 import Anfragen from "./pages/Anfragen";
+import Templates from "./pages/Templates";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +56,7 @@ const AppLayout = () => (
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/postfach" element={<Postfach />} />
         <Route path="/anfragen" element={<Anfragen />} />
+        <Route path="/vorlagen" element={<Templates />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>

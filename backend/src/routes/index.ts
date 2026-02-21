@@ -24,6 +24,7 @@ import { recurringTransactionRouter } from "./recurring-transaction.routes.js";
 import { dunningRouter } from "./dunning.routes.js";
 import { handoverRouter } from "./handover.routes.js";
 import { maintenanceScheduleRouter } from "./maintenance-schedule.routes.js";
+import { documentTemplateRouter } from "./document-template.routes.js";
 
 const router = Router();
 
@@ -55,5 +56,6 @@ router.use("/recurring-transactions", requireAuth, tenantGuard, recurringTransac
 router.use("/dunning", requireAuth, tenantGuard, dunningRouter);
 router.use("/handover-protocols", requireAuth, tenantGuard, handoverRouter);
 router.use("/maintenance-schedules", requireAuth, tenantGuard, maintenanceScheduleRouter);
+router.use("/document-templates", requireAuth, tenantGuard, documentTemplateRouter);
 
 export { router as apiRouter };
