@@ -5,6 +5,7 @@ import { deleteOldAuditLogs } from "./audit.service.js";
 import { startImapSync, stopImapSync } from "./imap-sync.service.js";
 import { processRecurringTransactions } from "./recurring-transaction.service.js";
 import { markOverduePayments } from "./dunning.service.js";
+import { processOverdueSchedules } from "./maintenance-schedule.service.js";
 
 /**
  * DSGVO Art. 17 / Art. 5(1)(e) - Aufbewahrungsfristen
@@ -67,6 +68,7 @@ export function startRetentionCleanup(): void {
         }),
         processRecurringTransactions().catch((err) => logger.error({ err }, "[RECURRING] Fehler beim Verarbeiten")),
         markOverduePayments().catch((err) => logger.error({ err }, "[MAHNWESEN] Fehler")),
+        processOverdueSchedules().catch((err) => logger.error({ err }, "[WARTUNGSPLAN] Fehler")),
     ]).catch((err) => logger.error({ err }, "[CLEANUP] Fehler beim initialen Cleanup"));
 
     // Dann stuendlich
@@ -79,6 +81,7 @@ export function startRetentionCleanup(): void {
             }),
             processRecurringTransactions().catch((err) => logger.error({ err }, "[RECURRING] Fehler beim Verarbeiten")),
             markOverduePayments().catch((err) => logger.error({ err }, "[MAHNWESEN] Fehler")),
+            processOverdueSchedules().catch((err) => logger.error({ err }, "[WARTUNGSPLAN] Fehler")),
         ]).catch((err) => logger.error({ err }, "[CLEANUP] Fehler beim periodischen Cleanup"));
     }, CLEANUP_INTERVAL_MS);
 

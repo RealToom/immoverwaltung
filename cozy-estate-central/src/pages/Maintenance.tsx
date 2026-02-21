@@ -11,7 +11,10 @@ import {
   User,
   MessageSquare,
   Loader2,
+  ListChecks,
+  Trash2,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,6 +49,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useMaintenanceTickets, useCreateMaintenanceTicket, useUpdateMaintenanceTicket, useDeleteMaintenanceTicket, type MaintenanceTicketItem } from "@/hooks/api/useMaintenanceTickets";
+import { useMaintenanceSchedules, useCreateMaintenanceSchedule, useDeleteMaintenanceSchedule } from "@/hooks/api/useMaintenanceSchedules";
 import { useProperties } from "@/hooks/api/useProperties";
 import {
   mapMaintenanceCategory,
@@ -125,6 +129,27 @@ const Maintenance = () => {
 
   const tickets = ticketsResponse?.data ?? [];
   const properties = propertiesResponse?.data ?? [];
+
+  // Wartungsplan state
+  const { data: schedulesRes } = useMaintenanceSchedules();
+  const schedules = schedulesRes ?? [];
+  const createSchedule = useCreateMaintenanceSchedule();
+  const deleteSchedule = useDeleteMaintenanceSchedule();
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const EMPTY_SCHEDULE = {
+    title: "", description: "", category: "SANITAER", interval: "JAEHRLICH",
+    nextDue: new Date().toISOString().slice(0, 10), assignedTo: "", propertyId: "",
+  };
+  const [newSchedule, setNewSchedule] = useState(EMPTY_SCHEDULE);
+
+  const INTERVAL_LABELS: Record<string, string> = {
+    MONATLICH: "Monatlich", VIERTELJAEHRLICH: "Vierteljährlich",
+    HALBJAEHRLICH: "Halbjährlich", JAEHRLICH: "Jährlich",
+  };
+  const CATEGORY_LABELS: Record<string, string> = {
+    SANITAER: "Sanitär", ELEKTRIK: "Elektrik", HEIZUNG: "Heizung",
+    GEBAEUDE: "Gebäude", AUSSENANLAGE: "Außenanlage", SONSTIGES: "Sonstiges",
+  };
 
   const [newTicket, setNewTicket] = useState({
     title: "",
@@ -226,6 +251,29 @@ const Maintenance = () => {
       setDetailTicket(null);
     } catch {
       toast({ title: "Fehler", description: "Ticket konnte nicht gelöscht werden.", variant: "destructive" });
+    }
+  };
+
+  const handleCreateSchedule = async () => {
+    if (!newSchedule.title.trim() || !newSchedule.propertyId) {
+      toast({ title: "Fehler", description: "Bitte Titel und Immobilie angeben.", variant: "destructive" });
+      return;
+    }
+    try {
+      await createSchedule.mutateAsync({
+        title: newSchedule.title.trim(),
+        description: newSchedule.description || undefined,
+        category: newSchedule.category,
+        interval: newSchedule.interval,
+        nextDue: new Date(newSchedule.nextDue + "T12:00:00Z").toISOString(),
+        assignedTo: newSchedule.assignedTo || undefined,
+        propertyId: Number(newSchedule.propertyId),
+      });
+      toast({ title: "Gespeichert", description: "Wartungsplan wurde erstellt." });
+      setNewSchedule(EMPTY_SCHEDULE);
+      setScheduleOpen(false);
+    } catch {
+      toast({ title: "Fehler", description: "Wartungsplan konnte nicht erstellt werden.", variant: "destructive" });
     }
   };
 
@@ -368,6 +416,19 @@ const Maintenance = () => {
           </Card>
         </div>
 
+        <Tabs defaultValue="tickets" className="space-y-4">
+          <TabsList className="bg-muted/50">
+            <TabsTrigger value="tickets" className="gap-1.5">
+              <Wrench className="h-4 w-4" />
+              Tickets ({tickets.length})
+            </TabsTrigger>
+            <TabsTrigger value="wartungsplan" className="gap-1.5">
+              <ListChecks className="h-4 w-4" />
+              Wartungsplan ({schedules.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tickets" className="space-y-4">
         {/* Filters */}
         <Card>
           <CardContent className="p-4">
@@ -482,6 +543,87 @@ const Maintenance = () => {
             </CardContent>
           </Card>
         )}
+          </TabsContent>
+
+          <TabsContent value="wartungsplan">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading font-semibold text-foreground">Wartungsplan</h3>
+                  <p className="text-sm text-muted-foreground">Wiederkehrende Wartungsaufgaben — bei Fälligkeit wird automatisch ein Ticket erstellt</p>
+                </div>
+                <Button size="sm" onClick={() => { setNewSchedule(EMPTY_SCHEDULE); setScheduleOpen(true); }} className="gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  Neuer Wartungsplan
+                </Button>
+              </div>
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Titel</TableHead>
+                        <TableHead>Immobilie</TableHead>
+                        <TableHead>Kategorie</TableHead>
+                        <TableHead>Intervall</TableHead>
+                        <TableHead>Letzte Durchf.</TableHead>
+                        <TableHead>Nächste Fälligkeit</TableHead>
+                        <TableHead>Zugewiesen</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {schedules.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                            Noch keine Wartungspläne vorhanden.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        schedules.map((s) => {
+                          const now = new Date();
+                          const due = new Date(s.nextDue);
+                          const daysUntil = Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                          const dueBadgeClass = daysUntil < 0
+                            ? "text-destructive font-medium"
+                            : daysUntil <= 30
+                            ? "text-warning font-medium"
+                            : "text-foreground";
+                          return (
+                            <TableRow key={s.id}>
+                              <TableCell>
+                                <div className="font-medium text-sm">{s.title}</div>
+                                {s.description && <div className="text-xs text-muted-foreground truncate max-w-[180px]">{s.description}</div>}
+                              </TableCell>
+                              <TableCell className="text-sm">{s.property?.name ?? "—"}</TableCell>
+                              <TableCell className="text-sm">{CATEGORY_LABELS[s.category] ?? s.category}</TableCell>
+                              <TableCell className="text-sm">{INTERVAL_LABELS[s.interval] ?? s.interval}</TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {s.lastDone ? formatDate(s.lastDone) : "—"}
+                              </TableCell>
+                              <TableCell className={`text-sm ${dueBadgeClass}`}>
+                                {formatDate(s.nextDue)}
+                                {daysUntil < 0 && <span className="text-xs ml-1">(überfällig)</span>}
+                                {daysUntil >= 0 && daysUntil <= 30 && <span className="text-xs ml-1">({daysUntil}d)</span>}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">{s.assignedTo ?? "—"}</TableCell>
+                              <TableCell>
+                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                                  onClick={() => deleteSchedule.mutate(s.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Detail Dialog */}
@@ -593,6 +735,95 @@ const Maintenance = () => {
                 </DialogFooter>
               </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Wartungsplan erstellen Dialog */}
+      <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Neuer Wartungsplan</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Titel *</Label>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={newSchedule.title}
+                onChange={(e) => setNewSchedule((s) => ({ ...s, title: e.target.value }))}
+                placeholder="z.B. Heizungswartung"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Beschreibung</Label>
+              <input
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={newSchedule.description}
+                onChange={(e) => setNewSchedule((s) => ({ ...s, description: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Kategorie *</Label>
+                <Select value={newSchedule.category} onValueChange={(v) => setNewSchedule((s) => ({ ...s, category: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Intervall *</Label>
+                <Select value={newSchedule.interval} onValueChange={(v) => setNewSchedule((s) => ({ ...s, interval: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(INTERVAL_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Immobilie *</Label>
+                <Select value={newSchedule.propertyId} onValueChange={(v) => setNewSchedule((s) => ({ ...s, propertyId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Wählen..." /></SelectTrigger>
+                  <SelectContent>
+                    {properties.map((p) => (
+                      <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Nächste Fälligkeit *</Label>
+                <Input
+                  type="date"
+                  value={newSchedule.nextDue}
+                  onChange={(e) => setNewSchedule((s) => ({ ...s, nextDue: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Zugewiesen an</Label>
+              <Input
+                value={newSchedule.assignedTo}
+                onChange={(e) => setNewSchedule((s) => ({ ...s, assignedTo: e.target.value }))}
+                placeholder="Handwerker / Firma"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScheduleOpen(false)}>Abbrechen</Button>
+            <Button onClick={handleCreateSchedule} disabled={createSchedule.isPending} className="gap-1.5">
+              {createSchedule.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Erstellen
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
