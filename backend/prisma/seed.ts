@@ -11,7 +11,14 @@ function parseDate(dateStr: string): Date {
 async function main() {
   console.log("Seeding database...");
 
-  // Clean existing data
+  // Clean existing data — neue Modelle zuerst (FK-Constraints)
+  await prisma.documentTemplate.deleteMany();
+  await prisma.maintenanceSchedule.deleteMany();
+  await prisma.handoverProtocol.deleteMany();
+  await prisma.dunningRecord.deleteMany();
+  await prisma.meterReading.deleteMany();
+  await prisma.meter.deleteMany();
+  await prisma.recurringTransaction.deleteMany();
   await prisma.rentPayment.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.maintenanceTicket.deleteMany();
@@ -539,6 +546,177 @@ async function main() {
       },
     ],
   });
+
+  // ─── Meter (Zähler) ────────────────────────────────────────
+  const meter1 = await prisma.meter.create({
+    data: {
+      label: "Stromzähler 1A",
+      type: "STROM",
+      unitId: units1[0].id,
+      propertyId: p1.id,
+      companyId: company.id,
+    },
+  });
+  const meter2 = await prisma.meter.create({
+    data: {
+      label: "Wasserzähler 1A",
+      type: "WASSER",
+      unitId: units1[0].id,
+      propertyId: p1.id,
+      companyId: company.id,
+    },
+  });
+  await prisma.meterReading.createMany({
+    data: [
+      { value: 4320.5, readAt: new Date("2026-01-01T12:00:00Z"), note: "Jahresablesung", meterId: meter1.id, companyId: company.id },
+      { value: 4489.2, readAt: new Date("2026-02-01T12:00:00Z"), note: "Monatsablesung", meterId: meter1.id, companyId: company.id },
+      { value: 112.3, readAt: new Date("2026-01-01T12:00:00Z"), note: "Jahresablesung", meterId: meter2.id, companyId: company.id },
+      { value: 118.9, readAt: new Date("2026-02-01T12:00:00Z"), note: "Monatsablesung", meterId: meter2.id, companyId: company.id },
+    ],
+  });
+  console.log("Meters + readings seeded");
+
+  // ─── RecurringTransactions ─────────────────────────────────
+  await prisma.recurringTransaction.createMany({
+    data: [
+      {
+        description: "Hausverwaltungsgebühr",
+        type: "AUSGABE",
+        amount: 180.0,
+        category: "Verwaltung",
+        interval: "MONATLICH",
+        dayOfMonth: 1,
+        startDate: new Date("2025-01-01T12:00:00Z"),
+        propertyId: p1.id,
+        companyId: company.id,
+      },
+      {
+        description: "Gebäudeversicherung Jahresprämie",
+        type: "AUSGABE",
+        amount: 1240.0,
+        category: "Versicherung",
+        interval: "JAEHRLICH",
+        dayOfMonth: 15,
+        startDate: new Date("2025-03-15T12:00:00Z"),
+        propertyId: p1.id,
+        companyId: company.id,
+      },
+      {
+        description: "Gartenpflege Quartalsrechnung",
+        type: "AUSGABE",
+        amount: 420.0,
+        category: "Instandhaltung",
+        interval: "VIERTELJAEHRLICH",
+        dayOfMonth: 1,
+        startDate: new Date("2025-01-01T12:00:00Z"),
+        propertyId: p1.id,
+        companyId: company.id,
+      },
+    ],
+  });
+  console.log("RecurringTransactions seeded");
+
+  // ─── DunningRecord ─────────────────────────────────────────
+  const wolfContract = contracts.find((c) => c.tenantId === tenantByName["Thomas Wolf"].id);
+  if (wolfContract) {
+    await prisma.dunningRecord.create({
+      data: {
+        level: 1,
+        sentAt: new Date("2026-01-15T12:00:00Z"),
+        dueDate: new Date("2026-01-31T12:00:00Z"),
+        totalAmount: 950.0,
+        status: "OFFEN",
+        contractId: wolfContract.id,
+        companyId: company.id,
+      },
+    });
+    console.log("DunningRecord seeded");
+  }
+
+  // ─── HandoverProtocol ──────────────────────────────────────
+  await prisma.handoverProtocol.create({
+    data: {
+      type: "EINZUG",
+      date: new Date("2022-03-01T12:00:00Z"),
+      tenantName: "Martin Schmidt",
+      notes: "Einzug ohne Mängel. Schlüssel übergeben (2× Haustür, 1× Keller).",
+      rooms: [
+        { name: "Wohnzimmer", condition: "GUT", notes: "" },
+        { name: "Schlafzimmer", condition: "GUT", notes: "" },
+        { name: "Küche", condition: "GUT", notes: "Neue Einbauküche vorhanden" },
+        { name: "Bad", condition: "GUT", notes: "" },
+        { name: "Flur", condition: "GUT", notes: "" },
+      ],
+      meterData: [
+        { label: "Strom", value: 4320.5, type: "STROM" },
+        { label: "Wasser", value: 112.3, type: "WASSER" },
+      ],
+      unitId: units1[0].id,
+      companyId: company.id,
+    },
+  });
+  console.log("HandoverProtocol seeded");
+
+  // ─── MaintenanceSchedule ───────────────────────────────────
+  await prisma.maintenanceSchedule.createMany({
+    data: [
+      {
+        title: "Heizungsanlage Jahreswartung",
+        description: "Komplette Inspektion und Wartung der Heizungsanlage inkl. Brenner und Pumpen",
+        category: "HEIZUNG",
+        interval: "JAEHRLICH",
+        nextDue: new Date("2026-10-01T12:00:00Z"),
+        assignedTo: "Heizungsfirma Müller GmbH",
+        propertyId: p1.id,
+        companyId: company.id,
+      },
+      {
+        title: "Rauchmelder Quartalscheck",
+        description: "Funktionstest aller Rauchmelder (Drücken des Testknopfs, Batteriewechsel falls nötig)",
+        category: "GEBAEUDE",
+        interval: "VIERTELJAEHRLICH",
+        nextDue: new Date("2026-04-01T12:00:00Z"),
+        propertyId: p1.id,
+        companyId: company.id,
+      },
+      {
+        title: "Aufzug TÜV-Prüfung",
+        description: "Gesetzlich vorgeschriebene Hauptuntersuchung des Aufzugs",
+        category: "GEBAEUDE",
+        interval: "JAEHRLICH",
+        nextDue: new Date("2026-06-15T12:00:00Z"),
+        assignedTo: "TÜV Rheinland",
+        propertyId: p1.id,
+        companyId: company.id,
+      },
+    ],
+  });
+  console.log("MaintenanceSchedules seeded");
+
+  // ─── DocumentTemplate ──────────────────────────────────────
+  await prisma.documentTemplate.createMany({
+    data: [
+      {
+        name: "Mietvertrag Standard",
+        category: "Mietvertrag",
+        content: "Mietvertrag\n\nzwischen\n\n{{landlord}} (Vermieter)\n\nund\n\n{{tenantName}} (Mieter)\n\n§ 1 Mietobjekt\nDas Mietobjekt befindet sich in der Immobilie \"{{propertyName}}\", Einheit {{unitNumber}}.\n\n§ 2 Mietbeginn\nDas Mietverhältnis beginnt am {{date}}.\n\n§ 3 Miete\nDie monatliche Kaltmiete beträgt {{amount}} EUR.\n\nDatum: {{date}}\n\n___________________________       ___________________________\n{{landlord}} (Vermieter)          {{tenantName}} (Mieter)",
+        companyId: company.id,
+      },
+      {
+        name: "Mahnung Stufe 1",
+        category: "Mahnung",
+        content: "Zahlungserinnerung\n\nAn: {{tenantName}}\nImmobilie: {{propertyName}}, Einheit {{unitNumber}}\nDatum: {{date}}\n\nSehr geehrte/r {{tenantName}},\n\nhiermit erinnern wir Sie freundlich an die ausstehende Zahlung\nin Höhe von {{amount}} EUR.\n\nBitte überweisen Sie den Betrag bis spätestens 14 Tage nach\nErhalt dieser Mahnung.\n\nMit freundlichen Grüßen\n{{landlord}}",
+        companyId: company.id,
+      },
+      {
+        name: "Übergabeprotokoll",
+        category: "Übergabeprotokoll",
+        content: "Wohnungsübergabeprotokoll\n\nDatum: {{date}}\nMieter: {{tenantName}}\nImmobilie: {{propertyName}}, Einheit {{unitNumber}}\nVermieter: {{landlord}}\n\nDie Übergabe der Wohnung erfolgt in ordnungsgemäßem Zustand.\nDie Zählerstände wurden notiert und von beiden Parteien bestätigt.\n\n___________________________       ___________________________\n{{landlord}} (Vermieter)          {{tenantName}} (Mieter)",
+        companyId: company.id,
+      },
+    ],
+  });
+  console.log("DocumentTemplates seeded");
 
   console.log("Seeding completed.");
 }
