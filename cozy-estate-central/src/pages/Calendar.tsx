@@ -1,0 +1,204 @@
+import { useState, useMemo } from "react";
+import { Calendar, dateFnsLocalizer, View } from "react-big-calendar";
+import { format, parse, startOfWeek, getDay, addMonths, subMonths } from "date-fns";
+import { de } from "date-fns/locale/de";
+import "react-big-calendar/lib/css/react-big-calendar.css";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { useCalendarEvents, useCreateCalendarEvent } from "@/hooks/api/useCalendarEvents";
+import { toast } from "sonner";
+
+const locales = { de };
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+  getDay,
+  locales,
+});
+
+const EVENT_COLORS: Record<string, string> = {
+  MANUELL: "#3b82f6",
+  AUTO_VERTRAG: "#f97316",
+  AUTO_WARTUNG: "#ef4444",
+  AUTO_MIETE: "#22c55e",
+  AUTO_EMAIL: "#8b5cf6",
+};
+
+const EVENT_LABELS: Record<string, string> = {
+  MANUELL: "Manuell",
+  AUTO_VERTRAG: "Vertrag",
+  AUTO_WARTUNG: "Wartung",
+  AUTO_MIETE: "Mietzahlung",
+  AUTO_EMAIL: "Aus E-Mail",
+};
+
+export default function CalendarPage() {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [view, setView] = useState<View>("month");
+  const [newEventOpen, setNewEventOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newStart, setNewStart] = useState("");
+
+  const from = subMonths(currentDate, 1);
+  const to = addMonths(currentDate, 2);
+  const { data, isLoading } = useCalendarEvents(from, to);
+  const createEvent = useCreateCalendarEvent();
+
+  const events = useMemo(() =>
+    (data?.data ?? []).map((e) => ({
+      ...e,
+      start: new Date(e.start),
+      end: e.end ? new Date(e.end) : new Date(e.start),
+      resource: e,
+    })), [data]);
+
+  const upcoming = useMemo(() =>
+    (data?.data ?? [])
+      .filter((e) => new Date(e.start) >= new Date())
+      .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+      .slice(0, 8), [data]);
+
+  const handleCreate = async () => {
+    if (!newTitle || !newStart) return;
+    try {
+      await createEvent.mutateAsync({ title: newTitle, start: new Date(newStart).toISOString(), allDay: true });
+      toast.success("Termin erstellt");
+      setNewEventOpen(false);
+      setNewTitle("");
+      setNewStart("");
+    } catch {
+      toast.error("Fehler beim Erstellen");
+    }
+  };
+
+  const eventStyleGetter = (event: { resource: { type: string; color?: string } }) => ({
+    style: {
+      backgroundColor: event.resource.color ?? EVENT_COLORS[event.resource.type] ?? "#6b7280",
+      borderRadius: "3px",
+      border: "none",
+      fontSize: "11px",
+      padding: "2px 4px",
+    },
+  });
+
+  return (
+    <div className="flex flex-col h-screen">
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+        <SidebarTrigger />
+        <Separator orientation="vertical" className="h-4" />
+        <span className="font-heading font-semibold">Kalender</span>
+      </header>
+
+      <div className="flex flex-1 overflow-hidden gap-0">
+        {/* Kalender */}
+        <div className="flex-1 flex flex-col p-4 min-w-0">
+          {/* Toolbar */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="font-semibold text-base min-w-40 text-center">
+                {format(currentDate, "MMMM yyyy", { locale: de })}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>Heute</Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex rounded-md border overflow-hidden">
+                {(["month", "week", "day"] as View[]).map((v) => (
+                  <button key={v} onClick={() => setView(v)}
+                    className={`px-3 py-1.5 text-sm ${view === v ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}>
+                    {{ month: "Monat", week: "Woche", day: "Tag" }[v as string]}
+                  </button>
+                ))}
+              </div>
+              <Button size="sm" onClick={() => setNewEventOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" /> Neuer Termin
+              </Button>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0">
+              <Calendar
+                localizer={localizer}
+                events={events}
+                view={view}
+                date={currentDate}
+                onNavigate={setCurrentDate}
+                onView={setView}
+                eventPropGetter={eventStyleGetter as never}
+                culture="de"
+                style={{ height: "100%" }}
+                toolbar={false}
+              />
+            </div>
+          )}
+
+          {/* Legende */}
+          <div className="flex gap-4 mt-2 flex-wrap">
+            {Object.entries(EVENT_LABELS).map(([type, label]) => (
+              <div key={type} className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: EVENT_COLORS[type] }} />
+                <span className="text-xs text-muted-foreground">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Kommende Termine Panel */}
+        <div className="w-64 border-l p-4 overflow-y-auto flex flex-col gap-3">
+          <p className="text-sm font-semibold">Kommende Termine</p>
+          {upcoming.length === 0 && <p className="text-xs text-muted-foreground">Keine Termine</p>}
+          {upcoming.map((e) => (
+            <div key={e.id} className="rounded-md border p-2.5 text-xs flex flex-col gap-1"
+              style={{ borderLeftColor: e.color ?? EVENT_COLORS[e.type], borderLeftWidth: 3 }}>
+              <span className="font-medium line-clamp-2">{e.title}</span>
+              <span className="text-muted-foreground">{format(new Date(e.start), "dd.MM.yyyy", { locale: de })}</span>
+              {e.type === "AUTO_EMAIL" && (
+                <Badge variant="outline" className="text-purple-600 border-purple-300 w-fit text-[10px]">KI-Vorschlag</Badge>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Neuer Termin Dialog */}
+      <Dialog open={newEventOpen} onOpenChange={setNewEventOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Neuer Termin</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            <div>
+              <Label>Titel</Label>
+              <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Terminbezeichnung" />
+            </div>
+            <div>
+              <Label>Datum</Label>
+              <Input type="datetime-local" value={newStart} onChange={(e) => setNewStart(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewEventOpen(false)}>Abbrechen</Button>
+            <Button onClick={handleCreate} disabled={createEvent.isPending || !newTitle || !newStart}>
+              {createEvent.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -11,6 +11,9 @@ import {
   LogOut,
   Landmark,
   UserCog,
+  CalendarDays,
+  Mail,
+  Inbox,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -40,6 +43,12 @@ const secondaryNav = [
   { title: "Wartung", url: "/maintenance", icon: Wrench },
   { title: "Berichte", url: "/reports", icon: BarChart3 },
   { title: "Benachrichtigungen", url: "/notifications", icon: Bell },
+];
+
+const kommunikationNav = [
+  { title: "Kalender", url: "/calendar", icon: CalendarDays },
+  { title: "Postfach", url: "/postfach", icon: Mail },
+  { title: "Anfragen", url: "/anfragen", icon: Inbox },
 ];
 
 export function AppSidebar() {
@@ -126,6 +135,29 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-sidebar-foreground/50 text-[11px] uppercase tracking-wider">
+            Kommunikation
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {kommunikationNav.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild tooltip={item.title}>
+                    <NavLink
+                      to={item.url}
+                      className="text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

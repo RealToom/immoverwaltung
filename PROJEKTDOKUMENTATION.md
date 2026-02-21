@@ -1,7 +1,7 @@
 # Immoverwaltung - Projektdokumentation
 
-> **Letzte Aktualisierung:** 2026-02-20
-> **Status:** Production-Ready — alle Security-Items behoben, CI/CD, Backup, Passwort-Ändern, AuditLog-DB
+> **Letzte Aktualisierung:** 2026-02-21
+> **Status:** Production-Ready + Kalender/E-Mail/Anfragen-Integration vollständig implementiert
 
 ## Roadmap / Zukünftige Features
 
@@ -49,6 +49,43 @@
 ---
 
 ## Changelog
+
+### 2026-02-21: Kalender + E-Mail-Integration + Anfragen-Portal
+
+**Neue Features:**
+
+**Kalender (react-big-calendar):**
+- `CalendarEvent` Prisma-Model + `CalendarEventType` Enum (MANUELL, AUTO_VERTRAG, AUTO_WARTUNG, AUTO_MIETE, AUTO_EMAIL)
+- `GET /api/calendar?from=&to=` — kombiniert manuelle Events aus DB mit auto-generierten Events aus Verträgen (nextReminder + endDate), Wartungstickets (dueDate), ausstehenden Mieteingang (dueDate)
+- `POST /api/calendar` — manuellen Termin anlegen (ADMIN/VERWALTER/BUCHHALTER)
+- `PATCH /api/calendar/:id` — Termin bearbeiten (nur MANUELL-Typ, nicht Auto-Events)
+- `DELETE /api/calendar/:id` — Termin löschen (nur MANUELL-Typ)
+- Frontend: `Calendar.tsx` mit Monat-/Woche-/Tages-Ansicht, farbcodierten Events, "Kommende Termine"-Panel, Neuer-Termin-Dialog
+- Hooks: `useCalendarEvents`, `useCreateCalendarEvent`, `useUpdateCalendarEvent`, `useDeleteCalendarEvent`
+
+**E-Mail-Integration (IMAP/SMTP + Claude Haiku):**
+- `EmailAccount` Prisma-Model — IMAP/SMTP-Zugangsdaten mit AES-256-GCM verschlüsseltem Passwort
+- `EmailMessage` + `EmailAttachment` Prisma-Models — Cache für IMAP-Nachrichten in DB
+- `InquiryStatus` Enum (NEU, IN_BEARBEITUNG, AKZEPTIERT, ABGELEHNT)
+- `encryptString` / `decryptString` in `crypto.ts` — AES-256-GCM für IMAP-Passwörter
+- `/api/email-accounts` — CRUD + `POST /:id/sync` (IMAP-Verbindungstest vor dem Anlegen)
+- `/api/email-messages` — Liste/Detail/Update + Reply/SendDocument/CreateEvent
+- `imap-sync.service.ts` — IMAP-Polling alle 5 Minuten via `imap-simple` + `mailparser`:
+  - Neue Nachrichten seit `lastSync` werden in DB gecacht
+  - Claude Haiku analysiert Betreff + Body: Terminangaben → `CalendarEvent` AUTO_EMAIL
+  - Anfragen-Erkennung → `isInquiry=true` + `inquiryStatus=NEU`
+  - Dateianhänge werden als Metadaten gespeichert
+- `retention.service.ts` integriert IMAP-Sync-Start/-Stop
+- Frontend: `Postfach.tsx` — Zwei-Spalten-Inbox mit Filter-Tabs (Alle/Ungelesen/Anfragen), HTML-E-Mail-Vorschau (iframe), Antwort-Dialog, KI-Terminvorschlag-Banner, Termin-Dialog
+- Frontend: Settings.tsx → "Postfächer"-Tab mit Account-Liste (Sync/Löschen) + Verbinden-Formular
+
+**Anfragen-Portal:**
+- `Anfragen.tsx` — Tabelle aller E-Mails mit `isInquiry=true`, Status-Tabs (ALLE/NEU/IN_BEARBEITUNG/AKZEPTIERT/ABGELEHNT), Workflow-Buttons (Bearbeiten → Akzeptieren/Ablehnen)
+
+**Sidebar-Navigation:**
+- Neue Gruppe "Kommunikation": Kalender, Postfach, Anfragen
+
+---
 
 ### 2026-02-20: Production-Readiness + Security-Hardening Runde 3
 

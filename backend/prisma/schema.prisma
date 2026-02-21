@@ -31,6 +31,10 @@ model Company {
   rentPayments       RentPayment[]
   bankAccounts       BankAccount[]
   documents          Document[]
+  calendarEvents     CalendarEvent[]
+  emailAccounts      EmailAccount[]
+  emailMessages      EmailMessage[]
+  emailAttachments   EmailAttachment[]
 
   @@map("companies")
 }
@@ -369,4 +373,112 @@ model AuditLog {
   @@index([companyId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ─── CalendarEvent (Kalender) ────────────────────────────────
+model CalendarEvent {
+  id              Int               @id @default(autoincrement())
+  title           String
+  description     String?
+  start           DateTime
+  end             DateTime?
+  allDay          Boolean           @default(false) @map("all_day")
+  type            CalendarEventType @default(MANUELL)
+  sourceId        Int?              @map("source_id")
+  color           String?
+  companyId       Int               @map("company_id")
+  createdByUserId Int?              @map("created_by_user_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("calendar_events")
+}
+
+enum CalendarEventType {
+  MANUELL
+  AUTO_VERTRAG
+  AUTO_WARTUNG
+  AUTO_MIETE
+  AUTO_EMAIL
+}
+
+// ─── EmailAccount (Verbundene Postfächer) ────────────────────
+model EmailAccount {
+  id                Int       @id @default(autoincrement())
+  label             String
+  email             String
+  imapHost          String    @map("imap_host")
+  imapPort          Int       @map("imap_port")
+  imapTls           Boolean   @default(true) @map("imap_tls")
+  imapUser          String    @map("imap_user")
+  encryptedPassword String    @map("encrypted_password")
+  smtpHost          String    @map("smtp_host")
+  smtpPort          Int       @map("smtp_port")
+  smtpTls           Boolean   @default(true) @map("smtp_tls")
+  lastSync          DateTime? @map("last_sync")
+  isActive          Boolean   @default(true) @map("is_active")
+  companyId         Int       @map("company_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  company  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  messages EmailMessage[]
+
+  @@index([companyId])
+  @@map("email_accounts")
+}
+
+// ─── EmailMessage (Posteingang-Cache) ────────────────────────
+model EmailMessage {
+  id               Int            @id @default(autoincrement())
+  messageId        String         @unique @map("message_id")
+  fromAddress      String         @map("from_address")
+  fromName         String?        @map("from_name")
+  toAddress        String         @map("to_address")
+  subject          String
+  bodyText         String?        @map("body_text")
+  bodyHtml         String?        @map("body_html")
+  receivedAt       DateTime       @map("received_at")
+  isRead           Boolean        @default(false) @map("is_read")
+  isInquiry        Boolean        @default(false) @map("is_inquiry")
+  inquiryStatus    InquiryStatus? @map("inquiry_status")
+  suggestedEventId Int?           @map("suggested_event_id")
+  emailAccountId   Int            @map("email_account_id")
+  companyId        Int            @map("company_id")
+  createdAt        DateTime       @default(now()) @map("created_at")
+
+  emailAccount EmailAccount      @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  company      Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  attachments  EmailAttachment[]
+
+  @@index([companyId, isRead])
+  @@index([companyId, isInquiry])
+  @@map("email_messages")
+}
+
+enum InquiryStatus {
+  NEU
+  IN_BEARBEITUNG
+  AKZEPTIERT
+  ABGELEHNT
+}
+
+// ─── EmailAttachment (Anhänge) ───────────────────────────────
+model EmailAttachment {
+  id             Int          @id @default(autoincrement())
+  filename       String
+  mimeType       String       @map("mime_type")
+  size           Int
+  storedPath     String?      @map("stored_path")
+  emailMessageId Int          @map("email_message_id")
+  companyId      Int          @map("company_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  emailMessage EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+  company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("email_attachments")
 }

@@ -6,5 +6,6 @@ declare namespace Express {
       role: string;
     };
     companyId?: number;
+    userId?: number;
   }
 }
