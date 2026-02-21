@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useContracts, useCreateContract } from "@/hooks/api/useContracts";
+import { useDunning, useSendDunning, useResolveDunning } from "@/hooks/api/useDunning";
 import { useProperties } from "@/hooks/api/useProperties";
 import {
   mapContractType,
@@ -54,6 +55,9 @@ const reminderConfig: Record<string, { color: string; bg: string }> = {
 
 const Contracts = () => {
   const { toast } = useToast();
+  const sendDunning = useSendDunning();
+  const resolveDunning = useResolveDunning();
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("alle");
@@ -402,10 +406,28 @@ const Contracts = () => {
                   <div className="space-y-4 py-2">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-foreground">{c.tenant.name}</h3>
-                      <Badge variant={sc.variant} className="gap-1">
-                        <Icon className="h-3 w-3" />
-                        {sc.label}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={sc.variant} className="gap-1">
+                          <Icon className="h-3 w-3" />
+                          {sc.label}
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-7 text-xs gap-1"
+                          disabled={sendDunning.isPending}
+                          onClick={async () => {
+                            try {
+                              await sendDunning.mutateAsync(c.id);
+                              toast({ title: "Mahnung versendet" });
+                            } catch {
+                              toast({ title: "Fehler", description: "Mahnung konnte nicht versendet werden.", variant: "destructive" });
+                            }
+                          }}
+                        >
+                          Mahnung senden
+                        </Button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>

@@ -21,6 +21,7 @@ import { emailAccountRouter } from "./email-account.routes.js";
 import { emailMessageRouter } from "./email-message.routes.js";
 import { meterRouter } from "./meter.routes.js";
 import { recurringTransactionRouter } from "./recurring-transaction.routes.js";
+import { dunningRouter } from "./dunning.routes.js";
 
 const router = Router();
 
@@ -49,5 +50,6 @@ router.use("/email-accounts", requireAuth, tenantGuard, emailAccountRouter);
 router.use("/email-messages", requireAuth, tenantGuard, emailMessageRouter);
 router.use("/meters", requireAuth, tenantGuard, meterRouter);
 router.use("/recurring-transactions", requireAuth, tenantGuard, recurringTransactionRouter);
+router.use("/dunning", requireAuth, tenantGuard, dunningRouter);
 
 export { router as apiRouter };
