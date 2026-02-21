@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import * as financeService from "../services/finance.service.js";
+import { createPdfResponse } from "../lib/pdf.js";
 
 export async function getSummary(req: Request, res: Response): Promise<void> {
   const summary = await financeService.getFinanceSummary(req.companyId!);
@@ -55,6 +56,33 @@ export async function getUtilityStatement(req: Request, res: Response): Promise<
   const year = Number(req.query.year) || new Date().getFullYear();
   const data = await financeService.getUtilityStatement(req.companyId!, propertyId, year);
   res.json({ data });
+}
+
+export async function utilityStatementPdf(req: Request, res: Response): Promise<void> {
+  const propertyId = Number(req.query.propertyId);
+  const year = Number(req.query.year) || new Date().getFullYear();
+  const statement = await financeService.getUtilityStatement(req.companyId!, propertyId, year);
+  const costPerSqm = statement.totalArea > 0 ? statement.totalCosts / statement.totalArea : 0;
+
+  const doc = createPdfResponse(res, `Nebenkostenabrechnung_${year}`);
+
+  doc.fontSize(20).font("Helvetica-Bold").text("Nebenkostenabrechnung", { align: "center" });
+  doc.fontSize(12).font("Helvetica").text(`Jahr: ${year}`, { align: "center" });
+  doc.moveDown();
+  doc.text(`Gesamtkosten: ${statement.totalCosts.toFixed(2)} €`);
+  doc.text(`Gesamtfläche: ${statement.totalArea} m²`);
+  doc.text(`Kosten pro m²: ${costPerSqm.toFixed(2)} €`);
+  doc.moveDown();
+
+  doc.fontSize(14).font("Helvetica-Bold").text("Abrechnung pro Einheit");
+  doc.font("Helvetica").moveDown(0.5);
+  for (const u of statement.items) {
+    doc.fontSize(10).text(
+      `Einheit ${u.unitNumber}  (${u.area} m²  ·  ${u.areaPercent.toFixed(1)} %)  –  Mieter: ${u.tenantName}  –  Anteil: ${u.amount.toFixed(2)} €`,
+    );
+  }
+
+  doc.end();
 }
 
 export async function getRoi(req: Request, res: Response): Promise<void> {

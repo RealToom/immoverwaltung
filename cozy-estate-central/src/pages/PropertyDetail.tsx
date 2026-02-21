@@ -766,10 +766,32 @@ const PropertyDetail = () => {
               {showStatement && utilityRes?.data && (
                 <Card className="border border-border/60 shadow-sm">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base font-heading font-semibold">Nebenkostenabrechnung {nebenkostenYear}</CardTitle>
-                    <CardDescription>
-                      Gesamtkosten: {formatCurrency(utilityRes.data.totalCosts)} auf {utilityRes.data.totalArea.toFixed(1)} m² verteilt
-                    </CardDescription>
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <CardTitle className="text-base font-heading font-semibold">Nebenkostenabrechnung {nebenkostenYear}</CardTitle>
+                        <CardDescription>
+                          Gesamtkosten: {formatCurrency(utilityRes.data.totalCosts)} auf {utilityRes.data.totalArea.toFixed(1)} m² verteilt
+                        </CardDescription>
+                      </div>
+                      <Button size="sm" variant="outline" className="gap-1.5 shrink-0" onClick={async () => {
+                        const token = localStorage.getItem("accessToken");
+                        const res = await fetch(
+                          `/api/finance/utility-statement/pdf?propertyId=${propertyId}&year=${nebenkostenYear}`,
+                          { headers: { Authorization: `Bearer ${token}` } },
+                        );
+                        if (!res.ok) return;
+                        const blob = await res.blob();
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `Nebenkostenabrechnung_${nebenkostenYear}.pdf`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      }}>
+                        <Download className="h-4 w-4" />
+                        PDF
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent className="p-0">
                     {utilityRes.data.items.length === 0 ? (
