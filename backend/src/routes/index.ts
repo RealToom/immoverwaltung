@@ -19,6 +19,7 @@ import { userRouter } from "./user.routes.js";
 import { calendarRouter } from "./calendar.routes.js";
 import { emailAccountRouter } from "./email-account.routes.js";
 import { emailMessageRouter } from "./email-message.routes.js";
+import { meterRouter } from "./meter.routes.js";
 
 const router = Router();
 
@@ -45,5 +46,6 @@ router.use("/users", requireAuth, tenantGuard, userRouter);
 router.use("/calendar", requireAuth, tenantGuard, calendarRouter);
 router.use("/email-accounts", requireAuth, tenantGuard, emailAccountRouter);
 router.use("/email-messages", requireAuth, tenantGuard, emailMessageRouter);
+router.use("/meters", requireAuth, tenantGuard, meterRouter);
 
 export { router as apiRouter };
