@@ -21,13 +21,14 @@ import {
   ArrowLeft, MapPin, Building2, Users, CreditCard, Home, Mail, Phone,
   FileText, Download, Eye, Trash2, Upload, Plus, UserPlus, Loader2,
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Pencil, Car,
-  BarChart3,
+  BarChart3, ClipboardList,
 } from "lucide-react";
 import { useProperty, useUpdateProperty, useCreateUnit, useUpdateUnit } from "@/hooks/api/useProperties";
 import { useTenants } from "@/hooks/api/useTenants";
 import { useUploadDocument, useDeleteDocument, useDownloadDocument, usePreviewDocument } from "@/hooks/api/useDocuments";
 import { useTransactions, useUpdateTransaction, useUtilityStatement } from "@/hooks/api/useFinance";
 import { useMeters, useCreateMeter, useAddMeterReading, useDeleteMeter } from "@/hooks/api/useMeters";
+import { useHandovers, useCreateHandover, useDeleteHandover } from "@/hooks/api/useHandover";
 import { mapPropertyStatus, mapUnitStatus, mapUnitType, formatDate, formatCurrency } from "@/lib/mappings";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
@@ -63,6 +64,25 @@ const PropertyDetail = () => {
     STROM: "Strom (kWh)", WASSER: "Wasser (m³)", GAS: "Gas (m³)",
     WAERME: "Wärme (kWh)", SONSTIGES: "Sonstiges",
   };
+
+  // Übergabeprotokoll state
+  const { data: handoversRes } = useHandovers();
+  const [handoverOpen, setHandoverOpen] = useState(false);
+  const [handoverStep, setHandoverStep] = useState(1);
+  const EMPTY_HANDOVER = {
+    type: "EINZUG",
+    date: new Date().toISOString().slice(0, 10),
+    tenantName: "",
+    notes: "",
+    unitId: "",
+    rooms: [] as { name: string; condition: string; notes: string }[],
+    meterData: [] as { label: string; value: string; type: string }[],
+  };
+  const [newHandover, setNewHandover] = useState(EMPTY_HANDOVER);
+  const [newRoom, setNewRoom] = useState({ name: "", condition: "GUT", notes: "" });
+  const [newMeterEntry, setNewMeterEntry] = useState({ label: "", value: "", type: "STROM" });
+  const createHandoverMutation = useCreateHandover();
+  const deleteHandoverMutation = useDeleteHandover();
 
   // Nebenkosten state
   const [nebenkostenYear, setNebenkostenYear] = useState(new Date().getFullYear());
@@ -201,6 +221,30 @@ const PropertyDetail = () => {
     setAssignUnitId(unitId);
     setAssignTenantId(currentTenantId ? String(currentTenantId) : "none");
     setAssignOpen(true);
+  };
+
+  const handleCreateHandover = async () => {
+    if (!newHandover.unitId || !newHandover.tenantName.trim()) {
+      toast({ title: "Fehler", description: "Bitte Einheit und Mietername angeben.", variant: "destructive" });
+      return;
+    }
+    try {
+      await createHandoverMutation.mutateAsync({
+        type: newHandover.type,
+        date: new Date(newHandover.date + "T12:00:00Z").toISOString(),
+        tenantName: newHandover.tenantName.trim(),
+        notes: newHandover.notes || undefined,
+        unitId: Number(newHandover.unitId),
+        rooms: newHandover.rooms,
+        meterData: newHandover.meterData.map((m) => ({ ...m, value: Number(m.value) })),
+      });
+      toast({ title: "Gespeichert", description: "Übergabeprotokoll wurde erstellt." });
+      setNewHandover(EMPTY_HANDOVER);
+      setHandoverStep(1);
+      setHandoverOpen(false);
+    } catch {
+      toast({ title: "Fehler", description: "Protokoll konnte nicht erstellt werden.", variant: "destructive" });
+    }
   };
 
   const openEditDialog = () => {
@@ -416,6 +460,10 @@ const PropertyDetail = () => {
             <TabsTrigger value="zaehler" className="gap-1.5">
               <Gauge className="h-4 w-4" />
               Zähler
+            </TabsTrigger>
+            <TabsTrigger value="protokolle" className="gap-1.5">
+              <ClipboardList className="h-4 w-4" />
+              Protokolle
             </TabsTrigger>
           </TabsList>
 
@@ -896,6 +944,122 @@ const PropertyDetail = () => {
               )}
             </div>
           </TabsContent>
+
+          {/* Protokolle Tab */}
+          <TabsContent value="protokolle">
+            {(() => {
+              const unitIds = new Set(units.map((u: { id: number }) => u.id));
+              const propertyHandovers = (handoversRes ?? []).filter((h) => unitIds.has(h.unitId));
+              const CONDITION_LABELS: Record<string, string> = { GUT: "Gut", MAENGEL: "Mängel", DEFEKT: "Defekt" };
+              return (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-heading font-semibold text-foreground">Übergabeprotokolle</h3>
+                      <p className="text-sm text-muted-foreground">Ein- und Auszugsprotokolle mit Raumzustand und Zählerständen</p>
+                    </div>
+                    <Button size="sm" onClick={() => { setHandoverStep(1); setNewHandover(EMPTY_HANDOVER); setHandoverOpen(true); }} className="gap-1.5">
+                      <Plus className="h-4 w-4" />
+                      Neues Protokoll
+                    </Button>
+                  </div>
+
+                  {propertyHandovers.length === 0 ? (
+                    <Card className="border border-border/60 shadow-sm">
+                      <CardContent className="p-8 text-center text-muted-foreground">
+                        Noch keine Protokolle vorhanden.
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      {propertyHandovers.map((h) => (
+                        <Card key={h.id} className="border border-border/60 shadow-sm">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <Badge className={h.type === "EINZUG" ? "bg-success/15 text-success border-0" : "bg-warning/15 text-warning border-0"}>
+                                  {h.type === "EINZUG" ? "Einzug" : "Auszug"}
+                                </Badge>
+                                <div>
+                                  <p className="font-medium text-sm">{h.tenantName}</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {formatDate(h.date)} · Einheit {h.unit?.number ?? h.unitId}
+                                  </p>
+                                </div>
+                              </div>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"
+                                onClick={() => deleteHandoverMutation.mutate(h.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CardHeader>
+                          {(h.rooms.length > 0 || h.meterData.length > 0 || h.notes) && (
+                            <CardContent className="pt-0 space-y-3">
+                              {h.notes && <p className="text-sm text-muted-foreground italic">{h.notes}</p>}
+                              {h.rooms.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Raumzustand</p>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Raum</TableHead>
+                                        <TableHead>Zustand</TableHead>
+                                        <TableHead>Notiz</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {h.rooms.map((r, i) => (
+                                        <TableRow key={i}>
+                                          <TableCell>{r.name}</TableCell>
+                                          <TableCell>
+                                            <Badge variant="outline" className={
+                                              r.condition === "GUT" ? "border-success text-success" :
+                                              r.condition === "MAENGEL" ? "border-warning text-warning" :
+                                              "border-destructive text-destructive"
+                                            }>
+                                              {CONDITION_LABELS[r.condition] ?? r.condition}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="text-muted-foreground">{r.notes ?? "—"}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              )}
+                              {h.meterData.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1.5">Zählerstände</p>
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Zähler</TableHead>
+                                        <TableHead>Typ</TableHead>
+                                        <TableHead className="text-right">Stand</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {h.meterData.map((m, i) => (
+                                        <TableRow key={i}>
+                                          <TableCell>{m.label}</TableCell>
+                                          <TableCell className="text-muted-foreground">{m.type}</TableCell>
+                                          <TableCell className="text-right font-mono">{m.value.toLocaleString("de-DE")}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                </div>
+                              )}
+                            </CardContent>
+                          )}
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -1205,6 +1369,192 @@ const PropertyDetail = () => {
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Loeschen
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Übergabeprotokoll Dialog (3 Schritte) */}
+      <Dialog open={handoverOpen} onOpenChange={(o) => { if (!o) { setHandoverOpen(false); setHandoverStep(1); setNewHandover(EMPTY_HANDOVER); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Neues Übergabeprotokoll
+              <span className="ml-2 text-sm font-normal text-muted-foreground">Schritt {handoverStep}/3</span>
+            </DialogTitle>
+          </DialogHeader>
+
+          {/* Step 1: Grunddaten */}
+          {handoverStep === 1 && (
+            <div className="grid gap-4 py-2">
+              <div className="grid gap-2">
+                <Label>Typ *</Label>
+                <Select value={newHandover.type} onValueChange={(v) => setNewHandover((h) => ({ ...h, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EINZUG">Einzug</SelectItem>
+                    <SelectItem value="AUSZUG">Auszug</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Einheit *</Label>
+                <Select value={newHandover.unitId} onValueChange={(v) => setNewHandover((h) => ({ ...h, unitId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Einheit wählen" /></SelectTrigger>
+                  <SelectContent>
+                    {units.map((u: { id: number; number: string }) => (
+                      <SelectItem key={u.id} value={String(u.id)}>Einheit {u.number}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Mieter *</Label>
+                <Input
+                  value={newHandover.tenantName}
+                  onChange={(e) => setNewHandover((h) => ({ ...h, tenantName: e.target.value }))}
+                  placeholder="Name des Mieters"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Datum *</Label>
+                <Input
+                  type="date"
+                  value={newHandover.date}
+                  onChange={(e) => setNewHandover((h) => ({ ...h, date: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Notizen</Label>
+                <Input
+                  value={newHandover.notes}
+                  onChange={(e) => setNewHandover((h) => ({ ...h, notes: e.target.value }))}
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Räume */}
+          {handoverStep === 2 && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">Raumzustand erfassen (optional)</p>
+              <div className="flex gap-2">
+                <Input
+                  value={newRoom.name}
+                  onChange={(e) => setNewRoom((r) => ({ ...r, name: e.target.value }))}
+                  placeholder="Raum (z.B. Wohnzimmer)"
+                  className="flex-1"
+                />
+                <Select value={newRoom.condition} onValueChange={(v) => setNewRoom((r) => ({ ...r, condition: v }))}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="GUT">Gut</SelectItem>
+                    <SelectItem value="MAENGEL">Mängel</SelectItem>
+                    <SelectItem value="DEFEKT">Defekt</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" onClick={() => {
+                  if (!newRoom.name.trim()) return;
+                  setNewHandover((h) => ({ ...h, rooms: [...h.rooms, { ...newRoom, name: newRoom.name.trim() }] }));
+                  setNewRoom({ name: "", condition: "GUT", notes: "" });
+                }}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {newHandover.rooms.length > 0 && (
+                <div className="space-y-1">
+                  {newHandover.rooms.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
+                      <span>{r.name}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {r.condition === "GUT" ? "Gut" : r.condition === "MAENGEL" ? "Mängel" : "Defekt"}
+                        </Badge>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive"
+                          onClick={() => setNewHandover((h) => ({ ...h, rooms: h.rooms.filter((_, j) => j !== i) }))}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Zählerstände */}
+          {handoverStep === 3 && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">Zählerstände erfassen (optional)</p>
+              <div className="flex gap-2">
+                <Input
+                  value={newMeterEntry.label}
+                  onChange={(e) => setNewMeterEntry((m) => ({ ...m, label: e.target.value }))}
+                  placeholder="Zählerbezeichnung"
+                  className="flex-1"
+                />
+                <Input
+                  type="number"
+                  value={newMeterEntry.value}
+                  onChange={(e) => setNewMeterEntry((m) => ({ ...m, value: e.target.value }))}
+                  placeholder="Stand"
+                  className="w-28"
+                />
+                <Select value={newMeterEntry.type} onValueChange={(v) => setNewMeterEntry((m) => ({ ...m, type: v }))}>
+                  <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="STROM">Strom</SelectItem>
+                    <SelectItem value="WASSER">Wasser</SelectItem>
+                    <SelectItem value="GAS">Gas</SelectItem>
+                    <SelectItem value="WAERME">Wärme</SelectItem>
+                    <SelectItem value="SONSTIGES">Sonst.</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" onClick={() => {
+                  if (!newMeterEntry.label.trim() || !newMeterEntry.value) return;
+                  setNewHandover((h) => ({ ...h, meterData: [...h.meterData, { ...newMeterEntry }] }));
+                  setNewMeterEntry({ label: "", value: "", type: "STROM" });
+                }}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {newHandover.meterData.length > 0 && (
+                <div className="space-y-1">
+                  {newHandover.meterData.map((m, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2 text-sm">
+                      <span>{m.label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono">{m.value} ({m.type})</span>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-destructive"
+                          onClick={() => setNewHandover((h) => ({ ...h, meterData: h.meterData.filter((_, j) => j !== i) }))}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            {handoverStep > 1 && (
+              <Button variant="outline" onClick={() => setHandoverStep((s) => s - 1)}>Zurück</Button>
+            )}
+            <Button variant="outline" onClick={() => { setHandoverOpen(false); setHandoverStep(1); setNewHandover(EMPTY_HANDOVER); }}>
+              Abbrechen
+            </Button>
+            {handoverStep < 3 ? (
+              <Button onClick={() => setHandoverStep((s) => s + 1)}
+                disabled={handoverStep === 1 && (!newHandover.unitId || !newHandover.tenantName.trim())}>
+                Weiter
+              </Button>
+            ) : (
+              <Button onClick={handleCreateHandover} disabled={createHandoverMutation.isPending} className="gap-1.5">
+                {createHandoverMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Speichern
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
