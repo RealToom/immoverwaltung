@@ -31,10 +31,17 @@ model Company {
   rentPayments       RentPayment[]
   bankAccounts       BankAccount[]
   documents          Document[]
-  calendarEvents     CalendarEvent[]
-  emailAccounts      EmailAccount[]
-  emailMessages      EmailMessage[]
-  emailAttachments   EmailAttachment[]
+  calendarEvents        CalendarEvent[]
+  emailAccounts         EmailAccount[]
+  emailMessages         EmailMessage[]
+  emailAttachments      EmailAttachment[]
+  meters                Meter[]
+  meterReadings         MeterReading[]
+  recurringTransactions RecurringTransaction[]
+  dunningRecords        DunningRecord[]
+  handoverProtocols     HandoverProtocol[]
+  maintenanceSchedules  MaintenanceSchedule[]
+  documentTemplates     DocumentTemplate[]
 
   @@map("companies")
 }
@@ -99,8 +106,11 @@ model Property {
   units              Unit[]
   documents          Document[]
   contracts          Contract[]
-  maintenanceTickets MaintenanceTicket[]
-  transactions       Transaction[]
+  maintenanceTickets    MaintenanceTicket[]
+  transactions          Transaction[]
+  meters                Meter[]
+  recurringTransactions RecurringTransaction[]
+  maintenanceSchedules  MaintenanceSchedule[]
 
   @@map("properties")
 }
@@ -128,6 +138,8 @@ model Unit {
   tenant             Tenant?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   contracts          Contract[]
   maintenanceTickets MaintenanceTicket[]
+  meters             Meter[]
+  handoverProtocols  HandoverProtocol[]
 
   @@unique([propertyId, number])
   @@map("units")
@@ -188,7 +200,8 @@ model Contract {
   property     Property      @relation(fields: [propertyId], references: [id])
   unit         Unit          @relation(fields: [unitId], references: [id])
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  rentPayments RentPayment[]
+  rentPayments   RentPayment[]
+  dunningRecords DunningRecord[]
 
   @@map("contracts")
 }
@@ -357,6 +370,167 @@ enum RentPaymentStatus {
   PUENKTLICH
   VERSPAETET
   AUSSTEHEND
+}
+
+// ─── Meter (Zähler) ─────────────────────────────────────────
+model Meter {
+  id         Int       @id @default(autoincrement())
+  label      String
+  type       MeterType
+  unitId     Int?      @map("unit_id")
+  propertyId Int       @map("property_id")
+  companyId  Int       @map("company_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  unit     Unit?         @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  property Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  readings MeterReading[]
+
+  @@map("meters")
+}
+
+enum MeterType {
+  STROM
+  WASSER
+  GAS
+  WAERME
+  SONSTIGES
+}
+
+model MeterReading {
+  id        Int      @id @default(autoincrement())
+  value     Float
+  readAt    DateTime @map("read_at")
+  note      String?
+  meterId   Int      @map("meter_id")
+  companyId Int      @map("company_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  meter   Meter   @relation(fields: [meterId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("meter_readings")
+}
+
+// ─── RecurringTransaction (Wiederkehrende Buchung) ───────────
+model RecurringTransaction {
+  id          Int               @id @default(autoincrement())
+  description String
+  type        TransactionType
+  amount      Float
+  category    String            @default("")
+  allocatable Boolean           @default(false)
+  interval    RecurringInterval
+  dayOfMonth  Int               @default(1) @map("day_of_month")
+  startDate   DateTime          @map("start_date")
+  endDate     DateTime?         @map("end_date")
+  lastRun     DateTime?         @map("last_run")
+  isActive    Boolean           @default(true) @map("is_active")
+  propertyId  Int?              @map("property_id")
+  companyId   Int               @map("company_id")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  property Property? @relation(fields: [propertyId], references: [id])
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("recurring_transactions")
+}
+
+enum RecurringInterval {
+  MONATLICH
+  VIERTELJAEHRLICH
+  HALBJAEHRLICH
+  JAEHRLICH
+}
+
+// ─── DunningRecord (Mahnung) ─────────────────────────────────
+model DunningRecord {
+  id          Int           @id @default(autoincrement())
+  level       Int
+  sentAt      DateTime      @map("sent_at")
+  dueDate     DateTime      @map("due_date")
+  totalAmount Float         @map("total_amount")
+  status      DunningStatus @default(OFFEN)
+  contractId  Int           @map("contract_id")
+  companyId   Int           @map("company_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  contract Contract @relation(fields: [contractId], references: [id])
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("dunning_records")
+}
+
+enum DunningStatus {
+  OFFEN
+  BEZAHLT
+  STORNIERT
+}
+
+// ─── HandoverProtocol (Übergabeprotokoll) ────────────────────
+model HandoverProtocol {
+  id         Int          @id @default(autoincrement())
+  type       HandoverType
+  date       DateTime
+  tenantName String       @map("tenant_name")
+  notes      String?
+  rooms      Json         @default("[]")
+  meterData  Json         @default("[]")
+  unitId     Int          @map("unit_id")
+  companyId  Int          @map("company_id")
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  unit    Unit    @relation(fields: [unitId], references: [id])
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("handover_protocols")
+}
+
+enum HandoverType {
+  EINZUG
+  AUSZUG
+}
+
+// ─── MaintenanceSchedule (Wartungsplan) ──────────────────────
+model MaintenanceSchedule {
+  id          Int                 @id @default(autoincrement())
+  title       String
+  description String              @default("")
+  category    MaintenanceCategory
+  interval    RecurringInterval
+  lastDone    DateTime?           @map("last_done")
+  nextDue     DateTime            @map("next_due")
+  assignedTo  String?             @map("assigned_to")
+  isActive    Boolean             @default(true) @map("is_active")
+  propertyId  Int                 @map("property_id")
+  companyId   Int                 @map("company_id")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("maintenance_schedules")
+}
+
+// ─── DocumentTemplate (Dokumenten-Vorlage) ───────────────────
+model DocumentTemplate {
+  id        Int      @id @default(autoincrement())
+  name      String
+  category  String   @default("")
+  content   String
+  companyId Int      @map("company_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("document_templates")
 }
 
 // ─── AuditLog (DSGVO Art. 5 - Nachweisbarkeit) ──────────────
