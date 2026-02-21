@@ -8,8 +8,6 @@ services:
     image: postgres:16-alpine
     container_name: immoverwaltung-db-local
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: immoverwaltung
       POSTGRES_USER: immo
