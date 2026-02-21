@@ -12,6 +12,10 @@ import {
   ScanLine,
   BarChart3,
   Building2,
+  RefreshCw,
+  Trash2,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -28,6 +32,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Area, AreaChart } from "recharts";
 import { useFinanceSummary, useMonthlyRevenue, useRevenueByProperty, useTransactions, useExpenseBreakdown, useRentCollection, useCreateTransaction, useScanReceipt, useRoiData } from "@/hooks/api/useFinance";
+import { useRecurringTransactions, useCreateRecurring, useUpdateRecurring, useDeleteRecurring } from "@/hooks/api/useRecurringTransactions";
 import { useProperties } from "@/hooks/api/useProperties";
 import { formatDate, formatCurrency, formatChartMonth } from "@/lib/mappings";
 import { useToast } from "@/hooks/use-toast";
@@ -83,6 +88,11 @@ const Finances = () => {
   const [scanInfo, setScanInfo] = useState<string | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
+  // Wiederkehrende Transaktionen state
+  const [recurringOpen, setRecurringOpen] = useState(false);
+  const EMPTY_RECURRING = { description: "", type: "AUSGABE", amount: "", category: "", allocatable: false, interval: "MONATLICH", dayOfMonth: "1", startDate: "", endDate: "", propertyId: "" };
+  const [newRecurring, setNewRecurring] = useState(EMPTY_RECURRING);
+
   const months = parseInt(period.replace("m", ""), 10);
   const { data: summaryRes, isLoading: summaryLoading } = useFinanceSummary();
   const { data: monthlyRes } = useMonthlyRevenue(months);
@@ -97,6 +107,10 @@ const Finances = () => {
   const { data: roiRes } = useRoiData(roiYear);
   const createTx = useCreateTransaction();
   const scanReceipt = useScanReceipt();
+  const { data: recurringRes } = useRecurringTransactions();
+  const createRecurring = useCreateRecurring();
+  const updateRecurring = useUpdateRecurring();
+  const deleteRecurring = useDeleteRecurring();
 
   const summary = summaryRes?.data;
   const transactions = txRes?.data ?? [];
@@ -203,6 +217,32 @@ const Finances = () => {
     }
   };
 
+  const handleCreateRecurring = async () => {
+    if (!newRecurring.description || !newRecurring.amount || !newRecurring.startDate) {
+      toast({ title: "Pflichtfelder fehlen", description: "Beschreibung, Betrag und Startdatum sind erforderlich.", variant: "destructive" });
+      return;
+    }
+    try {
+      await createRecurring.mutateAsync({
+        description: newRecurring.description,
+        type: newRecurring.type,
+        amount: parseFloat(newRecurring.amount),
+        category: newRecurring.category || "",
+        allocatable: newRecurring.allocatable,
+        interval: newRecurring.interval,
+        dayOfMonth: parseInt(newRecurring.dayOfMonth, 10),
+        startDate: new Date(newRecurring.startDate + "T12:00:00Z").toISOString(),
+        endDate: newRecurring.endDate ? new Date(newRecurring.endDate + "T12:00:00Z").toISOString() : undefined,
+        propertyId: newRecurring.propertyId ? Number(newRecurring.propertyId) : undefined,
+      });
+      setRecurringOpen(false);
+      setNewRecurring(EMPTY_RECURRING);
+      toast({ title: "Wiederkehrende Buchung gespeichert" });
+    } catch {
+      toast({ title: "Speichern fehlgeschlagen", description: "Bitte erneut versuchen.", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-h-screen">
       <header className="flex h-16 items-center gap-3 border-b border-border/60 bg-card px-6">
@@ -240,6 +280,10 @@ const Finances = () => {
             <TabsTrigger value="rendite" className="gap-1.5">
               <BarChart3 className="h-4 w-4" />
               Rendite
+            </TabsTrigger>
+            <TabsTrigger value="wiederkehrend" className="gap-1.5">
+              <RefreshCw className="h-4 w-4" />
+              Wiederkehrend
             </TabsTrigger>
           </TabsList>
 
@@ -618,6 +662,87 @@ const Finances = () => {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Wiederkehrende Transaktionen */}
+          <TabsContent value="wiederkehrend" className="space-y-4 mt-0">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-base font-semibold">Wiederkehrende Buchungen</h2>
+                <p className="text-sm text-muted-foreground">Automatisch generierte Transaktionen nach Zeitplan</p>
+              </div>
+              <Button size="sm" className="gap-1.5" onClick={() => { setNewRecurring(EMPTY_RECURRING); setRecurringOpen(true); }}>
+                <Plus className="h-4 w-4" />
+                Neue Regel
+              </Button>
+            </div>
+            <Card>
+              <CardContent className="p-0">
+                {!recurringRes || recurringRes.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <RefreshCw className="h-10 w-10 mb-3 opacity-40" />
+                    <p className="text-sm">Noch keine wiederkehrenden Buchungen definiert.</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent border-border/60">
+                        <TableHead className="pl-6 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Beschreibung</TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Typ</TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right">Betrag</TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Intervall</TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Letzter Lauf</TableHead>
+                        <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</TableHead>
+                        <TableHead className="pr-6" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recurringRes.map((rec) => (
+                        <TableRow key={rec.id} className="hover:bg-muted/50 border-border/40">
+                          <TableCell className="pl-6 font-medium">
+                            {rec.description}
+                            {rec.property && <span className="ml-2 text-xs text-muted-foreground">({rec.property.name})</span>}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={rec.type === "EINNAHME" ? "bg-success/15 text-success border-0" : "bg-destructive/10 text-destructive border-0"}>
+                              {rec.type === "EINNAHME" ? "Einnahme" : "Ausgabe"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-mono">{formatCurrency(rec.amount)}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {{ MONATLICH: "Monatlich", VIERTELJAEHRLICH: "Vierteljährlich", HALBJAEHRLICH: "Halbjährlich", JAEHRLICH: "Jährlich" }[rec.interval] ?? rec.interval}
+                            {" "}(Tag {rec.dayOfMonth})
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {rec.lastRun ? formatDate(rec.lastRun) : "–"}
+                          </TableCell>
+                          <TableCell>
+                            <button
+                              onClick={() => updateRecurring.mutate({ id: rec.id, data: { isActive: !rec.isActive } })}
+                              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                            >
+                              {rec.isActive ? (
+                                <><ToggleRight className="h-5 w-5 text-success" /><span className="text-success">Aktiv</span></>
+                              ) : (
+                                <><ToggleLeft className="h-5 w-5" /><span>Inaktiv</span></>
+                              )}
+                            </button>
+                          </TableCell>
+                          <TableCell className="pr-6 text-right">
+                            <button
+                              onClick={() => deleteRecurring.mutate(rec.id)}
+                              className="text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -745,6 +870,98 @@ const Finances = () => {
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Abbrechen</Button>
             <Button onClick={handleCreate} disabled={createTx.isPending}>
               {createTx.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Wiederkehrende Buchung Dialog */}
+      <Dialog open={recurringOpen} onOpenChange={setRecurringOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Wiederkehrende Buchung</DialogTitle>
+            <DialogDescription>Automatisch wiederkehrende Einnahme oder Ausgabe einrichten.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Typ *</Label>
+                <Select value={newRecurring.type} onValueChange={(v) => setNewRecurring((p) => ({ ...p, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EINNAHME">Einnahme</SelectItem>
+                    <SelectItem value="AUSGABE">Ausgabe</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Betrag (€) *</Label>
+                <Input type="number" step="0.01" value={newRecurring.amount} onChange={(e) => setNewRecurring((p) => ({ ...p, amount: e.target.value }))} placeholder="0.00" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Beschreibung *</Label>
+              <Input value={newRecurring.description} onChange={(e) => setNewRecurring((p) => ({ ...p, description: e.target.value }))} placeholder="z.B. Hausmeisterdienst" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Intervall</Label>
+                <Select value={newRecurring.interval} onValueChange={(v) => setNewRecurring((p) => ({ ...p, interval: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MONATLICH">Monatlich</SelectItem>
+                    <SelectItem value="VIERTELJAEHRLICH">Vierteljährlich</SelectItem>
+                    <SelectItem value="HALBJAEHRLICH">Halbjährlich</SelectItem>
+                    <SelectItem value="JAEHRLICH">Jährlich</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Tag des Monats (1–28)</Label>
+                <Input type="number" min="1" max="28" value={newRecurring.dayOfMonth} onChange={(e) => setNewRecurring((p) => ({ ...p, dayOfMonth: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Startdatum *</Label>
+                <Input type="date" value={newRecurring.startDate} onChange={(e) => setNewRecurring((p) => ({ ...p, startDate: e.target.value }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Enddatum (optional)</Label>
+                <Input type="date" value={newRecurring.endDate} onChange={(e) => setNewRecurring((p) => ({ ...p, endDate: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Kategorie</Label>
+                <Select value={newRecurring.category} onValueChange={(v) => setNewRecurring((p) => ({ ...p, category: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Kategorie wählen" /></SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Immobilie</Label>
+                <Select value={newRecurring.propertyId} onValueChange={(v) => setNewRecurring((p) => ({ ...p, propertyId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Alle Immobilien" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Alle Immobilien</SelectItem>
+                    {properties.map((prop) => (
+                      <SelectItem key={prop.id} value={String(prop.id)}>{prop.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecurringOpen(false)}>Abbrechen</Button>
+            <Button onClick={handleCreateRecurring} disabled={createRecurring.isPending}>
+              {createRecurring.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Speichern
             </Button>
           </DialogFooter>
