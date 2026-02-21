@@ -40,6 +40,10 @@ jobs:
         working-directory: backend
         run: npm ci
 
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
       - name: TypeScript check
         working-directory: backend
         run: npx tsc --noEmit
