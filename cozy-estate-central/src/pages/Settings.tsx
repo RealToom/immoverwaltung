@@ -16,6 +16,9 @@ import {
   Shield,
   Eye,
   EyeOff,
+  RefreshCw,
+  Trash2,
+  Inbox,
 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -44,6 +47,8 @@ import {
 } from "@/hooks/api/useSettings";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEmailAccounts, useCreateEmailAccount, useDeleteEmailAccount, useSyncEmailAccount } from "@/hooks/api/useEmailAccounts";
+import { formatDate } from "@/lib/mappings";
 
 type Theme = "light" | "dark" | "system";
 
@@ -173,6 +178,27 @@ const SettingsPage = () => {
 
   const profile = profileData?.data;
 
+  // ─── Email Accounts ──────────────────────────────────────
+  const { data: emailAccounts } = useEmailAccounts();
+  const createEmailAccount = useCreateEmailAccount();
+  const deleteEmailAccount = useDeleteEmailAccount();
+  const syncEmailAccount = useSyncEmailAccount();
+  const [mailForm, setMailForm] = useState({
+    label: "", email: "", imapHost: "", imapPort: 993, imapTls: true,
+    imapUser: "", password: "", smtpHost: "", smtpPort: 587, smtpTls: true,
+  });
+
+  const handleConnectMailbox = async () => {
+    try {
+      await createEmailAccount.mutateAsync({ ...mailForm });
+      toast({ title: "Postfach verbunden", description: `${mailForm.email} wurde erfolgreich verbunden.` });
+      setMailForm({ label: "", email: "", imapHost: "", imapPort: 993, imapTls: true, imapUser: "", password: "", smtpHost: "", smtpPort: 587, smtpTls: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verbindung fehlgeschlagen";
+      toast({ title: "Fehler", description: msg, variant: "destructive" });
+    }
+  };
+
   // ─── Password Change ─────────────────────────────────────
   const { logout } = useAuth();
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
@@ -221,6 +247,7 @@ const SettingsPage = () => {
             <TabsTrigger value="darstellung" className="gap-1.5"><Moon className="h-4 w-4" /> Darstellung</TabsTrigger>
             <TabsTrigger value="app" className="gap-1.5"><Settings className="h-4 w-4" /> App</TabsTrigger>
             <TabsTrigger value="sicherheit" className="gap-1.5"><Shield className="h-4 w-4" /> Sicherheit</TabsTrigger>
+            <TabsTrigger value="postfaecher" className="gap-1.5"><Inbox className="h-4 w-4" /> Postfächer</TabsTrigger>
           </TabsList>
 
           {/* Profile Tab */}
@@ -600,6 +627,107 @@ const SettingsPage = () => {
                   >
                     {pwLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
                     Passwort ändern
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Postfächer Tab */}
+          <TabsContent value="postfaecher" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Verbundene Postfächer</CardTitle>
+                <CardDescription>IMAP/SMTP-Konten für den integrierten Posteingang</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {emailAccounts?.data?.length === 0 && (
+                  <p className="text-sm text-muted-foreground">Noch keine Postfächer verbunden.</p>
+                )}
+                {emailAccounts?.data?.map((acc) => (
+                  <div key={acc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium">{acc.label}</p>
+                      <p className="text-sm text-muted-foreground">{acc.email}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Letzter Sync: {acc.lastSync ? formatDate(acc.lastSync) : "Noch nie"}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" title="Jetzt synchronisieren"
+                        onClick={() => syncEmailAccount.mutate(acc.id)}
+                        disabled={syncEmailAccount.isPending}>
+                        <RefreshCw className={`h-4 w-4 ${syncEmailAccount.isPending ? "animate-spin" : ""}`} />
+                      </Button>
+                      <Button size="sm" variant="destructive"
+                        onClick={() => deleteEmailAccount.mutate(acc.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                <Separator />
+                <p className="font-medium text-sm">Postfach verbinden</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Bezeichnung</Label>
+                    <Input placeholder="z.B. Büro-Postfach" value={mailForm.label}
+                      onChange={(e) => setMailForm((f) => ({ ...f, label: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>E-Mail-Adresse</Label>
+                    <Input type="email" placeholder="mail@beispiel.de" value={mailForm.email}
+                      onChange={(e) => setMailForm((f) => ({ ...f, email: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>IMAP-Server</Label>
+                    <Input placeholder="imap.beispiel.de" value={mailForm.imapHost}
+                      onChange={(e) => setMailForm((f) => ({ ...f, imapHost: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>IMAP-Port</Label>
+                    <Input type="number" value={mailForm.imapPort}
+                      onChange={(e) => setMailForm((f) => ({ ...f, imapPort: Number(e.target.value) }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>IMAP-Benutzername</Label>
+                    <Input placeholder="Benutzername / E-Mail" value={mailForm.imapUser}
+                      onChange={(e) => setMailForm((f) => ({ ...f, imapUser: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Passwort</Label>
+                    <Input type="password" placeholder="App-Passwort" value={mailForm.password}
+                      onChange={(e) => setMailForm((f) => ({ ...f, password: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>SMTP-Server</Label>
+                    <Input placeholder="smtp.beispiel.de" value={mailForm.smtpHost}
+                      onChange={(e) => setMailForm((f) => ({ ...f, smtpHost: e.target.value }))} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>SMTP-Port</Label>
+                    <Input type="number" value={mailForm.smtpPort}
+                      onChange={(e) => setMailForm((f) => ({ ...f, smtpPort: Number(e.target.value) }))} />
+                  </div>
+                  <div className="flex items-center gap-2 pt-2">
+                    <Switch checked={mailForm.imapTls}
+                      onCheckedChange={(v) => setMailForm((f) => ({ ...f, imapTls: v }))} />
+                    <Label>IMAP SSL/TLS</Label>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2">
+                    <Switch checked={mailForm.smtpTls}
+                      onCheckedChange={(v) => setMailForm((f) => ({ ...f, smtpTls: v }))} />
+                    <Label>SMTP SSL/TLS</Label>
+                  </div>
+                </div>
+                <div className="flex justify-end pt-2">
+                  <Button onClick={handleConnectMailbox} disabled={
+                    createEmailAccount.isPending || !mailForm.label || !mailForm.email ||
+                    !mailForm.imapHost || !mailForm.imapUser || !mailForm.password || !mailForm.smtpHost
+                  }>
+                    {createEmailAccount.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Mail className="h-4 w-4 mr-1" />}
+                    Verbinden &amp; Testen
                   </Button>
                 </div>
               </CardContent>

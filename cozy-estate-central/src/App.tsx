@@ -21,6 +21,9 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import BankIntegration from "./pages/BankIntegration";
 import UsersPage from "./pages/Users";
+import CalendarPage from "./pages/Calendar";
+import Postfach from "./pages/Postfach";
+import Anfragen from "./pages/Anfragen";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -49,6 +52,9 @@ const AppLayout = () => (
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/bank" element={<BankIntegration />} />
         <Route path="/users" element={<UsersPage />} />
+        <Route path="/calendar" element={<CalendarPage />} />
+        <Route path="/postfach" element={<Postfach />} />
+        <Route path="/anfragen" element={<Anfragen />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
