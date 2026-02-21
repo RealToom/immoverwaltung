@@ -20,6 +20,7 @@ import { calendarRouter } from "./calendar.routes.js";
 import { emailAccountRouter } from "./email-account.routes.js";
 import { emailMessageRouter } from "./email-message.routes.js";
 import { meterRouter } from "./meter.routes.js";
+import { recurringTransactionRouter } from "./recurring-transaction.routes.js";
 
 const router = Router();
 
@@ -47,5 +48,6 @@ router.use("/calendar", requireAuth, tenantGuard, calendarRouter);
 router.use("/email-accounts", requireAuth, tenantGuard, emailAccountRouter);
 router.use("/email-messages", requireAuth, tenantGuard, emailMessageRouter);
 router.use("/meters", requireAuth, tenantGuard, meterRouter);
+router.use("/recurring-transactions", requireAuth, tenantGuard, recurringTransactionRouter);
 
 export { router as apiRouter };

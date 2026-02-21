@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { logger } from "../lib/logger.js";
 import { deleteOldAuditLogs } from "./audit.service.js";
 import { startImapSync, stopImapSync } from "./imap-sync.service.js";
+import { processRecurringTransactions } from "./recurring-transaction.service.js";
 
 /**
  * DSGVO Art. 17 / Art. 5(1)(e) - Aufbewahrungsfristen
@@ -63,6 +64,7 @@ export function startRetentionCleanup(): void {
         deleteOldAuditLogs(90).then((count) => {
             if (count > 0) logger.info({ count }, "[DSGVO-CLEANUP] Alte Audit-Logs geloescht (>90 Tage)");
         }),
+        processRecurringTransactions().catch((err) => logger.error({ err }, "[RECURRING] Fehler beim Verarbeiten")),
     ]).catch((err) => logger.error({ err }, "[CLEANUP] Fehler beim initialen Cleanup"));
 
     // Dann stuendlich
@@ -73,6 +75,7 @@ export function startRetentionCleanup(): void {
             deleteOldAuditLogs(90).then((count) => {
                 if (count > 0) logger.info({ count }, "[DSGVO-CLEANUP] Alte Audit-Logs geloescht (>90 Tage)");
             }),
+            processRecurringTransactions().catch((err) => logger.error({ err }, "[RECURRING] Fehler beim Verarbeiten")),
         ]).catch((err) => logger.error({ err }, "[CLEANUP] Fehler beim periodischen Cleanup"));
     }, CLEANUP_INTERVAL_MS);
 
