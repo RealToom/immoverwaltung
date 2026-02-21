@@ -10,7 +10,8 @@ const router = Router();
 
 router.get("/", validate({ query: emailMessageQuerySchema }), ctrl.list);
 router.get("/:id", validate({ params: idParamSchema }), ctrl.getById);
-router.patch("/:id", validate({ params: idParamSchema, body: updateEmailMessageSchema }), ctrl.update);
+router.patch("/:id", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
+  validate({ params: idParamSchema, body: updateEmailMessageSchema }), ctrl.update);
 router.post("/:id/reply", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
   validate({ params: idParamSchema, body: replyEmailSchema }), ctrl.reply);
 router.post("/:id/send-document", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),

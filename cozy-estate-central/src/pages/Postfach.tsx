@@ -171,7 +171,7 @@ export default function Postfach() {
               {detail.bodyHtml ? (
                 <iframe
                   srcDoc={detail.bodyHtml}
-                  sandbox="allow-same-origin"
+                  sandbox=""
                   className="w-full h-full border-0"
                   title="E-Mail-Inhalt"
                 />

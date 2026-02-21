@@ -48,8 +48,8 @@ export async function updateMessage(companyId: number, id: number, data: {
   return prisma.emailMessage.update({ where: { id }, data: data as never });
 }
 
-async function getSmtpTransport(accountId: number) {
-  const account = await prisma.emailAccount.findUnique({ where: { id: accountId } });
+async function getSmtpTransport(accountId: number, companyId: number) {
+  const account = await prisma.emailAccount.findFirst({ where: { id: accountId, companyId } });
   if (!account) throw new AppError(404, "Postfach nicht gefunden");
   const password = decryptString(account.encryptedPassword);
   return {
@@ -63,7 +63,7 @@ async function getSmtpTransport(accountId: number) {
 
 export async function replyToMessage(companyId: number, messageId: number, body: string) {
   const msg = await getMessage(companyId, messageId);
-  const { transport, fromEmail } = await getSmtpTransport(msg.emailAccountId);
+  const { transport, fromEmail } = await getSmtpTransport(msg.emailAccountId, companyId);
 
   await transport.sendMail({
     from: fromEmail,
@@ -82,7 +82,7 @@ export async function sendDocument(companyId: number, messageId: number, documen
   ]);
   if (!doc) throw new AppError(404, "Dokument nicht gefunden");
 
-  const { transport, fromEmail } = await getSmtpTransport(msg.emailAccountId);
+  const { transport, fromEmail } = await getSmtpTransport(msg.emailAccountId, companyId);
 
   let attachmentContent: Buffer | null = null;
   if (doc.filePath) {
@@ -108,7 +108,7 @@ export async function createEventFromEmail(companyId: number, userId: number, me
 
   // Remove old AI suggestion if present
   if (msg.suggestedEventId) {
-    await prisma.calendarEvent.deleteMany({ where: { id: msg.suggestedEventId } });
+    await prisma.calendarEvent.deleteMany({ where: { id: msg.suggestedEventId, companyId } });
   }
 
   const event = await prisma.calendarEvent.create({

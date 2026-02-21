@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ type TabFilter = "ALLE" | InquiryStatus;
 
 export default function Anfragen() {
   const [tab, setTab] = useState<TabFilter>("ALLE");
+  const navigate = useNavigate();
   const updateMsg = useUpdateEmailMessage();
 
   const { data, isLoading } = useEmailMessages({
@@ -119,7 +121,7 @@ export default function Anfragen() {
                   <td className="p-3">
                     <div className="flex gap-1.5 flex-wrap">
                       <Button size="sm" variant="outline" className="h-7 text-xs"
-                        onClick={() => window.location.href = `/postfach?selected=${msg.id}`}>
+                        onClick={() => navigate("/postfach")}>
                         Öffnen
                       </Button>
                       {msg.inquiryStatus === "NEU" && (

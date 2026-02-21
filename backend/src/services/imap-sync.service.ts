@@ -110,12 +110,13 @@ export async function syncAccount(accountId: number, companyId: number): Promise
       });
 
       // AI appointment suggestion: create CalendarEvent
-      if (ai.hasAppointment && ai.appointmentDate) {
+      const parsedDate = ai.hasAppointment && ai.appointmentDate ? new Date(ai.appointmentDate) : null;
+      if (parsedDate && !isNaN(parsedDate.getTime())) {
         const event = await prisma.calendarEvent.create({
           data: {
             title: ai.appointmentTitle ?? subject,
             description: `Aus E-Mail von ${emailMsg.fromAddress}: ${subject}`,
-            start: new Date(ai.appointmentDate),
+            start: parsedDate,
             type: "AUTO_EMAIL",
             color: "#8b5cf6",
             companyId,
