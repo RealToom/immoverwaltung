@@ -3,7 +3,7 @@ const TOKEN_KEY = "accessToken";
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 
-function getToken(): string | null {
+export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
