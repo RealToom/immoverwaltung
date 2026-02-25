@@ -172,7 +172,7 @@ export async function sendDigestEmails(companyId: number, frequency: string): Pr
     WOECHENTLICH: "Wochenübersicht",
     MONATLICH: "Monatsübersicht",
   };
-  const period = frequencyLabels[frequency] ?? frequency;
+  const period = escHtml(frequencyLabels[frequency] ?? frequency);
 
   const subject = `Immoverwaltung – ${period}`;
   const html = htmlWrapper(period, `

@@ -62,9 +62,13 @@ const Reports = () => {
       const params = new URLSearchParams({ format });
       if (from) params.set("from", from);
       if (to) params.set("to", to);
+      const token = getToken();
       const res = await fetch(`/api/reports/export?${params}`, {
-        headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+      if (!res.ok) {
+        throw new Error(`Export fehlgeschlagen (${res.status})`);
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

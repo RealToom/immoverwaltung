@@ -77,10 +77,11 @@ export function generateReportCsv(data: ReportData): Buffer {
     "",
     "Immobilien",
     "Name;Einheiten gesamt;Einheiten belegt;Monatliche Einnahmen (EUR)",
-    ...data.properties.map(
-      (p) =>
-        `${p.name};${p.totalUnits};${p.occupiedUnits};${fmt(p.monthlyRevenue)}`,
-    ),
+    ...data.properties.map((p) => {
+      // Prefix with tab to prevent CSV formula injection (=, +, -, @)
+      const safeName = /^[=+\-@]/.test(p.name) ? `\t${p.name}` : p.name;
+      return `${safeName};${p.totalUnits};${p.occupiedUnits};${fmt(p.monthlyRevenue)}`;
+    }),
     "",
     "Finanzsummary",
     "Einnahmen (EUR);Ausgaben (EUR);Netto (EUR)",
