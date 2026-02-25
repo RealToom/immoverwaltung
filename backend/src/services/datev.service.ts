@@ -127,7 +127,7 @@ function buildHeader(
 
   const wjBeginn =
     String(fromDate.getFullYear()) +
-    pad2(settings.fiscalYearStart) +
+    pad2(settings.fiscalYearStart ?? 1) +
     "01";
 
   const fields = [
