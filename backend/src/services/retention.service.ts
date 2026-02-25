@@ -6,6 +6,8 @@ import { startImapSync, stopImapSync } from "./imap-sync.service.js";
 import { processRecurringTransactions } from "./recurring-transaction.service.js";
 import { markOverduePayments } from "./dunning.service.js";
 import { processOverdueSchedules } from "./maintenance-schedule.service.js";
+import { syncAllAccounts } from "./banking.service.js";
+import { matchAllPendingTransactions } from "./matching.service.js";
 
 /**
  * DSGVO Art. 17 / Art. 5(1)(e) - Aufbewahrungsfristen
@@ -18,6 +20,7 @@ import { processOverdueSchedules } from "./maintenance-schedule.service.js";
  */
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 Stunde
+const BANKING_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 Stunden
 
 export async function cleanupExpiredDocuments(): Promise<number> {
     const now = new Date();
@@ -57,6 +60,7 @@ export async function cleanupExpiredRefreshTokens(): Promise<number> {
 }
 
 let cleanupTimer: ReturnType<typeof setInterval> | null = null;
+let bankingSyncTimer: ReturnType<typeof setInterval> | null = null;
 
 export function startRetentionCleanup(): void {
     // Sofort einmal ausfuehren
@@ -86,6 +90,15 @@ export function startRetentionCleanup(): void {
     }, CLEANUP_INTERVAL_MS);
 
     logger.info("Aufbewahrungsfristen-Cleanup gestartet (Intervall: 1h)");
+
+    // Banking sync every 6 hours (PSD2 rate limit: max 4x/day per account)
+    bankingSyncTimer = setInterval(() => {
+        syncAllAccounts()
+            .then(() => matchAllPendingTransactions())
+            .catch((err) => logger.error({ err }, "[BANKING-SYNC] Fehler beim automatischen Sync"));
+    }, BANKING_SYNC_INTERVAL_MS);
+
+    logger.info("Banking-Sync gestartet (Intervall: 6h)");
     startImapSync();
 }
 
@@ -93,6 +106,10 @@ export function stopRetentionCleanup(): void {
     if (cleanupTimer) {
         clearInterval(cleanupTimer);
         cleanupTimer = null;
+    }
+    if (bankingSyncTimer) {
+        clearInterval(bankingSyncTimer);
+        bankingSyncTimer = null;
     }
     stopImapSync();
 }
