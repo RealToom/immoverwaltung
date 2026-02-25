@@ -48,12 +48,11 @@ export async function exportReport(req: Request, res: Response): Promise<void> {
   const csv = generateReportCsv(data);
   const fromStr = data.from ? data.from.toLocaleDateString("de-DE") : "Beginn";
   const toStr = data.to ? data.to.toLocaleDateString("de-DE") : "Heute";
+  const csvFilename = encodeURIComponent(`Bericht_${fromStr}-${toStr}.csv`);
 
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="Bericht_${fromStr}-${toStr}.csv"`,
-  );
+  res.setHeader("Content-Disposition", `attachment; filename="${csvFilename}"`);
   res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.send(csv);
 }
