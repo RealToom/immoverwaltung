@@ -30,6 +30,6 @@ router.delete(
   validate({ params: idParamSchema }),
   ctrl.remove,
 );
-router.post("/:id/render", apiLimiter, validate({ params: idParamSchema }), ctrl.renderToPdf);
+router.post("/:id/render", apiLimiter, requireRole("ADMIN", "VERWALTER"), validate({ params: idParamSchema }), ctrl.renderToPdf);
 
 export { router as documentTemplateRouter };

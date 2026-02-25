@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import type { TransactionType } from "@prisma/client";
 import { paginationMeta } from "../schemas/common.schema.js";
 import { notifyRentPayment } from "./email.service.js";
+import { logger } from "../lib/logger.js";
 
 export async function getFinanceSummary(companyId: number) {
   const monthlyRevenue = await prisma.unit.aggregate({
@@ -206,7 +207,7 @@ export async function createTransaction(
       tenantName: data.description,
       amount: data.amount,
       month: monthStr,
-    }).catch((err) => console.error("E-Mail-Benachrichtigung fehlgeschlagen:", err));
+    }).catch((err) => logger.error({ err }, "E-Mail-Benachrichtigung fehlgeschlagen"));
   }
 
   return transaction;

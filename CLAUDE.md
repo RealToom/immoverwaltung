@@ -94,11 +94,12 @@ npm test                      # Unit-Tests ausfuehren (vitest)
 - Phase 3 (Mock-Bereinigung): Abgeschlossen
 - Phase 4 (Settings + RentPayment): Abgeschlossen
 - Phase 7 (Dokument-Preview, Ticket-Bearbeitung, Unit-Typen, Adress-Aufspaltung): Abgeschlossen
-- Production-Hardening: Abgeschlossen - Migrationen, Graceful Shutdown, HTTPS+nginx, Tests (19+9)
-- Security-Haertung Runde 1+2: Abgeschlossen - Rate-Limiting (auth/api/admin), RBAC, Account-Lockout, Refresh-Token-DB, Passwort-Komplexitaet, CORS, Pino, HSTS, BCRYPT_COST, MIME-Whitelist, Magic-Bytes, SameSite=Strict, AuditLog-DB
+- Production-Hardening: Abgeschlossen (2026-02-25) - Migrationen, Graceful Shutdown, HTTPS+nginx, Tests (55+), Deployment Guide
+- Security-Haertung Runde 1-3: Abgeschlossen - Rate-Limiting, RBAC, Lockout, Refresh-Token-DB, Magic-Bytes, SameSite=Strict, AuditLog-DB, PSD2-Security (IBAN masking)
 - KI-Belegscan: Abgeschlossen - POST /api/finance/scan (Claude Haiku Vision)
-- F6 Nebenkostenabrechnung: Abgeschlossen - allocatable, utility-statement
+- F6 Nebenkostenabrechnung: Abgeschlossen - allocatable, utility-statement + PDF Export
 - F9 ROI-Dashboard: Abgeschlossen - purchasePrice+equity, /finance/roi, Rendite-Tab
 - Benutzerverwaltung: Abgeschlossen - /api/users CRUD + reset-password + unlock, Users.tsx
 - Production-Readiness: Abgeschlossen - docker-compose Haertung, GitHub Actions CI, backup.sh, E-Mail Passwort-Reset, DEPLOYMENT.md Checkliste
 - Passwort-Aendern: Abgeschlossen - PATCH /api/auth/me/password + Settings Sicherheit-Tab
+- DATEV Export + PSD2 Banking (Nordigen): Abgeschlossen (2026-02-25)

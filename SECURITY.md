@@ -1,7 +1,7 @@
 # Sicherheitsanalyse - Immoverwaltung Backend
 
 > **Erstellt:** 2026-02-11
-> **Letzte Aktualisierung:** 2026-02-20
+> **Letzte Aktualisierung:** 2026-02-25
 
 ---
 
@@ -41,6 +41,8 @@
 | N2 | `SameSite=Lax` auf Refresh-Cookie | Auf `SameSite=Strict` gesetzt (Frontend + API gleiche Domain via nginx) | `controllers/auth.controller.ts` |
 | N4 | Keine Magic-Bytes-Validierung | `file-type` prüft Dateiinhalt nach Multer-Upload; bei Nichtübereinstimmung wird Datei gelöscht + 400 zurückgegeben | `controllers/document.controller.ts` |
 | N6 | Audit-Logs nur in Pino (kein DB-Persistenz) | `AuditLog` Prisma-Model + `audit.service.ts`; Logs werden in DB gespeichert (90-Tage-Retention via retention.service.ts) | `services/audit.service.ts`, `document.controller.ts` |
+| S13 | PSD2-Sicherheit (Banking) | IBAN-Maskierung (`maskIban()`) in API + Logs; Nordigen-Tokens nur In-Memory (nie persistent); Multi-Tenancy-Check auf BankAccount-Ebene | `nordigen.service.ts`, `banking.service.ts` |
+| S14 | Matching-Integrität | Deterministisches Matching (Betrag ±0.01 + Name-Score); atomares Upsert von RentPayment + Ledger; Optimistic Locking gegen Concurrent-Matching | `matching.service.ts` |
 
 ---
 

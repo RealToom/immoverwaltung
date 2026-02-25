@@ -2,7 +2,7 @@
 
 > **Verantwortlicher:** [Firmenname einsetzen]
 > **Datenschutzbeauftragter:** [DSB einsetzen, sofern bestellt]
-> **Letzte Aktualisierung:** 2026-02-16
+> **Letzte Aktualisierung:** 2026-02-25
 
 ---
 
@@ -123,6 +123,21 @@
 | **Drittlandtransfer** | Keiner |
 | **Löschfrist** | 1 Jahr (rollierende Log-Dateien empfohlen) |
 | **Technische Maßnahmen** | Strukturiertes JSON-Logging, nur serverseitig |
+
+---
+
+## 9. Bankanbindung (PSD2 / Banking)
+
+| Feld | Beschreibung |
+|------|-------------|
+| **Zweck** | Automatischer Abgleich von Mieteingängen via PSD2-Schnittstelle (Nordigen/GoCardless) |
+| **Rechtsgrundlage** | Art. 6 Abs. 1 lit. b (Vertragserfüllung), lit. c (GoB / AO Buchführung) |
+| **Betroffene Personen** | Mieter (Zahlungssender), Verwaltungsmitarbeiter (Kontoinhaber) |
+| **Personenbezogene Daten** | IBAN (maskiert), Name des Absenders, Betrag, Verwendungszweck |
+| **Empfänger** | GoCardless/Nordigen (Schnittstellen-Provider) |
+| **Drittlandtransfer** | Keiner (Provider innerhalb EU/EWR) |
+| **Löschfrist** | 10 Jahre (§ 147 AO) |
+| **Technische Maßnahmen** | Übertragung via TLS, Maskierung der IBAN in Logs/API (`maskIban()`), Nordigen-Zugriffstokens nur In-Memory, Mandantentrennung auf Datenbankebene |
 
 ---
 

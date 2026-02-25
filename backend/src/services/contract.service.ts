@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { NotFoundError } from "../lib/errors.js";
 import { paginationMeta } from "../schemas/common.schema.js";
 import { notifyContractStatusChange } from "./email.service.js";
+import { logger } from "../lib/logger.js";
 import type { ContractStatus, ContractType, ReminderType, Prisma } from "@prisma/client";
 
 interface ContractQuery {
@@ -90,7 +91,7 @@ export async function createContract(companyId: number, data: CreateContractData
       tenantName: contract.tenant.name,
       propertyName: contract.property.name,
       status: data.status,
-    }).catch((err) => console.error("E-Mail-Benachrichtigung fehlgeschlagen:", err));
+    }).catch((err) => logger.error({ err }, "E-Mail-Benachrichtigung fehlgeschlagen"));
   }
 
   return contract;
@@ -111,7 +112,7 @@ export async function updateContract(companyId: number, id: number, data: Update
       tenantName: contract.tenant.name,
       propertyName: contract.property.name,
       status: data.status,
-    }).catch((err) => console.error("E-Mail-Benachrichtigung fehlgeschlagen:", err));
+    }).catch((err) => logger.error({ err }, "E-Mail-Benachrichtigung fehlgeschlagen"));
   }
 
   return contract;

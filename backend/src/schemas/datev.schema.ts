@@ -20,4 +20,11 @@ export const datevExportSchema = z.object({
   toDate: z.coerce.date(),
 }).refine((d) => d.fromDate <= d.toDate, {
   message: "fromDate muss vor toDate liegen",
+}).refine((d) => {
+  const maxRangeMs = 366 * 24 * 60 * 60 * 1000; // max 366 days (1 full fiscal year)
+  return d.toDate.getTime() - d.fromDate.getTime() <= maxRangeMs;
+}, {
+  message: "Der Exportzeitraum darf maximal 366 Tage betragen",
 });
+
+export const datevMappingParamsSchema = datevMappingSchema.pick({ category: true });

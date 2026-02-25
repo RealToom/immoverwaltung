@@ -1,11 +1,17 @@
 import { prisma } from "../lib/prisma.js";
 import { NotFoundError, ForbiddenError } from "../lib/errors.js";
 
+function maskIban(iban: string): string {
+  if (iban.length < 8) return "****";
+  return iban.slice(0, 4) + "****" + iban.slice(-4);
+}
+
 export async function listBankAccounts(companyId: number) {
-    return prisma.bankAccount.findMany({
+    const accounts = await prisma.bankAccount.findMany({
         where: { companyId },
         orderBy: { createdAt: "desc" },
     });
+    return accounts.map((a) => ({ ...a, iban: maskIban(a.iban) }));
 }
 
 export async function getBankAccount(companyId: number, id: number) {
@@ -14,7 +20,7 @@ export async function getBankAccount(companyId: number, id: number) {
     });
 
     if (!account) throw new NotFoundError("Bankkonto", id);
-    return account;
+    return { ...account, iban: maskIban(account.iban) };
 }
 
 export async function createBankAccount(companyId: number, data: { name: string; iban: string; bic?: string }) {

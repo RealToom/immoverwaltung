@@ -12,6 +12,7 @@ const router = Router();
 
 router.get(
   "/institutions",
+  requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
   validate({ query: listInstitutionsSchema }),
   ctrl.listInstitutions
 );
@@ -23,12 +24,13 @@ router.post(
   ctrl.initiateRequisition
 );
 
-router.get("/accounts/:id/status", ctrl.getAccountStatus);
+router.get("/accounts/:id/status", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"), ctrl.getAccountStatus);
 
 router.post("/accounts/:id/sync", requireRole("ADMIN", "VERWALTER"), ctrl.syncAccount);
 
 router.get(
   "/accounts/:id/transactions",
+  requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
   validate({ query: bankTransactionQuerySchema }),
   ctrl.listTransactions
 );

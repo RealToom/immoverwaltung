@@ -69,8 +69,8 @@ export async function deleteAccount(companyId: number, id: number) {
   await prisma.emailAccount.delete({ where: { id } });
 }
 
-export async function getDecryptedPassword(accountId: number): Promise<string> {
-  const account = await prisma.emailAccount.findUnique({ where: { id: accountId } });
+export async function getDecryptedPassword(accountId: number, companyId: number): Promise<string> {
+  const account = await prisma.emailAccount.findFirst({ where: { id: accountId, companyId } });
   if (!account) throw new AppError(404, "Postfach nicht gefunden");
   return decryptString(account.encryptedPassword);
 }

@@ -192,7 +192,15 @@ function buildDataRow(
   const gegenkonto = settings.defaultBankAccount;
   const belegdatum = formatDatevDate(tx.date);
   const belegfeld1 = buildBelegfeld1(tx.id);
-  const buchungstext = tx.description.slice(0, 60).replace(/;/g, " ");
+  // Strip newlines, carriage returns, and CSV formula-injection prefixes (=, +, -, @)
+  // to prevent spreadsheet formula injection when the CSV is opened in Excel/LibreOffice.
+  const rawBuchungstext = tx.description
+    .slice(0, 60)
+    .replace(/[\r\n]/g, " ")
+    .replace(/;/g, " ");
+  const buchungstext = /^[=+\-@]/.test(rawBuchungstext)
+    ? "'" + rawBuchungstext
+    : rawBuchungstext;
 
   const fields = [
     amount,      // Umsatz (ohne Soll/Haben-Kz)

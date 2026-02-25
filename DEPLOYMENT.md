@@ -12,6 +12,9 @@ Vor dem ersten Go-Live alle Punkte abhaken:
 
 ### Pflicht (ohne diese laeuft docker-compose nicht hoch)
 
+- [ ] [Rechtliche Checkliste](file:///c:/Users/tomsc/Documents/Projects/AI-Programming/immoverwaltung/LEGAL_TEMPLATES.md) (Abmahngefahr!)
+- [ ] [Server-Absicherung](file:///c:/Users/tomsc/Documents/Projects/AI-Programming/immoverwaltung/SERVER_SECURITY.md) (SSH/Firewall)
+- [ ] [DNS-Konfiguration](file:///c:/Users/tomsc/Documents/Projects/AI-Programming/immoverwaltung/DNS_CONFIG.md) (E-Mail Zustellbarkeit)
 - [ ] `ENCRYPTION_KEY` generieren und setzen:
   ```bash
   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -25,6 +28,7 @@ Vor dem ersten Go-Live alle Punkte abhaken:
   [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Max 256 }) -as [byte[]])
   ```
 - [ ] `CORS_ORIGINS` — exakte HTTPS-URL des Frontends (z.B. `https://verwaltung.meine-firma.de`)
+- [ ] `NORDIGEN_SECRET_ID` + `NORDIGEN_SECRET_KEY` — PSD2 Bankanbindung (GoCardless/Nordigen)
 - [ ] SSL-Zertifikate vorhanden (Let's Encrypt empfohlen, siehe unten)
 
 ### Empfohlen
@@ -32,6 +36,7 @@ Vor dem ersten Go-Live alle Punkte abhaken:
 - [ ] `ANTHROPIC_API_KEY` setzen — aktiviert KI-Belegscan (optional, kann leer bleiben)
 - [ ] `BCRYPT_COST=12` — Standard, bei sehr starken Servern auf 13 erhoehen
 - [ ] `SEED_DB=false` — nur beim allerersten Start auf `true` setzen
+- [ ] DATEV-Kategorie-Mappings in den Admin-Einstellungen pflegen
 - [ ] SMTP-Daten konfigurieren — aktiviert E-Mail-Benachrichtigungen + Passwort-Reset-E-Mails
 - [ ] Automatisches Backup einrichten (Cronjob, siehe Abschnitt "Backup")
 - [ ] Monitoring einrichten (UptimeRobot: GET `/health` alle 5 Min, Alert bei Status != 200)

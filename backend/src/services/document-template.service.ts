@@ -51,6 +51,9 @@ export async function renderTemplate(
 ): Promise<string> {
   const t = await prisma.documentTemplate.findFirst({ where: { id, companyId } });
   if (!t) throw new AppError(404, "Vorlage nicht gefunden");
-  const compiled = Handlebars.compile(t.content);
-  return compiled(variables);
+  const compiled = Handlebars.compile(t.content, { strict: true, noEscape: false });
+  return compiled(variables, {
+    allowProtoPropertiesByDefault: false,
+    allowProtoMethodsByDefault: false,
+  });
 }

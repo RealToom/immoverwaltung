@@ -43,13 +43,14 @@ export async function handleCallback(req: Request, res: Response): Promise<void>
 }
 
 // GET /banking/accounts/:id/status
+// NOTE: requisitionId and nordigenAccountId are intentionally omitted from the response
+// to avoid exposing internal Nordigen identifiers that could enable direct Nordigen API access.
 export async function getAccountStatus(req: Request, res: Response): Promise<void> {
   const account = await prisma.bankAccount.findFirst({
     where: { id: Number(req.params.id), companyId: req.companyId! },
     select: {
       id: true, name: true, status: true, provider: true,
-      requisitionId: true, nordigenAccountId: true, lastSync: true,
-      iban: true,
+      lastSync: true, iban: true,
     },
   });
   if (!account) {

@@ -307,7 +307,7 @@ export async function ignoreBankTransaction(
   if (!tx) throw new NotFoundError("BankTransaction", bankTransactionId);
 
   await prisma.bankTransaction.update({
-    where: { id: bankTransactionId },
+    where: { id: bankTransactionId, companyId },
     data: { status: "IGNORED" },
   });
 }

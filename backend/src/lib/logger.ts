@@ -9,4 +9,21 @@ export const logger = pino({
     env: process.env.NODE_ENV,
   },
   timestamp: pino.stdTimeFunctions.isoTime,
+  // Automatische PII-Redaktion sensibler Felder (DSGVO-Konformität)
+  redact: {
+    paths: [
+      "*.password",
+      "*.passwordHash",
+      "*.encryptedPassword",
+      "*.token",
+      "*.accessToken",
+      "*.refreshToken",
+      "*.secret",
+      "*.apiKey",
+      "*.api_key",
+      "*.iban",
+      "*.IBAN",
+    ],
+    censor: "[REDACTED]",
+  },
 });
