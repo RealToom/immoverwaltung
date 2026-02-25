@@ -35,3 +35,8 @@ export async function createEvent(req: Request, res: Response): Promise<void> {
   const event = await svc.createEventFromEmail(req.companyId!, req.userId!, Number(req.params.id), req.body);
   res.status(201).json({ data: event });
 }
+
+export async function sendNew(req: Request, res: Response): Promise<void> {
+  await svc.sendNewEmail(req.companyId!, req.body);
+  res.json({ message: "Nachricht gesendet" });
+}

@@ -11,6 +11,7 @@ export const createEmailAccountSchema = z.object({
   smtpHost: z.string().min(1),
   smtpPort: z.number().int().min(1).max(65535).default(587),
   smtpTls: z.boolean().default(true),
+  skipConnectionTest: z.boolean().default(false),
 });
 
 export const updateEmailAccountSchema = z.object({

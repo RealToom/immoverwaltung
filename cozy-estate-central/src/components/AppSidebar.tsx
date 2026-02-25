@@ -55,7 +55,7 @@ const kommunikationNav = [
 
 export function AppSidebar() {
   const { state } = useSidebar();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const collapsed = state === "collapsed";
   const isAdmin = user?.role === "ADMIN";
 
@@ -177,6 +177,16 @@ export function AppSidebar() {
                 <Settings className="h-4 w-4" />
                 <span>Einstellungen</span>
               </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="Abmelden"
+              onClick={logout}
+              className="text-sidebar-foreground/80 hover:bg-destructive/20 hover:text-destructive cursor-pointer"
+            >
+              <LogOut className="h-4 w-4" />
+              <span>Abmelden</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

@@ -3,12 +3,14 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Reply, CalendarDays, Sparkles, Check, X } from "lucide-react";
+import { Loader2, Reply, CalendarDays, Sparkles, Check, X, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { useEmailMessages, useEmailMessage, useUpdateEmailMessage, useReplyEmail, useCreateEventFromEmail } from "@/hooks/api/useEmailMessages";
+import { useEmailMessages, useEmailMessage, useUpdateEmailMessage, useReplyEmail, useCreateEventFromEmail, useSendNewEmail } from "@/hooks/api/useEmailMessages";
+import { useEmailAccounts } from "@/hooks/api/useEmailAccounts";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDate } from "@/lib/mappings";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -23,6 +25,11 @@ export default function Postfach() {
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
   const [eventTitle, setEventTitle] = useState("");
   const [eventStart, setEventStart] = useState("");
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeTo, setComposeTo] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [composeAccountId, setComposeAccountId] = useState<string>("");
 
   const isReadFilter = filter === "ungelesen" ? false : undefined;
   const isInquiryFilter = filter === "anfragen" ? true : undefined;
@@ -36,6 +43,9 @@ export default function Postfach() {
   const updateMsg = useUpdateEmailMessage();
   const replyEmail = useReplyEmail();
   const createEvent = useCreateEventFromEmail();
+  const sendNew = useSendNewEmail();
+  const { data: accountsRes } = useEmailAccounts();
+  const accounts = accountsRes?.data ?? [];
 
   const messages = listData?.data ?? [];
   const detail = detailData?.data;
@@ -91,6 +101,9 @@ export default function Postfach() {
         {/* E-Mail-Liste */}
         <div className="w-[360px] border-r flex flex-col shrink-0">
           <div className="p-3 border-b flex flex-col gap-2">
+            <Button size="sm" className="gap-1.5 w-full" onClick={() => { setComposeTo(""); setComposeSubject(""); setComposeBody(""); setComposeAccountId(accounts[0] ? String(accounts[0].id) : ""); setComposeOpen(true); }}>
+              <Pencil className="h-4 w-4" /> Neue E-Mail
+            </Button>
             <div className="flex gap-1.5 flex-wrap">
               {filters.map((f) => (
                 <button key={f.key} onClick={() => setFilter(f.key)}
@@ -199,6 +212,62 @@ export default function Postfach() {
             <Button variant="outline" onClick={() => setReplyOpen(false)}>Abbrechen</Button>
             <Button onClick={handleReply} disabled={replyEmail.isPending}>
               {replyEmail.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Senden
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Neue E-Mail Dialog */}
+      <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Neue E-Mail schreiben</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-3 py-1">
+            {accounts.length > 1 && (
+              <div>
+                <Label className="text-xs mb-1 block">Absender-Postfach</Label>
+                <Select value={composeAccountId} onValueChange={setComposeAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Postfach auswählen" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={String(a.id)}>{a.label} ({a.email})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div>
+              <Label className="text-xs mb-1 block">An</Label>
+              <Input value={composeTo} onChange={(e) => setComposeTo(e.target.value)} placeholder="empfaenger@example.com" type="email" />
+            </div>
+            <div>
+              <Label className="text-xs mb-1 block">Betreff</Label>
+              <Input value={composeSubject} onChange={(e) => setComposeSubject(e.target.value)} placeholder="Betreff..." />
+            </div>
+            <div>
+              <Label className="text-xs mb-1 block">Nachricht</Label>
+              <Textarea rows={7} value={composeBody} onChange={(e) => setComposeBody(e.target.value)} placeholder="Ihre Nachricht..." />
+            </div>
+            {accounts.length === 0 && (
+              <p className="text-xs text-destructive">Kein E-Mail-Postfach konfiguriert. Bitte zuerst ein Postfach in den Einstellungen anlegen.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setComposeOpen(false)}>Abbrechen</Button>
+            <Button
+              disabled={sendNew.isPending || accounts.length === 0 || !composeTo || !composeSubject || !composeBody}
+              onClick={async () => {
+                const accountId = composeAccountId ? Number(composeAccountId) : accounts[0]?.id;
+                if (!accountId) return;
+                try {
+                  await sendNew.mutateAsync({ accountId, to: composeTo, subject: composeSubject, body: composeBody });
+                  toast.success("E-Mail gesendet");
+                  setComposeOpen(false);
+                } catch {
+                  toast.error("Fehler beim Senden der E-Mail");
+                }
+              }}
+            >
+              {sendNew.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Senden
             </Button>
           </DialogFooter>
         </DialogContent>

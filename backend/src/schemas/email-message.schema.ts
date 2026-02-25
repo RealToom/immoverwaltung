@@ -29,3 +29,10 @@ export const createEventFromEmailSchema = z.object({
   end: z.coerce.date().optional(),
   allDay: z.boolean().default(false),
 });
+
+export const sendNewEmailSchema = z.object({
+  accountId: z.number().int().positive(),
+  to: z.string().email(),
+  subject: z.string().min(1).max(500),
+  body: z.string().min(1).max(50000),
+});

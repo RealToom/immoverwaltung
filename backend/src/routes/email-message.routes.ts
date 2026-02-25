@@ -2,7 +2,7 @@ import { Router } from "express";
 import { validate } from "../middleware/validate.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { emailMessageQuerySchema, updateEmailMessageSchema,
-         replyEmailSchema, sendDocumentSchema, createEventFromEmailSchema } from "../schemas/email-message.schema.js";
+         replyEmailSchema, sendDocumentSchema, createEventFromEmailSchema, sendNewEmailSchema } from "../schemas/email-message.schema.js";
 import { idParamSchema } from "../schemas/common.schema.js";
 import * as ctrl from "../controllers/email-message.controller.js";
 
@@ -18,5 +18,7 @@ router.post("/:id/send-document", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"
   validate({ params: idParamSchema, body: sendDocumentSchema }), ctrl.sendDocument);
 router.post("/:id/create-event", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
   validate({ params: idParamSchema, body: createEventFromEmailSchema }), ctrl.createEvent);
+router.post("/send", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
+  validate({ body: sendNewEmailSchema }), ctrl.sendNew);
 
 export { router as emailMessageRouter };

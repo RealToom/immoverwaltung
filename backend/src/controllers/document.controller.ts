@@ -166,6 +166,8 @@ export async function preview(req: Request, res: Response): Promise<void> {
   });
 
   setSecureFileHeaders(res);
+  // Override X-Frame-Options for preview: SAMEORIGIN allows same-origin iframes
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
 
   const safeName = sanitizeName(doc.name);
 

@@ -26,19 +26,27 @@ export async function testImapConnection(config: {
 export async function createAccount(companyId: number, data: {
   label: string; email: string; imapHost: string; imapPort: number; imapTls: boolean;
   imapUser: string; password: string; smtpHost: string; smtpPort: number; smtpTls: boolean;
+  skipConnectionTest?: boolean;
 }) {
-  // Test IMAP connection before saving
-  try {
-    await testImapConnection({ host: data.imapHost, port: data.imapPort,
-                               tls: data.imapTls, user: data.imapUser, password: data.password });
-  } catch (err) {
-    logger.warn({ err }, "IMAP-Verbindungstest fehlgeschlagen");
-    throw new AppError(400, "IMAP-Verbindung fehlgeschlagen. Bitte Zugangsdaten prüfen.");
+  let imapConnected = true;
+  // Test IMAP connection before saving (unless skipped)
+  if (!data.skipConnectionTest) {
+    try {
+      await testImapConnection({ host: data.imapHost, port: data.imapPort,
+                                 tls: data.imapTls, user: data.imapUser, password: data.password });
+    } catch (err) {
+      logger.warn({ err }, "IMAP-Verbindungstest fehlgeschlagen");
+      throw new AppError(400, "IMAP-Verbindung fehlgeschlagen. Bitte Zugangsdaten prüfen oder 'Verbindungstest überspringen' aktivieren.");
+    }
+  } else {
+    // If test is skipped, mark as inactive until manually synced
+    imapConnected = false;
+    logger.info({ email: data.email }, "IMAP-Verbindungstest übersprungen, Postfach wird als inaktiv gespeichert");
   }
 
-  const { password, ...rest } = data;
+  const { password, skipConnectionTest: _, ...rest } = data;
   return prisma.emailAccount.create({
-    data: { ...rest, encryptedPassword: encryptString(password), companyId },
+    data: { ...rest, encryptedPassword: encryptString(password), companyId, isActive: imapConnected },
   });
 }
 

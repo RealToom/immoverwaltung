@@ -96,6 +96,12 @@ export async function createTicket(companyId: number, data: CreateTicketData) {
     }).catch((err) => console.error("E-Mail-Benachrichtigung fehlgeschlagen:", err));
   }
 
+  // Auto-set property status to WARTUNG when a ticket is created
+  await prisma.property.updateMany({
+    where: { id: data.propertyId, companyId, status: "AKTIV" },
+    data: { status: "WARTUNG" },
+  });
+
   return ticket;
 }
 
@@ -103,11 +109,30 @@ export async function updateTicket(companyId: number, id: number, data: UpdateTi
   const existing = await prisma.maintenanceTicket.findFirst({ where: { id, companyId } });
   if (!existing) throw new NotFoundError("Wartungsauftrag", id);
 
-  return prisma.maintenanceTicket.update({
+  const updated = await prisma.maintenanceTicket.update({
     where: { id },
     data,
     include: ticketInclude,
   });
+
+  // When a ticket is resolved (ERLEDIGT), check if there are remaining open tickets
+  if (data.status === "ERLEDIGT" && updated.propertyId) {
+    const openCount = await prisma.maintenanceTicket.count({
+      where: {
+        propertyId: updated.propertyId,
+        companyId,
+        status: { in: ["OFFEN", "IN_BEARBEITUNG", "WARTEND"] },
+      },
+    });
+    if (openCount === 0) {
+      await prisma.property.updateMany({
+        where: { id: updated.propertyId, companyId, status: "WARTUNG" },
+        data: { status: "AKTIV" },
+      });
+    }
+  }
+
+  return updated;
 }
 
 export async function deleteTicket(companyId: number, id: number) {

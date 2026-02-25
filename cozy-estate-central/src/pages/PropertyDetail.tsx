@@ -26,7 +26,8 @@ import {
 import { useProperty, useUpdateProperty, useCreateUnit, useUpdateUnit } from "@/hooks/api/useProperties";
 import { useTenants } from "@/hooks/api/useTenants";
 import { useUploadDocument, useDeleteDocument, useDownloadDocument, usePreviewDocument } from "@/hooks/api/useDocuments";
-import { useTransactions, useUpdateTransaction, useUtilityStatement } from "@/hooks/api/useFinance";
+import { useTransactions, useUpdateTransaction, useUtilityStatement, useCreateTransaction } from "@/hooks/api/useFinance";
+import { useCreateContract } from "@/hooks/api/useContracts";
 import { useMeters, useCreateMeter, useAddMeterReading, useDeleteMeter } from "@/hooks/api/useMeters";
 import { useHandovers, useCreateHandover, useDeleteHandover } from "@/hooks/api/useHandover";
 import { mapPropertyStatus, mapUnitStatus, mapUnitType, formatDate, formatCurrency } from "@/lib/mappings";
@@ -127,6 +128,20 @@ const PropertyDetail = () => {
   const [assignUnitId, setAssignUnitId] = useState<number | null>(null);
   const [assignTenantId, setAssignTenantId] = useState<string>("");
 
+  // Neue Transaktion state
+  const EMPTY_TX = { date: new Date().toISOString().slice(0, 10), description: "", type: "AUSGABE", amount: "", category: "SONSTIGES" };
+  const [newTxOpen, setNewTxOpen] = useState(false);
+  const [newTx, setNewTx] = useState(EMPTY_TX);
+  const createTransactionMutation = useCreateTransaction();
+
+  // Auto-Vertrag state
+  const EMPTY_CONTRACT = { type: "MIETE", startDate: new Date().toISOString().slice(0, 10), endDate: "", monthlyRent: "", deposit: "", noticePeriod: "3", notes: "" };
+  const [autoContractOpen, setAutoContractOpen] = useState(false);
+  const [autoContractTenantId, setAutoContractTenantId] = useState<number | null>(null);
+  const [autoContractUnitId, setAutoContractUnitId] = useState<number | null>(null);
+  const [contractForm, setContractForm] = useState(EMPTY_CONTRACT);
+  const createContractMutation = useCreateContract();
+
   // Handlers
   const handleUpload = () => {
     if (!uploadFile) return;
@@ -210,10 +225,45 @@ const PropertyDetail = () => {
       });
       toast({ title: "Aktualisiert", description: tenantId ? "Mieter wurde zugewiesen." : "Mieter wurde entfernt." });
       setAssignOpen(false);
+      // Offer auto-contract creation when assigning a tenant
+      if (tenantId) {
+        const unit = property?.units?.find((u: { id: number; rent: number }) => u.id === assignUnitId);
+        setAutoContractTenantId(tenantId);
+        setAutoContractUnitId(assignUnitId);
+        setContractForm({ ...EMPTY_CONTRACT, monthlyRent: unit?.rent ? String(unit.rent) : "" });
+        setAutoContractOpen(true);
+      }
       setAssignTenantId("");
       setAssignUnitId(null);
     } catch {
       toast({ title: "Fehler", description: "Zuweisung fehlgeschlagen.", variant: "destructive" });
+    }
+  };
+
+  const handleCreateContract = async () => {
+    if (!autoContractTenantId || !autoContractUnitId || !contractForm.monthlyRent) {
+      toast({ title: "Fehler", description: "Monatsmiete ist ein Pflichtfeld.", variant: "destructive" });
+      return;
+    }
+    try {
+      await createContractMutation.mutateAsync({
+        type: contractForm.type,
+        startDate: new Date(contractForm.startDate + "T12:00:00Z").toISOString(),
+        endDate: contractForm.endDate ? new Date(contractForm.endDate + "T12:00:00Z").toISOString() : null,
+        monthlyRent: parseFloat(contractForm.monthlyRent),
+        deposit: contractForm.deposit ? parseFloat(contractForm.deposit) : 0,
+        noticePeriod: parseInt(contractForm.noticePeriod, 10),
+        notes: contractForm.notes || null,
+        tenantId: autoContractTenantId,
+        propertyId,
+        unitId: autoContractUnitId,
+        status: "AKTIV",
+      });
+      toast({ title: "Vertrag erstellt", description: "Mietvertrag wurde automatisch angelegt." });
+      setAutoContractOpen(false);
+      setContractForm(EMPTY_CONTRACT);
+    } catch {
+      toast({ title: "Fehler", description: "Vertrag konnte nicht erstellt werden.", variant: "destructive" });
     }
   };
 
@@ -284,10 +334,8 @@ const PropertyDetail = () => {
     }
   };
 
-  // Available tenants = those without a WOHNUNG unit
-  const availableTenants = allTenants.filter(
-    (t) => !t.units.some((u) => u.type === "WOHNUNG")
-  );
+  // All tenants are available for assignment (one tenant can rent multiple units)
+  const availableTenants = allTenants;
 
   if (isLoading) {
     return (
@@ -690,8 +738,15 @@ const PropertyDetail = () => {
               {/* Property Transactions */}
               <Card className="border border-border/60 shadow-sm">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base font-heading font-semibold">Transaktionen</CardTitle>
-                  <CardDescription>Alle Buchungen fuer diese Immobilie</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base font-heading font-semibold">Transaktionen</CardTitle>
+                      <CardDescription>Alle Buchungen fuer diese Immobilie</CardDescription>
+                    </div>
+                    <Button size="sm" className="gap-1.5" onClick={() => { setNewTx(EMPTY_TX); setNewTxOpen(true); }}>
+                      <Plus className="h-4 w-4" />Neue Transaktion
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent className="p-0">
                   {propertyTransactions.length === 0 ? (
@@ -1368,6 +1423,140 @@ const PropertyDetail = () => {
             <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)} disabled={deleteMutation.isPending} className="gap-1.5">
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Loeschen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Neue Transaktion Dialog */}
+      <Dialog open={newTxOpen} onOpenChange={setNewTxOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Neue Transaktion</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Datum *</Label>
+                <Input type="date" value={newTx.date} onChange={(e) => setNewTx((t) => ({ ...t, date: e.target.value }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Typ *</Label>
+                <Select value={newTx.type} onValueChange={(v) => setNewTx((t) => ({ ...t, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EINNAHME">Einnahme</SelectItem>
+                    <SelectItem value="AUSGABE">Ausgabe</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Beschreibung *</Label>
+              <Input value={newTx.description} onChange={(e) => setNewTx((t) => ({ ...t, description: e.target.value }))} placeholder="z.B. Mietzahlung Februar" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Betrag (€) *</Label>
+                <Input type="number" step="0.01" min="0" value={newTx.amount} onChange={(e) => setNewTx((t) => ({ ...t, amount: e.target.value }))} placeholder="0.00" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Kategorie</Label>
+                <Select value={newTx.category} onValueChange={(v) => setNewTx((t) => ({ ...t, category: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MIETE">Miete</SelectItem>
+                    <SelectItem value="NEBENKOSTEN">Nebenkosten</SelectItem>
+                    <SelectItem value="REPARATUR">Reparatur</SelectItem>
+                    <SelectItem value="VERWALTUNG">Verwaltung</SelectItem>
+                    <SelectItem value="SONSTIGES">Sonstiges</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewTxOpen(false)}>Abbrechen</Button>
+            <Button
+              disabled={createTransactionMutation.isPending}
+              onClick={async () => {
+                if (!newTx.description.trim() || !newTx.amount) {
+                  toast({ title: "Fehler", description: "Bitte alle Pflichtfelder ausfüllen.", variant: "destructive" });
+                  return;
+                }
+                try {
+                  await createTransactionMutation.mutateAsync({
+                    date: new Date(newTx.date + "T12:00:00Z").toISOString(),
+                    description: newTx.description.trim(),
+                    type: newTx.type,
+                    amount: parseFloat(newTx.amount),
+                    category: newTx.category,
+                    propertyId,
+                  });
+                  toast({ title: "Gespeichert", description: "Transaktion wurde erstellt." });
+                  setNewTxOpen(false);
+                  setNewTx(EMPTY_TX);
+                } catch {
+                  toast({ title: "Fehler", description: "Transaktion konnte nicht erstellt werden.", variant: "destructive" });
+                }
+              }}
+            >
+              {createTransactionMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />}
+              Erstellen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Auto-Vertrag Dialog (nach Mieter-Zuweisung) */}
+      <Dialog open={autoContractOpen} onOpenChange={setAutoContractOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Mietvertrag erstellen?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Möchten Sie einen Mietvertrag für den zugewiesenen Mieter anlegen?</p>
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Vertragstyp</Label>
+                <Select value={contractForm.type} onValueChange={(v) => setContractForm((c) => ({ ...c, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MIETE">Miete</SelectItem>
+                    <SelectItem value="PACHT">Pacht</SelectItem>
+                    <SelectItem value="GEWERBE">Gewerbe</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Startdatum *</Label>
+                <Input type="date" value={contractForm.startDate} onChange={(e) => setContractForm((c) => ({ ...c, startDate: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Enddatum (leer = unbefristet)</Label>
+                <Input type="date" value={contractForm.endDate} onChange={(e) => setContractForm((c) => ({ ...c, endDate: e.target.value }))} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Kündigungsfrist (Monate)</Label>
+                <Input type="number" min="0" value={contractForm.noticePeriod} onChange={(e) => setContractForm((c) => ({ ...c, noticePeriod: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Monatsmiete (€) *</Label>
+                <Input type="number" step="0.01" min="0" value={contractForm.monthlyRent} onChange={(e) => setContractForm((c) => ({ ...c, monthlyRent: e.target.value }))} placeholder="0.00" />
+              </div>
+              <div className="grid gap-2">
+                <Label>Kaution (€)</Label>
+                <Input type="number" step="0.01" min="0" value={contractForm.deposit} onChange={(e) => setContractForm((c) => ({ ...c, deposit: e.target.value }))} placeholder="0.00" />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAutoContractOpen(false)}>Überspringen</Button>
+            <Button onClick={handleCreateContract} disabled={createContractMutation.isPending} className="gap-1.5">
+              {createContractMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Vertrag erstellen
             </Button>
           </DialogFooter>
         </DialogContent>

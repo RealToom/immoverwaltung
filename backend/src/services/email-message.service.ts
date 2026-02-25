@@ -100,6 +100,19 @@ export async function sendDocument(companyId: number, messageId: number, documen
   logger.info({ messageId, documentId, to: msg.fromAddress }, "[EMAIL] Dokument gesendet");
 }
 
+export async function sendNewEmail(companyId: number, data: {
+  accountId: number; to: string; subject: string; body: string;
+}) {
+  const { transport, fromEmail } = await getSmtpTransport(data.accountId, companyId);
+  await transport.sendMail({
+    from: fromEmail,
+    to: data.to,
+    subject: data.subject,
+    text: data.body,
+  });
+  logger.info({ to: data.to, subject: data.subject }, "[EMAIL] Neue Nachricht gesendet");
+}
+
 export async function createEventFromEmail(companyId: number, userId: number, messageId: number, data: {
   title: string; start: Date; end?: Date; allDay?: boolean;
 }) {

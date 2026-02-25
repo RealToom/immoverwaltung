@@ -17,7 +17,7 @@ export interface BankAccount {
 export function useBankAccounts() {
     return useQuery({
         queryKey: ["bank-accounts"],
-        queryFn: () => api<{ data: BankAccount[] }>(`/api/bank-accounts`).then((res) => res.data),
+        queryFn: () => api<{ data: BankAccount[] }>(`/bank-accounts`).then((res) => res.data),
     });
 }
 
@@ -25,7 +25,7 @@ export function useCreateBankAccount() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (data: { name: string; iban: string; bic?: string }) =>
-            api<{ data: BankAccount }>(`/api/bank-accounts`, {
+            api<{ data: BankAccount }>(`/bank-accounts`, {
                 method: "POST",
                 body: JSON.stringify(data),
             }),
@@ -39,7 +39,7 @@ export function useDeleteBankAccount() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (id: number) =>
-            api(`/api/bank-accounts/${id}`, {
+            api(`/bank-accounts/${id}`, {
                 method: "DELETE",
             }),
         onSuccess: () => {
@@ -52,7 +52,7 @@ export function useSyncBankAccount() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (id: number) =>
-            api<{ data: BankAccount }>(`/api/bank-accounts/${id}/sync`, {
+            api<{ data: BankAccount }>(`/bank-accounts/${id}/sync`, {
                 method: "POST",
             }),
         onSuccess: () => {
@@ -72,7 +72,7 @@ export function useImportTransactions() {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (transactions: CsvTransaction[]) =>
-            api<{ data: { imported: number } }>(`/api/bank-accounts/import`, {
+            api<{ data: { imported: number } }>(`/bank-accounts/import`, {
                 method: "POST",
                 body: JSON.stringify({ transactions }),
             }),

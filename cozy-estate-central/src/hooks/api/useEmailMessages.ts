@@ -65,3 +65,10 @@ export function useCreateEventFromEmail() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["calendar-events"] }),
   });
 }
+
+export function useSendNewEmail() {
+  return useMutation({
+    mutationFn: (data: { accountId: number; to: string; subject: string; body: string }) =>
+      api("/email-messages/send", { method: "POST", body: data }),
+  });
+}

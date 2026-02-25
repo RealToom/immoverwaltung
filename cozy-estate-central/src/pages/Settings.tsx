@@ -186,13 +186,17 @@ const SettingsPage = () => {
   const [mailForm, setMailForm] = useState({
     label: "", email: "", imapHost: "", imapPort: 993, imapTls: true,
     imapUser: "", password: "", smtpHost: "", smtpPort: 587, smtpTls: true,
+    skipConnectionTest: false,
   });
 
   const handleConnectMailbox = async () => {
     try {
       await createEmailAccount.mutateAsync({ ...mailForm });
-      toast({ title: "Postfach verbunden", description: `${mailForm.email} wurde erfolgreich verbunden.` });
-      setMailForm({ label: "", email: "", imapHost: "", imapPort: 993, imapTls: true, imapUser: "", password: "", smtpHost: "", smtpPort: 587, smtpTls: true });
+      const msg = mailForm.skipConnectionTest
+        ? `${mailForm.email} wurde gespeichert (ohne Verbindungstest).`
+        : `${mailForm.email} wurde erfolgreich verbunden.`;
+      toast({ title: "Postfach gespeichert", description: msg });
+      setMailForm({ label: "", email: "", imapHost: "", imapPort: 993, imapTls: true, imapUser: "", password: "", smtpHost: "", smtpPort: 587, smtpTls: true, skipConnectionTest: false });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Verbindung fehlgeschlagen";
       toast({ title: "Fehler", description: msg, variant: "destructive" });
@@ -720,6 +724,14 @@ const SettingsPage = () => {
                       onCheckedChange={(v) => setMailForm((f) => ({ ...f, smtpTls: v }))} />
                     <Label>SMTP SSL/TLS</Label>
                   </div>
+                  <div className="flex items-center gap-2 pt-2 col-span-2">
+                    <Switch checked={mailForm.skipConnectionTest}
+                      onCheckedChange={(v) => setMailForm((f) => ({ ...f, skipConnectionTest: v }))} />
+                    <div>
+                      <Label>Verbindungstest überspringen</Label>
+                      <p className="text-xs text-muted-foreground">Postfach ohne IMAP-Test speichern (z.B. bei lokalem Test-Setup)</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex justify-end pt-2">
                   <Button onClick={handleConnectMailbox} disabled={
@@ -727,7 +739,7 @@ const SettingsPage = () => {
                     !mailForm.imapHost || !mailForm.imapUser || !mailForm.password || !mailForm.smtpHost
                   }>
                     {createEmailAccount.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Mail className="h-4 w-4 mr-1" />}
-                    Verbinden &amp; Testen
+                    {mailForm.skipConnectionTest ? "Speichern (ohne Test)" : "Verbinden & Testen"}
                   </Button>
                 </div>
               </CardContent>

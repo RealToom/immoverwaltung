@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { Calendar, dateFnsLocalizer, View } from "react-big-calendar";
-import { format, parse, startOfWeek, getDay, addMonths, subMonths } from "date-fns";
+import { format, parse, startOfWeek, getDay, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from "date-fns";
 import { de } from "date-fns/locale/de";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -45,6 +45,7 @@ export default function CalendarPage() {
   const [newEventOpen, setNewEventOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newStart, setNewStart] = useState("");
+  const [selectedEvent, setSelectedEvent] = useState<(typeof events)[0] | null>(null);
 
   const from = subMonths(currentDate, 1);
   const to = addMonths(currentDate, 2);
@@ -102,13 +103,25 @@ export default function CalendarPage() {
           {/* Toolbar */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setCurrentDate(subMonths(currentDate, 1))}>
+              <Button variant="outline" size="sm" onClick={() => {
+                if (view === "day") setCurrentDate(subDays(currentDate, 1));
+                else if (view === "week") setCurrentDate(subWeeks(currentDate, 1));
+                else setCurrentDate(subMonths(currentDate, 1));
+              }}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="font-semibold text-base min-w-40 text-center">
-                {format(currentDate, "MMMM yyyy", { locale: de })}
+              <span className="font-semibold text-base min-w-48 text-center">
+                {view === "day"
+                  ? format(currentDate, "EEEE, dd. MMMM yyyy", { locale: de })
+                  : view === "week"
+                  ? `${format(startOfWeek(currentDate, { weekStartsOn: 1 }), "dd. MMM", { locale: de })} – ${format(addDays(startOfWeek(currentDate, { weekStartsOn: 1 }), 6), "dd. MMM yyyy", { locale: de })}`
+                  : format(currentDate, "MMMM yyyy", { locale: de })}
               </span>
-              <Button variant="outline" size="sm" onClick={() => setCurrentDate(addMonths(currentDate, 1))}>
+              <Button variant="outline" size="sm" onClick={() => {
+                if (view === "day") setCurrentDate(addDays(currentDate, 1));
+                else if (view === "week") setCurrentDate(addWeeks(currentDate, 1));
+                else setCurrentDate(addMonths(currentDate, 1));
+              }}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>Heute</Button>
@@ -145,6 +158,7 @@ export default function CalendarPage() {
                 culture="de"
                 style={{ height: "100%" }}
                 toolbar={false}
+                onSelectEvent={(event) => setSelectedEvent(event as (typeof events)[0])}
               />
             </div>
           )}
@@ -176,6 +190,36 @@ export default function CalendarPage() {
           ))}
         </div>
       </div>
+
+      {/* Termin-Detail Dialog */}
+      <Dialog open={!!selectedEvent} onOpenChange={(open) => { if (!open) setSelectedEvent(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedEvent?.title}</DialogTitle>
+          </DialogHeader>
+          {selectedEvent && (
+            <div className="space-y-3 py-1">
+              <div className="flex items-center gap-2">
+                <Badge style={{ backgroundColor: selectedEvent.resource?.color ?? EVENT_COLORS[selectedEvent.resource?.type] ?? "#6b7280" }} className="text-white border-0">
+                  {EVENT_LABELS[selectedEvent.resource?.type] ?? selectedEvent.resource?.type}
+                </Badge>
+              </div>
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p><span className="font-medium text-foreground">Start:</span> {format(selectedEvent.start, "dd. MMMM yyyy HH:mm", { locale: de })}</p>
+                {selectedEvent.end && selectedEvent.end.getTime() !== selectedEvent.start.getTime() && (
+                  <p><span className="font-medium text-foreground">Ende:</span> {format(selectedEvent.end, "dd. MMMM yyyy HH:mm", { locale: de })}</p>
+                )}
+                {selectedEvent.resource?.notes && (
+                  <p><span className="font-medium text-foreground">Notizen:</span> {selectedEvent.resource.notes}</p>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedEvent(null)}>Schließen</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Neuer Termin Dialog */}
       <Dialog open={newEventOpen} onOpenChange={setNewEventOpen}>
