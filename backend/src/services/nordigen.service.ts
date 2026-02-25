@@ -5,13 +5,11 @@ import { AppError } from "../lib/errors.js";
 const NORDIGEN_BASE = "https://bankaccountdata.gocardless.com/api/v2";
 
 // ── In-memory token cache ────────────────────────────────────────────────────
-let cachedToken: string | null = null;
-let tokenExpiresAt = 0; // Unix ms
-const TOKEN_BUFFER_MS = 5 * 60 * 1000; // refresh 5 min before expiry
+let tokenCache: { token: string; expiresAt: number } | null = null;
 
 export async function getAccessToken(): Promise<string> {
-  if (cachedToken && Date.now() < tokenExpiresAt - TOKEN_BUFFER_MS) {
-    return cachedToken;
+  if (tokenCache && Date.now() < tokenCache.expiresAt) {
+    return tokenCache.token;
   }
 
   const secretId = env.NORDIGEN_SECRET_ID;
@@ -27,16 +25,21 @@ export async function getAccessToken(): Promise<string> {
   });
 
   if (!res.ok) {
+    tokenCache = null;
     logger.error({ status: res.status }, "[NORDIGEN] Token-Anfrage fehlgeschlagen");
     throw new AppError(502, "Nordigen-Authentifizierung fehlgeschlagen");
   }
 
   const data = (await res.json()) as { access: string; access_expires: number };
-  cachedToken = data.access;
-  tokenExpiresAt = Date.now() + data.access_expires * 1000;
+  tokenCache = { token: data.access, expiresAt: Date.now() + (data.access_expires - 300) * 1000 };
 
   logger.info("[NORDIGEN] Neues Access-Token abgerufen");
-  return cachedToken;
+  return tokenCache.token;
+}
+
+/** @internal — only for use in tests */
+export function resetTokenCacheForTesting(): void {
+  tokenCache = null;
 }
 
 // ── Helper: authenticated fetch ──────────────────────────────────────────────
@@ -93,7 +96,7 @@ export async function createRequisition(
   institutionId: string,
   redirectUrl: string,
   reference: string
-): Promise<NordigenRequisition> {
+): Promise<{ id: string; link: string }> {
   const data = await nordigenFetch("/requisitions/", {
     method: "POST",
     body: JSON.stringify({
@@ -102,7 +105,7 @@ export async function createRequisition(
       reference,
     }),
   });
-  return data as NordigenRequisition;
+  return data as { id: string; link: string };
 }
 
 export async function getRequisitionStatus(requisitionId: string): Promise<NordigenRequisition> {
@@ -136,12 +139,11 @@ export interface NordigenTransaction {
 
 export async function getTransactions(
   accountId: string,
-  dateFrom: Date,
-  dateTo: Date
+  dateFrom: string,
+  dateTo: string
 ): Promise<NordigenTransaction[]> {
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
   const data = (await nordigenFetch(
-    `/accounts/${accountId}/transactions/?date_from=${fmt(dateFrom)}&date_to=${fmt(dateTo)}`
+    `/accounts/${accountId}/transactions/?date_from=${dateFrom}&date_to=${dateTo}`
   )) as { transactions: { booked: NordigenTransaction[] } };
   return data.transactions.booked ?? [];
 }

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { maskIban } from "../services/nordigen.service.js";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { maskIban, getAccessToken, resetTokenCacheForTesting } from "../services/nordigen.service.js";
 
 describe("maskIban", () => {
   it("masks middle digits of a full IBAN", () => {
@@ -18,14 +18,44 @@ describe("maskIban", () => {
   });
 });
 
-describe("token cache logic", () => {
-  it("considers token expired when expiresAt is in the past", () => {
-    const pastTime = Date.now() - 1000;
-    expect(Date.now() >= pastTime).toBe(true);
+describe("getAccessToken cache", () => {
+  beforeEach(() => {
+    resetTokenCacheForTesting();
+    // Provide required env vars so the function doesn't throw before fetching
+    process.env.NORDIGEN_SECRET_ID = "test-id";
+    process.env.NORDIGEN_SECRET_KEY = "test-key";
   });
 
-  it("considers token valid when expiresAt is in the future", () => {
-    const futureTime = Date.now() + 60_000;
-    expect(Date.now() >= futureTime).toBe(false);
+  afterEach(() => {
+    vi.restoreAllMocks();
+    resetTokenCacheForTesting();
+  });
+
+  it("calls fetch only once when token is still valid", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ access: "tok-abc", access_expires: 86400 }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await getAccessToken();
+    await getAccessToken();
+
+    // fetch should have been called only ONCE (second call uses cache)
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls fetch again when token is expired", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ access: "tok-xyz", access_expires: 0 }), // expires immediately (0 - 300 = -300s → already stale)
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await getAccessToken();
+    await getAccessToken();
+
+    // Both calls should hit fetch because access_expires=0 makes cache immediately stale
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
