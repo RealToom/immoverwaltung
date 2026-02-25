@@ -1,13 +1,14 @@
 # Immoverwaltung - Projektdokumentation
 
-> **Letzte Aktualisierung:** 2026-02-21
-> **Status:** Production-Ready + Feature-Backlog vollständig implementiert (Zähler, Wiederkehrend, PDF, Mahnwesen, Übergabeprotokoll, Wartungsplan, Dokumenten-Vorlagen)
+> **Letzte Aktualisierung:** 2026-02-25
+> **Status:** Production-Ready + Feature-Backlog vollständig implementiert + DATEV Export + PSD2 Banking (Nordigen/GoCardless)
 
 ## Roadmap / Zukünftige Features
 
-### 1. Echte Bankanbindung (PSD2)
-- Direkte Anbindung an Bankkonten via PSD2-Schnittstelle (z.B. GoCardless/Nordigen)
-- Automatischer Abgleich von Mieteingängen ohne manuellen CSV-Import
+### 1. Echte Bankanbindung (PSD2) ✅ IMPLEMENTIERT
+- Direkte Anbindung an Bankkonten via GoCardless/Nordigen API
+- Automatischer Abgleich von Mieteingängen (deterministisches Matching: Betrag ±0.01 EUR + Mietername)
+- Siehe Abschnitt "2026-02-25: DATEV Export + PSD2 Banking" im Changelog
 
 ### 2. KI-Belegscan (OCR) ✅ IMPLEMENTIERT
 - `POST /api/finance/scan` — nimmt Bild (JPEG/PNG/WebP) oder PDF, gibt extrahierte Felder zurück
@@ -38,9 +39,10 @@
 - Self-Service Login für Mieter
 - Dokumente einsehen, Schäden melden (Tickets), Stammdaten ändern
 
-### 8. DATEV / Steuer-Export
-- Export der Finanzdaten für den Steuerberater
-- Standardisierte Schnittstelle
+### 8. DATEV / Steuer-Export ✅ IMPLEMENTIERT
+- DATEV Buchungsstapel CSV (EXTF-Format, UTF-8 BOM, CRLF, Soll/Haben)
+- Beraternummer + Mandantennummer konfigurierbar, Kategorie→Konto-Mapping, DatevExportLog
+- Siehe Abschnitt "2026-02-25: DATEV Export + PSD2 Banking" im Changelog
 
 ### 9. Rendite-Dashboard (ROI) ✅ IMPLEMENTIERT
 - `GET /api/finance/roi?year=Y` — Brutto-/Nettorendite + EK-Rendite pro Immobilie
@@ -50,6 +52,51 @@
 ---
 
 ## Changelog
+
+### 2026-02-25: DATEV Export + PSD2 Banking (Nordigen/GoCardless)
+
+**Neue Prisma-Models:**
+- `BankTransaction` — `nordigenId @unique`, `amount Decimal(15,2)`, Status: UNMATCHED/MATCHED/IGNORED
+- `CompanyAccountingSettings` — Beraternummer, Mandantennummer, Kontenrahmen (SKR03/SKR04), Kontonummer-Defaults
+- `CategoryAccountMapping` — Kategorie → DATEV-Kontonummer (@@unique companyId+category)
+- `DatevExportLog` — Audit-Trail für CSV-Exporte
+- `BankAccount` erweitert: `provider` (MANUAL/NORDIGEN), `institutionId`, `requisitionId`, `nordigenAccountId`
+
+**Neue Services:**
+- `nordigen.service.ts` — Nordigen API Client: Token-Cache (In-Memory, 24h, Race-Condition-Safe), `maskIban()`, listInstitutions, createRequisition, getRequisitionStatus, getAccountDetails, getTransactions
+- `banking.service.ts` — Requisition initiieren, OAuth Callback, idempotenter Sync (upsert by nordigenId), syncAllAccounts, IBAN-Maskierung in API-Antworten
+- `matching.service.ts` — Deterministisches Matching: Betrag ±0.01 EUR (Prisma.Decimal) + Mietername-Score ≥2; RentPayment upsert + Ledger-Buchung atomar; Optimistic Lock gegen Concurrent-Matching
+- `datev.service.ts` — DATEV EXTF Buchungsstapel CSV: UTF-8 BOM, CRLF, Soll/Haben-Kennzeichen, Kategorie-Mapping, DatevExportLog, Beraternummer-Validierung
+
+**Neue Endpunkte:**
+
+| Method | Path | Auth | Beschreibung |
+|--------|------|------|--------------|
+| GET | `/api/banking/institutions?country=DE` | VERWALTER+ | Banken auflisten |
+| POST | `/api/banking/requisitions` | VERWALTER+ | PSD2-Verknüpfung initiieren |
+| GET | `/api/banking/callback?ref=...` | **PUBLIC** | Nordigen OAuth Callback |
+| GET | `/api/banking/accounts/:id/status` | VERWALTER+ | Konto-Status |
+| POST | `/api/banking/accounts/:id/sync` | VERWALTER+ | Manueller Sync |
+| GET | `/api/banking/accounts/:id/transactions` | VERWALTER+ | BankTransactions (IBAN maskiert) |
+| POST | `/api/banking/accounts/:id/transactions/:txId/ignore` | VERWALTER+ | Transaktion ignorieren |
+| POST | `/api/banking/match` | VERWALTER+ | Matching-Engine starten |
+| GET | `/api/finance/datev/settings` | ADMIN | DATEV-Einstellungen |
+| PUT | `/api/finance/datev/settings` | ADMIN | DATEV-Einstellungen speichern |
+| GET | `/api/finance/datev/mappings` | ADMIN | Kategorie-Konten-Mappings |
+| PUT | `/api/finance/datev/mappings/:category` | ADMIN | Mapping upserten |
+| POST | `/api/finance/datev/export` | ADMIN/BUCHHALTER | DATEV CSV downloaden |
+
+**Cron:** Banking-Sync alle 6h (`syncAllAccounts → matchAllPendingTransactions`) in `retention.service.ts`
+
+**Tests:** +19 neue Tests (6 Nordigen, 9 Matching, 10 DATEV inkl. generateExport-Mock-Tests). Gesamt: 46 Tests.
+
+**Sicherheit:**
+- IBAN nur maskiert in Logs + API-Antworten (`maskIban()`)
+- Nordigen-Credentials nie geloggt, Token nur In-Memory (nie in DB)
+- Öffentlicher Callback-Endpoint: generic error (kein requisitionId-Leak), leere accounts → 502
+- Multi-Tenancy: alle Queries mit companyId, inkl. prisma.bankAccount.update in initiateRequisition
+
+---
 
 ### 2026-02-21: Feature-Backlog — Zähler, Wiederkehrend, PDF, Mahnwesen, Übergabeprotokoll, Wartungsplan, Vorlagen
 
