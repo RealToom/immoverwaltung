@@ -6,6 +6,8 @@ export const maintenanceQuerySchema = paginationSchema.extend({
   priority: z.enum(["NIEDRIG", "MITTEL", "HOCH", "DRINGEND"]).optional(),
   category: z.enum(["SANITAER", "ELEKTRIK", "HEIZUNG", "GEBAEUDE", "AUSSENANLAGE", "SONSTIGES"]).optional(),
   propertyId: z.coerce.number().int().positive().optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
 });
 
 export const createMaintenanceSchema = z.object({

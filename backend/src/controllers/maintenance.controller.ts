@@ -11,6 +11,8 @@ export async function list(req: Request, res: Response): Promise<void> {
     priority: req.query.priority as MaintenancePriority | undefined,
     category: req.query.category as MaintenanceCategory | undefined,
     propertyId: req.query.propertyId ? Number(req.query.propertyId) : undefined,
+    from: req.query.from ? new Date(req.query.from as string) : undefined,
+    to: req.query.to ? new Date(req.query.to as string) : undefined,
   });
   res.json(result);
 }

@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { NotFoundError } from "../lib/errors.js";
 import { paginationMeta } from "../schemas/common.schema.js";
 import { notifyMaintenanceCreated } from "./email.service.js";
+import { logger } from "../lib/logger.js";
 import type { MaintenanceStatus, MaintenancePriority, MaintenanceCategory, Prisma } from "@prisma/client";
 
 interface MaintenanceQuery {
@@ -12,6 +13,8 @@ interface MaintenanceQuery {
   priority?: MaintenancePriority;
   category?: MaintenanceCategory;
   propertyId?: number;
+  from?: Date;
+  to?: Date;
 }
 
 interface CreateTicketData {
@@ -39,7 +42,7 @@ const ticketInclude = {
 } as const;
 
 export async function listTickets(companyId: number, params: MaintenanceQuery) {
-  const { page, limit, search, status, priority, category, propertyId } = params;
+  const { page, limit, search, status, priority, category, propertyId, from, to } = params;
   const skip = (page - 1) * limit;
 
   const where: Prisma.MaintenanceTicketWhereInput = { companyId };
@@ -47,6 +50,12 @@ export async function listTickets(companyId: number, params: MaintenanceQuery) {
   if (priority) where.priority = priority;
   if (category) where.category = category;
   if (propertyId) where.propertyId = propertyId;
+  if (from || to) {
+    where.createdAt = {
+      ...(from && { gte: from }),
+      ...(to && { lte: to }),
+    };
+  }
   if (search) {
     where.OR = [
       { title: { contains: search, mode: "insensitive" } },
@@ -93,7 +102,7 @@ export async function createTicket(companyId: number, data: CreateTicketData) {
       priority: data.priority,
       propertyName: ticket.property.name,
       reportedBy: data.reportedBy,
-    }).catch((err) => console.error("E-Mail-Benachrichtigung fehlgeschlagen:", err));
+    }).catch((err) => logger.error({ err }, "E-Mail-Benachrichtigung fehlgeschlagen"));
   }
 
   // Auto-set property status to WARTUNG when a ticket is created
