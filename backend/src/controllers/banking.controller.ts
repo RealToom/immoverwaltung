@@ -7,7 +7,7 @@ import { env } from "../config/env.js";
 
 // GET /banking/institutions?country=DE
 export async function listInstitutions(req: Request, res: Response): Promise<void> {
-  const country = (req.query.country as string) || "DE";
+  const country = ((req.query.country as string) || "DE").toUpperCase();
   const institutions = await nordigenService.listInstitutions(country);
   res.json({ data: institutions });
 }
@@ -18,7 +18,7 @@ export async function initiateRequisition(req: Request, res: Response): Promise<
 
   // Store institutionId on the BankAccount so bankingService.initiateRequisition can use it
   await prisma.bankAccount.update({
-    where: { id: bankAccountId },
+    where: { id: bankAccountId, companyId: req.companyId! },
     data: { institutionId, provider: "NORDIGEN" },
   });
 

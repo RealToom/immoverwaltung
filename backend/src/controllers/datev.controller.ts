@@ -29,11 +29,11 @@ export async function putMapping(req: Request, res: Response): Promise<void> {
 
 // POST /finance/datev/export
 export async function exportCsv(req: Request, res: Response): Promise<void> {
-  const { fromDate, toDate } = req.body as { fromDate: string; toDate: string };
+  const { fromDate, toDate } = req.body as { fromDate: Date; toDate: Date };
   const { filename, buffer } = await datevService.generateExport(
     req.companyId!,
-    new Date(fromDate),
-    new Date(toDate),
+    fromDate,
+    toDate,
     req.userId
   );
 
