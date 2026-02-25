@@ -40,8 +40,12 @@ model Company {
   recurringTransactions RecurringTransaction[]
   dunningRecords        DunningRecord[]
   handoverProtocols     HandoverProtocol[]
-  maintenanceSchedules  MaintenanceSchedule[]
-  documentTemplates     DocumentTemplate[]
+  maintenanceSchedules    MaintenanceSchedule[]
+  documentTemplates       DocumentTemplate[]
+  bankTransactions        BankTransaction[]
+  accountingSettings      CompanyAccountingSettings?
+  categoryAccountMappings CategoryAccountMapping[]
+  datevExportLogs         DatevExportLog[]
 
   @@map("companies")
 }
@@ -314,30 +318,113 @@ model Transaction {
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
 
-  property    Property?    @relation(fields: [propertyId], references: [id])
-  bankAccount BankAccount? @relation(fields: [bankAccountId], references: [id])
-  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property        Property?       @relation(fields: [propertyId], references: [id])
+  bankAccount     BankAccount?    @relation(fields: [bankAccountId], references: [id])
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bankTransaction BankTransaction?
 
   @@map("transactions")
 }
 
 // ─── BankAccount (Bankkonten) ───────────────────────────────
 model BankAccount {
-  id          Int      @id @default(autoincrement())
-  name        String
-  iban        String
-  bic         String   @default("")
-  balance     Float    @default(0)
-  lastSync    DateTime @default(now()) @map("last_sync")
-  status      String   @default("connected") // connected, error
-  companyId   Int      @map("company_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                Int          @id @default(autoincrement())
+  name              String
+  iban              String
+  bic               String       @default("")
+  balance           Float        @default(0)
+  lastSync          DateTime     @default(now()) @map("last_sync")
+  status            String       @default("connected")
+  provider          BankProvider @default(MANUAL)
+  institutionId     String?      @map("institution_id")
+  requisitionId     String?      @map("requisition_id")
+  nordigenAccountId String?      @map("nordigen_account_id")
+  companyId         Int          @map("company_id")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
 
-  company     Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
+  company          Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions     Transaction[]
+  bankTransactions BankTransaction[]
 
   @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id             Int          @id @default(autoincrement())
+  nordigenId     String       @unique @map("nordigen_id")
+  bookingDate    DateTime     @map("booking_date")
+  valueDate      DateTime?    @map("value_date")
+  amount         Decimal      @db.Decimal(15, 2)
+  currency       String       @default("EUR")
+  remittanceInfo String       @default("") @map("remittance_info")
+  creditorName   String?      @map("creditor_name")
+  creditorIban   String?      @map("creditor_iban")
+  debtorName     String?      @map("debtor_name")
+  debtorIban     String?      @map("debtor_iban")
+  status         BankTxStatus @default(UNMATCHED)
+  bankAccountId  Int          @map("bank_account_id")
+  companyId      Int          @map("company_id")
+  rentPaymentId  Int?         @map("rent_payment_id")
+  transactionId  Int?         @unique @map("transaction_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  bankAccount BankAccount  @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  rentPayment RentPayment? @relation(fields: [rentPaymentId], references: [id])
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([companyId, status])
+  @@index([bankAccountId])
+  @@map("bank_transactions")
+}
+
+model CompanyAccountingSettings {
+  id                    Int             @id @default(autoincrement())
+  beraternummer         Int?            @map("beraternummer")
+  mandantennummer       Int?            @map("mandantennummer")
+  kontenrahmen          ChartOfAccounts @default(SKR03)
+  defaultBankAccount    String          @default("1810") @map("default_bank_account")
+  defaultIncomeAccount  String          @default("8400") @map("default_income_account")
+  defaultExpenseAccount String          @default("4900") @map("default_expense_account")
+  fiscalYearStart       Int             @default(1) @map("fiscal_year_start")
+  companyId             Int             @unique @map("company_id")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_accounting_settings")
+}
+
+model CategoryAccountMapping {
+  id            Int      @id @default(autoincrement())
+  category      String
+  accountNumber String   @map("account_number")
+  companyId     Int      @map("company_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, category])
+  @@map("category_account_mappings")
+}
+
+model DatevExportLog {
+  id        Int      @id @default(autoincrement())
+  fromDate  DateTime @map("from_date")
+  toDate    DateTime @map("to_date")
+  txCount   Int      @map("tx_count")
+  fileName  String   @map("file_name")
+  companyId Int      @map("company_id")
+  createdBy Int?     @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("datev_export_logs")
 }
 
 enum TransactionType {
@@ -359,8 +446,9 @@ model RentPayment {
   createdAt  DateTime          @default(now()) @map("created_at")
   updatedAt  DateTime          @updatedAt @map("updated_at")
 
-  contract Contract @relation(fields: [contractId], references: [id])
-  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contract         Contract          @relation(fields: [contractId], references: [id])
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bankTransactions BankTransaction[]
 
   @@unique([contractId, month])
   @@map("rent_payments")
@@ -638,6 +726,22 @@ enum InquiryStatus {
   IN_BEARBEITUNG
   AKZEPTIERT
   ABGELEHNT
+}
+
+enum BankProvider {
+  MANUAL
+  NORDIGEN
+}
+
+enum BankTxStatus {
+  UNMATCHED
+  MATCHED
+  IGNORED
+}
+
+enum ChartOfAccounts {
+  SKR03
+  SKR04
 }
 
 // ─── EmailAttachment (Anhänge) ───────────────────────────────
