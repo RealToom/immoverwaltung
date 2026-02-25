@@ -376,14 +376,30 @@ model BankTransaction {
   transaction Transaction? @relation(fields: [transactionId], references: [id])
 
   @@index([companyId, status])
-  @@index([bankAccountId])
+  @@index([bankAccountId, bookingDate])
   @@map("bank_transactions")
+}
+
+enum BankProvider {
+  MANUAL
+  NORDIGEN
+}
+
+enum BankTxStatus {
+  UNMATCHED
+  MATCHED
+  IGNORED
+}
+
+enum ChartOfAccounts {
+  SKR03
+  SKR04
 }
 
 model CompanyAccountingSettings {
   id                    Int             @id @default(autoincrement())
-  beraternummer         Int?            @map("beraternummer")
-  mandantennummer       Int?            @map("mandantennummer")
+  beraternummer         Int?
+  mandantennummer       Int?
   kontenrahmen          ChartOfAccounts @default(SKR03)
   defaultBankAccount    String          @default("1810") @map("default_bank_account")
   defaultIncomeAccount  String          @default("8400") @map("default_income_account")
@@ -418,7 +434,7 @@ model DatevExportLog {
   txCount   Int      @map("tx_count")
   fileName  String   @map("file_name")
   companyId Int      @map("company_id")
-  createdBy Int?     @map("created_by")
+  createdBy Int?     @map("created_by")  // No FK — intentional (AuditLog pattern: log survives user deletion)
   createdAt DateTime @default(now()) @map("created_at")
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -726,22 +742,6 @@ enum InquiryStatus {
   IN_BEARBEITUNG
   AKZEPTIERT
   ABGELEHNT
-}
-
-enum BankProvider {
-  MANUAL
-  NORDIGEN
-}
-
-enum BankTxStatus {
-  UNMATCHED
-  MATCHED
-  IGNORED
-}
-
-enum ChartOfAccounts {
-  SKR03
-  SKR04
 }
 
 // ─── EmailAttachment (Anhänge) ───────────────────────────────
