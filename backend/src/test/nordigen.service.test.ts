@@ -16,6 +16,10 @@ describe("maskIban", () => {
     expect(result.endsWith("6819")).toBe(true);
     expect(result).toContain("****");
   });
+
+  it("returns '****' for strings shorter than 8 characters (boundary: length 7)", () => {
+    expect(maskIban("DE1234X")).toBe("****"); // length 7
+  });
 });
 
 describe("getAccessToken cache", () => {
@@ -48,14 +52,15 @@ describe("getAccessToken cache", () => {
   it("calls fetch again when token is expired", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ access: "tok-xyz", access_expires: 0 }), // expires immediately (0 - 300 = -300s → already stale)
+      // access_expires=1 → (1 - 300) * 1000 = -299 000 ms → expiresAt is already in the past → cache stale
+      json: async () => ({ access: "tok-xyz", access_expires: 1 }),
     });
     vi.stubGlobal("fetch", mockFetch);
 
     await getAccessToken();
     await getAccessToken();
 
-    // Both calls should hit fetch because access_expires=0 makes cache immediately stale
+    // Both calls should hit fetch because access_expires=1 makes cache immediately stale
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });

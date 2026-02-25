@@ -6,11 +6,13 @@ const NORDIGEN_BASE = "https://bankaccountdata.gocardless.com/api/v2";
 
 // ── In-memory token cache ────────────────────────────────────────────────────
 let tokenCache: { token: string; expiresAt: number } | null = null;
+let tokenInFlight: Promise<string> | null = null;
 
 export async function getAccessToken(): Promise<string> {
   if (tokenCache && Date.now() < tokenCache.expiresAt) {
     return tokenCache.token;
   }
+  if (tokenInFlight) return tokenInFlight;
 
   const secretId = env.NORDIGEN_SECRET_ID;
   const secretKey = env.NORDIGEN_SECRET_KEY;
@@ -18,28 +20,39 @@ export async function getAccessToken(): Promise<string> {
     throw new AppError(503, "Nordigen-Zugangsdaten nicht konfiguriert (NORDIGEN_SECRET_ID / NORDIGEN_SECRET_KEY)");
   }
 
-  const res = await fetch(`${NORDIGEN_BASE}/token/new/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ secret_id: secretId, secret_key: secretKey }),
-  });
+  tokenInFlight = (async () => {
+    try {
+      const res = await fetch(`${NORDIGEN_BASE}/token/new/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ secret_id: secretId, secret_key: secretKey }),
+      });
 
-  if (!res.ok) {
-    tokenCache = null;
-    logger.error({ status: res.status }, "[NORDIGEN] Token-Anfrage fehlgeschlagen");
-    throw new AppError(502, "Nordigen-Authentifizierung fehlgeschlagen");
-  }
+      if (!res.ok) {
+        tokenCache = null;
+        logger.error({ status: res.status }, "[NORDIGEN] Token-Anfrage fehlgeschlagen");
+        throw new AppError(502, "Nordigen-Authentifizierung fehlgeschlagen");
+      }
 
-  const data = (await res.json()) as { access: string; access_expires: number };
-  tokenCache = { token: data.access, expiresAt: Date.now() + (data.access_expires - 300) * 1000 };
+      const data = (await res.json()) as { access: string; access_expires: number };
+      const expires = typeof data.access_expires === "number" && data.access_expires > 0
+        ? data.access_expires
+        : 86400;
+      tokenCache = { token: data.access, expiresAt: Date.now() + (expires - 300) * 1000 };
 
-  logger.info("[NORDIGEN] Neues Access-Token abgerufen");
-  return tokenCache.token;
+      logger.info("[NORDIGEN] Neues Access-Token abgerufen");
+      return tokenCache.token;
+    } finally {
+      tokenInFlight = null;
+    }
+  })();
+  return tokenInFlight;
 }
 
 /** @internal — only for use in tests */
 export function resetTokenCacheForTesting(): void {
   tokenCache = null;
+  tokenInFlight = null;
 }
 
 // ── Helper: authenticated fetch ──────────────────────────────────────────────
