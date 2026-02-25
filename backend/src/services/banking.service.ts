@@ -61,7 +61,7 @@ export async function handleCallback(ref: string): Promise<string> {
 
   if (!account) {
     logger.warn({ ref }, "[BANKING] Callback mit unbekannter requisitionId");
-    throw new NotFoundError("BankAccount (requisitionId)", ref);
+    throw new AppError(400, "Ungültiger oder abgelaufener Callback-Link");
   }
 
   const status = await nordigen.getRequisitionStatus(ref);
@@ -74,15 +74,36 @@ export async function handleCallback(ref: string): Promise<string> {
     return env.NORDIGEN_REDIRECT_BASE + "/bank-accounts?status=pending";
   }
 
+  if (status.accounts.length === 0) {
+    await prisma.bankAccount.update({
+      where: { id: account.id },
+      data: { status: "error" },
+    });
+    throw new AppError(502, "Nordigen-Requisition hat keine verknüpften Konten zurückgegeben");
+  }
+
   // Find the Nordigen account that matches our IBAN
-  let nordigenAccountId: string = status.accounts[0] ?? "";
+  let nordigenAccountId: string = status.accounts[0];
+  let ibanMatched = false;
 
   for (const accId of status.accounts) {
-    const details = await nordigen.getAccountDetails(accId);
-    if (details.iban === account.iban) {
-      nordigenAccountId = accId;
-      break;
+    try {
+      const details = await nordigen.getAccountDetails(accId);
+      if (details.iban === account.iban) {
+        nordigenAccountId = accId;
+        ibanMatched = true;
+        break;
+      }
+    } catch {
+      // skip accounts we can't fetch
     }
+  }
+
+  if (!ibanMatched) {
+    logger.warn(
+      { bankAccountId: account.id },
+      "[BANKING] IBAN-Match fehlgeschlagen, verwende erstes Nordigen-Konto als Fallback"
+    );
   }
 
   await prisma.bankAccount.update({
@@ -145,6 +166,10 @@ export async function syncBankAccount(
       tx.remittanceInformationStructured ??
       "";
 
+    // Upsert is idempotent: nordigenId has a @unique DB constraint.
+    // Nordigen guarantees globally unique transactionIds, so cross-company collisions are not expected.
+    // If a collision occurred, the first company's record would be created and subsequent companies
+    // would only update remittanceInfo/creditorName/debtorName (not ownership or amount).
     await prisma.bankTransaction.upsert({
       where: { nordigenId: tx.transactionId },
       create: {
@@ -210,12 +235,21 @@ export async function syncAllAccounts(): Promise<void> {
 
 // ── listBankTransactions ──────────────────────────────────────────────────────
 
+type MaskedBankTransaction = Omit<
+  Awaited<ReturnType<typeof prisma.bankTransaction.findMany>>[number],
+  "amount" | "creditorIban" | "debtorIban"
+> & {
+  amount: string;
+  creditorIban: string | null;
+  debtorIban: string | null;
+};
+
 export async function listBankTransactions(
   companyId: number,
   bankAccountId: number,
   params: { page: number; limit: number; status?: string }
 ): Promise<{
-  data: unknown[];
+  data: MaskedBankTransaction[];
   meta: { total: number; page: number; limit: number; totalPages: number };
 }> {
   const account = await prisma.bankAccount.findFirst({
