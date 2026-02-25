@@ -136,13 +136,6 @@ export async function notifyRentPayment(
   await Promise.allSettled(recipients.map((to) => sendMail(to, subject, html)));
 }
 
-interface DigestData {
-  period: string;
-  openTickets: number;
-  overdueRentCount: number;
-  upcomingEventsCount: number;
-}
-
 export async function sendDigestEmails(companyId: number, frequency: string): Promise<void> {
   if (!isEmailEnabled) return;
 
