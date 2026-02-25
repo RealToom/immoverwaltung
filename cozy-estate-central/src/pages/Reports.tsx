@@ -1,10 +1,12 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import {
   Users,
   Wrench,
   TrendingUp,
   CreditCard,
   Loader2,
+  Download,
+  CalendarDays,
 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -34,6 +36,7 @@ import { useProperties } from "@/hooks/api/useProperties";
 import { useMaintenanceTickets } from "@/hooks/api/useMaintenanceTickets";
 import { useRevenueByProperty } from "@/hooks/api/useFinance";
 import { mapMaintenanceCategory, mapMaintenanceStatus, formatCurrency } from "@/lib/mappings";
+import { getToken } from "@/lib/api";
 
 const COLORS = [
   "hsl(215, 60%, 28%)",
@@ -45,8 +48,34 @@ const COLORS = [
 
 const Reports = () => {
   const { data: propertiesRes, isLoading: propsLoading } = useProperties();
-  const { data: ticketsRes, isLoading: ticketsLoading } = useMaintenanceTickets();
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const { data: ticketsRes, isLoading: ticketsLoading } = useMaintenanceTickets(
+    undefined, undefined, undefined, undefined, from || undefined, to || undefined,
+  );
   const { data: revenueRes, isLoading: revenueLoading } = useRevenueByProperty();
+
+  const handleExport = async (format: "csv" | "pdf") => {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ format });
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const res = await fetch(`/api/reports/export?${params}`, {
+        headers: { Authorization: `Bearer ${getToken() ?? ""}` },
+      });
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Bericht.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const isLoading = propsLoading || ticketsLoading || revenueLoading;
   const properties = propertiesRes?.data ?? [];
@@ -171,9 +200,43 @@ const Reports = () => {
       <header className="flex h-16 items-center gap-3 border-b border-border/60 bg-card px-6">
         <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
         <Separator orientation="vertical" className="h-6" />
-        <div>
+        <div className="flex-1">
           <h1 className="font-heading text-lg font-semibold text-foreground">Berichte</h1>
           <p className="text-xs text-muted-foreground">Auswertungen und Analysen</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <CalendarDays className="h-4 w-4 text-muted-foreground" />
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className="text-sm border rounded px-2 py-1 bg-background"
+            title="Von"
+          />
+          <span className="text-muted-foreground text-xs">–</span>
+          <input
+            type="date"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            className="text-sm border rounded px-2 py-1 bg-background"
+            title="Bis"
+          />
+          <button
+            onClick={() => handleExport("csv")}
+            disabled={exporting}
+            className="flex items-center gap-1.5 text-sm border rounded px-3 py-1.5 hover:bg-muted disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            CSV
+          </button>
+          <button
+            onClick={() => handleExport("pdf")}
+            disabled={exporting}
+            className="flex items-center gap-1.5 text-sm border rounded px-3 py-1.5 hover:bg-muted disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" />
+            PDF
+          </button>
         </div>
       </header>
 

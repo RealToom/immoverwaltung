@@ -29,9 +29,11 @@ export function useMaintenanceTickets(
   status?: string,
   priority?: string,
   category?: string,
+  from?: string,
+  to?: string,
 ) {
   return useQuery({
-    queryKey: ["maintenance", search, status, priority, category],
+    queryKey: ["maintenance", search, status, priority, category, from, to],
     queryFn: () =>
       api<PaginatedResponse<MaintenanceTicketItem>>("/maintenance", {
         params: {
@@ -39,6 +41,8 @@ export function useMaintenanceTickets(
           status: status && status !== "alle" ? status : undefined,
           priority: priority && priority !== "alle" ? priority : undefined,
           category: category && category !== "alle" ? category : undefined,
+          from: from || undefined,
+          to: to || undefined,
           limit: 100,
         },
       }),
