@@ -3,6 +3,8 @@ import { Calendar, dateFnsLocalizer, View } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from "date-fns";
 import { de } from "date-fns/locale/de";
 import "react-big-calendar/lib/css/react-big-calendar.css";
+import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
+import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -11,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
-import { useCalendarEvents, useCreateCalendarEvent } from "@/hooks/api/useCalendarEvents";
+import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent } from "@/hooks/api/useCalendarEvents";
 import { toast } from "sonner";
 
 const locales = { de };
@@ -22,6 +24,8 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales,
 });
+
+const DnDCalendar = withDragAndDrop(Calendar) as typeof Calendar;
 
 const EVENT_COLORS: Record<string, string> = {
   MANUELL: "#3b82f6",
@@ -51,6 +55,7 @@ export default function CalendarPage() {
   const to = addMonths(currentDate, 2);
   const { data, isLoading } = useCalendarEvents(from, to);
   const createEvent = useCreateCalendarEvent();
+  const updateEvent = useUpdateCalendarEvent();
 
   const events = useMemo(() =>
     (data?.data ?? []).map((e) => ({
@@ -77,6 +82,23 @@ export default function CalendarPage() {
     } catch {
       toast.error("Fehler beim Erstellen");
     }
+  };
+
+  const handleEventDrop = ({
+    event,
+    start,
+    end,
+  }: {
+    event: (typeof events)[0];
+    start: string | Date;
+    end: string | Date;
+  }) => {
+    if (event.resource?.type !== "MANUELL") return;
+    updateEvent.mutate({
+      id: event.id as number,
+      start: new Date(start).toISOString(),
+      end: new Date(end).toISOString(),
+    });
   };
 
   const eventStyleGetter = (event: { resource: { type: string; color?: string } }) => ({
@@ -147,7 +169,7 @@ export default function CalendarPage() {
             </div>
           ) : (
             <div className="flex-1 min-h-0">
-              <Calendar
+              <DnDCalendar
                 localizer={localizer}
                 events={events}
                 view={view}
@@ -159,6 +181,9 @@ export default function CalendarPage() {
                 style={{ height: "100%" }}
                 toolbar={false}
                 onSelectEvent={(event) => setSelectedEvent(event as (typeof events)[0])}
+                onEventDrop={handleEventDrop as never}
+                draggableAccessor={(event) => (event as (typeof events)[0]).resource?.type === "MANUELL"}
+                resizable={false}
               />
             </div>
           )}
