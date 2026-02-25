@@ -8,6 +8,7 @@ import { markOverduePayments } from "./dunning.service.js";
 import { processOverdueSchedules } from "./maintenance-schedule.service.js";
 import { syncAllAccounts } from "./banking.service.js";
 import { matchAllPendingTransactions } from "./matching.service.js";
+import { sendDigestEmails } from "./email.service.js";
 
 /**
  * DSGVO Art. 17 / Art. 5(1)(e) - Aufbewahrungsfristen
@@ -21,6 +22,36 @@ import { matchAllPendingTransactions } from "./matching.service.js";
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 Stunde
 const BANKING_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 Stunden
+
+// In-memory dedup: avoids double-sending if server restarts during the 8 AM hour
+const digestSentAt = new Map<string, number>();
+
+async function processDigests(): Promise<void> {
+  const now = new Date();
+  const hour = now.getHours();
+  if (hour !== 8) return;
+
+  const day = now.getDay();   // 0=Sun, 1=Mon
+  const date = now.getDate();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+  const companies = await prisma.company.findMany({ select: { id: true } });
+
+  for (const company of companies) {
+    for (const freq of ["TAEGLICH", "WOECHENTLICH", "MONATLICH"] as const) {
+      if (freq === "WOECHENTLICH" && day !== 1) continue;
+      if (freq === "MONATLICH" && date !== 1) continue;
+
+      const key = `${company.id}:${freq}`;
+      if ((digestSentAt.get(key) ?? 0) >= dayStart) continue; // Already sent today
+
+      digestSentAt.set(key, Date.now());
+      await sendDigestEmails(company.id, freq).catch((err) =>
+        logger.error({ err, companyId: company.id, freq }, "[DIGEST] Fehler beim Senden"),
+      );
+    }
+  }
+}
 
 export async function cleanupExpiredDocuments(): Promise<number> {
     const now = new Date();
@@ -86,6 +117,7 @@ export function startRetentionCleanup(): void {
             processRecurringTransactions().catch((err) => logger.error({ err }, "[RECURRING] Fehler beim Verarbeiten")),
             markOverduePayments().catch((err) => logger.error({ err }, "[MAHNWESEN] Fehler")),
             processOverdueSchedules().catch((err) => logger.error({ err }, "[WARTUNGSPLAN] Fehler")),
+            processDigests().catch((err) => logger.error({ err }, "[DIGEST] Fehler")),
         ]).catch((err) => logger.error({ err }, "[CLEANUP] Fehler beim periodischen Cleanup"));
     }, CLEANUP_INTERVAL_MS);
 
