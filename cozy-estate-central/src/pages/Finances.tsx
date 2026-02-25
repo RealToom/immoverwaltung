@@ -31,11 +31,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Area, AreaChart } from "recharts";
-import { useFinanceSummary, useMonthlyRevenue, useRevenueByProperty, useTransactions, useExpenseBreakdown, useRentCollection, useCreateTransaction, useScanReceipt, useRoiData } from "@/hooks/api/useFinance";
+import { useFinanceSummary, useMonthlyRevenue, useRevenueByProperty, useTransactions, useExpenseBreakdown, useRentCollection, useCreateTransaction, useRoiData } from "@/hooks/api/useFinance";
+import type { ScannedReceipt } from "@/hooks/api/useFinance";
 import { useRecurringTransactions, useCreateRecurring, useUpdateRecurring, useDeleteRecurring } from "@/hooks/api/useRecurringTransactions";
 import { useProperties } from "@/hooks/api/useProperties";
 import { formatDate, formatCurrency, formatChartMonth } from "@/lib/mappings";
 import { useToast } from "@/hooks/use-toast";
+import { uploadFileWithProgress, type ScanPhase } from "@/lib/api";
 
 const PIE_COLORS = [
   "hsl(215, 60%, 28%)",
@@ -106,7 +108,7 @@ const Finances = () => {
   const { data: propertiesRes } = useProperties();
   const { data: roiRes } = useRoiData(roiYear);
   const createTx = useCreateTransaction();
-  const scanReceipt = useScanReceipt();
+  const [scanPhase, setScanPhase] = useState<ScanPhase>("idle");
   const { data: recurringRes } = useRecurringTransactions();
   const createRecurring = useCreateRecurring();
   const updateRecurring = useUpdateRecurring();
@@ -177,8 +179,14 @@ const Finances = () => {
     if (!file) return;
     const fd = new FormData();
     fd.append("file", file);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
     try {
-      const res = await scanReceipt.mutateAsync(fd);
+      const res = await uploadFileWithProgress<{ data: ScannedReceipt }>(
+        "/finance/scan",
+        fd,
+        setScanPhase,
+      );
       const d = res.data;
       setNewTx((prev) => ({
         ...prev,
@@ -192,7 +200,7 @@ const Finances = () => {
     } catch {
       toast({ title: "Scan fehlgeschlagen", description: "Bitte erneut versuchen.", variant: "destructive" });
     } finally {
-      e.target.value = "";
+      setScanPhase("idle");
     }
   };
 
@@ -768,15 +776,19 @@ const Finances = () => {
                 type="button"
                 variant="outline"
                 className="w-full gap-2"
-                disabled={scanReceipt.isPending}
+                disabled={scanPhase !== "idle"}
                 onClick={() => scanInputRef.current?.click()}
               >
-                {scanReceipt.isPending ? (
+                {scanPhase !== "idle" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <ScanLine className="h-4 w-4" />
                 )}
-                {scanReceipt.isPending ? "Wird gescannt…" : "Beleg scannen (KI)"}
+                {scanPhase === "idle"
+                  ? "Beleg scannen (KI)"
+                  : scanPhase === "uploading"
+                  ? "Wird hochgeladen…"
+                  : "KI analysiert…"}
               </Button>
               {scanInfo && (
                 <p className="text-xs text-muted-foreground bg-muted rounded px-3 py-2">
