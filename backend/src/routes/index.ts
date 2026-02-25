@@ -27,6 +27,7 @@ import { maintenanceScheduleRouter } from "./maintenance-schedule.routes.js";
 import { documentTemplateRouter } from "./document-template.routes.js";
 import { bankingRouter, bankingCallbackHandler } from "./banking.routes.js";
 import { datevRouter } from "./datev.routes.js";
+import { reportRouter } from "./report.routes.js";
 
 const router = Router();
 
@@ -66,5 +67,6 @@ router.get("/banking/callback", bankingCallbackHandler);
 // Protected banking and DATEV routes
 router.use("/banking", requireAuth, tenantGuard, bankingRouter);
 router.use("/finance/datev", requireAuth, tenantGuard, datevRouter);
+router.use("/reports", requireAuth, tenantGuard, reportRouter);
 
 export { router as apiRouter };
