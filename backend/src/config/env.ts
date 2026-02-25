@@ -28,4 +28,8 @@ export const env = {
   },
   // Anthropic API Key für KI-Belegscan (optional — Feature deaktiviert wenn nicht gesetzt)
   get ANTHROPIC_API_KEY() { return process.env.ANTHROPIC_API_KEY || ""; },
+  get NORDIGEN_SECRET_ID() { return process.env.NORDIGEN_SECRET_ID || ""; },
+  get NORDIGEN_SECRET_KEY() { return process.env.NORDIGEN_SECRET_KEY || ""; },
+  // Base URL for Nordigen OAuth callback redirect (no trailing slash)
+  get NORDIGEN_REDIRECT_BASE() { return process.env.NORDIGEN_REDIRECT_BASE || "http://localhost:8080"; },
 };
