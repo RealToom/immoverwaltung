@@ -85,7 +85,18 @@ export async function matchPendingTransactions(
       1
     );
 
+    let didMatch = false;
     await prisma.$transaction(async (tx) => {
+      // Optimistic lock: re-check status inside the transaction to prevent
+      // double-matching if concurrent invocations race on the same BankTransaction.
+      const current = await tx.bankTransaction.findUnique({
+        where: { id: bankTx.id },
+        select: { status: true },
+      });
+      if (!current || current.status !== "UNMATCHED") {
+        return; // already matched by a concurrent call — skip
+      }
+
       // RentPayment upserten
       const rentPayment = await tx.rentPayment.upsert({
         where: {
@@ -140,7 +151,11 @@ export async function matchPendingTransactions(
           transactionId: ledgerTx.id,
         },
       });
+
+      didMatch = true;
     });
+
+    if (!didMatch) continue;
 
     // AuditLog außerhalb der DB-Transaktion (schlägt stumm fehl)
     await createAuditLog(
