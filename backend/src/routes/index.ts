@@ -25,6 +25,8 @@ import { dunningRouter } from "./dunning.routes.js";
 import { handoverRouter } from "./handover.routes.js";
 import { maintenanceScheduleRouter } from "./maintenance-schedule.routes.js";
 import { documentTemplateRouter } from "./document-template.routes.js";
+import { bankingRouter, bankingCallbackHandler } from "./banking.routes.js";
+import { datevRouter } from "./datev.routes.js";
 
 const router = Router();
 
@@ -57,5 +59,12 @@ router.use("/dunning", requireAuth, tenantGuard, dunningRouter);
 router.use("/handover-protocols", requireAuth, tenantGuard, handoverRouter);
 router.use("/maintenance-schedules", requireAuth, tenantGuard, maintenanceScheduleRouter);
 router.use("/document-templates", requireAuth, tenantGuard, documentTemplateRouter);
+
+// Public: Nordigen OAuth callback (no auth — browser is redirected here by Nordigen)
+router.get("/banking/callback", bankingCallbackHandler);
+
+// Protected banking and DATEV routes
+router.use("/banking", requireAuth, tenantGuard, bankingRouter);
+router.use("/finance/datev", requireAuth, tenantGuard, datevRouter);
 
 export { router as apiRouter };
