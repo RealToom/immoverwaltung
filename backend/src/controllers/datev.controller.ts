@@ -21,7 +21,7 @@ export async function getMappings(req: Request, res: Response): Promise<void> {
 
 // PUT /finance/datev/mappings/:category
 export async function putMapping(req: Request, res: Response): Promise<void> {
-  const { category } = req.params;
+  const category = req.params.category as string;
   const { accountNumber } = req.body as { accountNumber: string };
   const mapping = await datevService.upsertMapping(req.companyId!, category, accountNumber);
   res.json({ data: mapping });
