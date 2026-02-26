@@ -4,18 +4,16 @@ import { Building2, Eye, EyeOff, Mail, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, register } = useAuth();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginData, setLoginData] = useState({ email: "", password: "" });
-  const [registerData, setRegisterData] = useState({ name: "", email: "", password: "", confirmPassword: "", companyName: "" });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,42 +50,6 @@ const Login = () => {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!registerData.name || !registerData.email || !registerData.password || !registerData.companyName) {
-      toast.error("Bitte alle Pflichtfelder ausfüllen");
-      return;
-    }
-    if (registerData.password !== registerData.confirmPassword) {
-      toast.error("Passwörter stimmen nicht überein");
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await register(registerData.name, registerData.email, registerData.password, registerData.companyName);
-      toast.success("Konto erfolgreich erstellt!");
-      navigate("/");
-    } catch (err: unknown) {
-      // Import ApiError dynamically or assume structure if import is tricky
-      // But we can just check if it has 'details' with 'details'
-      let message = err instanceof Error ? err.message : "Registrierung fehlgeschlagen";
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const apiError = err as any;
-      if (apiError.details?.details) {
-        const fieldErrors = apiError.details.details;
-        const detailedMessages = Object.values(fieldErrors).flat().join(", ");
-        if (detailedMessages) {
-          message = `${message}: ${detailedMessages}`;
-        }
-      }
-
-      toast.error(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-muted/30 p-4">
       <div className="w-full max-w-md space-y-6">
@@ -102,126 +64,52 @@ const Login = () => {
         </div>
 
         <Card className="border-border/50 shadow-xl">
-          <Tabs defaultValue="login">
-            <CardHeader className="pb-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Anmelden</TabsTrigger>
-                <TabsTrigger value="register">Registrieren</TabsTrigger>
-              </TabsList>
-            </CardHeader>
-
-            <TabsContent value="login">
-              <form onSubmit={handleLogin}>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">E-Mail</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="login-email"
-                        type="email"
-                        placeholder="name@firma.de"
-                        className="pl-10"
-                        value={loginData.email}
-                        onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="login-password">Passwort</Label>
-                      <button type="button" className="text-xs text-primary hover:underline">
-                        Passwort vergessen?
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="login-password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        className="pl-10 pr-10"
-                        value={loginData.password}
-                        onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                      />
-                      <button
-                        type="button"
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
-                    {isSubmitting ? "Anmelden..." : "Anmelden"}
-                  </Button>
-                </CardContent>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="register">
-              <form onSubmit={handleRegister}>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="reg-name">Vollständiger Name *</Label>
-                    <Input
-                      id="reg-name"
-                      placeholder="Max Mustermann"
-                      value={registerData.name}
-                      onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reg-company">Firmenname *</Label>
-                    <Input
-                      id="reg-company"
-                      placeholder="Mustermann Hausverwaltung GmbH"
-                      value={registerData.companyName}
-                      onChange={(e) => setRegisterData({ ...registerData, companyName: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reg-email">E-Mail *</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="reg-email"
-                        type="email"
-                        placeholder="name@firma.de"
-                        className="pl-10"
-                        value={registerData.email}
-                        onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reg-password">Passwort *</Label>
-                    <Input
-                      id="reg-password"
-                      type="password"
-                      placeholder="Min. 8 Zeichen, Groß-/Kleinbuchstabe, Zahl"
-                      value={registerData.password}
-                      onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reg-confirm">Passwort bestätigen *</Label>
-                    <Input
-                      id="reg-confirm"
-                      type="password"
-                      placeholder="Passwort wiederholen"
-                      value={registerData.confirmPassword}
-                      onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
-                    />
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
-                    {isSubmitting ? "Erstellen..." : "Konto erstellen"}
-                  </Button>
-                </CardContent>
-              </form>
-            </TabsContent>
-          </Tabs>
+          <form onSubmit={handleLogin}>
+            <CardContent className="space-y-4 pt-6">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">E-Mail</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="login-email"
+                    type="email"
+                    placeholder="name@firma.de"
+                    className="pl-10"
+                    value={loginData.email}
+                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                    autoComplete="email"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Passwort</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="login-password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    className="pl-10 pr-10"
+                    value={loginData.password}
+                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? "Anmelden..." : "Anmelden"}
+              </Button>
+            </CardContent>
+          </form>
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
