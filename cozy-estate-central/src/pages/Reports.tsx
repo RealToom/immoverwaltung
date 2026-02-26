@@ -270,11 +270,11 @@ const Reports = () => {
             </CardHeader>
             <CardContent>
               <ChartContainer config={occupancyChartConfig} className="h-[280px] w-full">
-                <BarChart data={occupancyData}>
+                <BarChart data={occupancyData} margin={{ left: 0, right: 16, top: 4, bottom: 4 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} />
+                  <XAxis dataKey="name" fontSize={11} tickLine={false} axisLine={false} interval={0} />
                   <YAxis fontSize={11} tickLine={false} axisLine={false} />
-                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <ChartTooltip content={<ChartTooltipContent labelKey="fullName" />} />
                   <Bar dataKey="belegt" stackId="a" fill="hsl(152, 60%, 42%)" radius={[0, 0, 0, 0]} />
                   <Bar dataKey="leer" stackId="a" fill="hsl(0, 72%, 51%)" radius={[4, 4, 0, 0]} />
                 </BarChart>

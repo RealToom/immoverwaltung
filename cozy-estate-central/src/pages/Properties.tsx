@@ -46,6 +46,7 @@ const Properties = () => {
   const [statusFilter, setStatusFilter] = useState<string>("alle");
   const [addOpen, setAddOpen] = useState(false);
   const [newProp, setNewProp] = useState({ name: "", street: "", zip: "", city: "" });
+  const [propErrors, setPropErrors] = useState({ name: false, street: false, zip: false, city: false });
   const createProperty = useCreateProperty();
 
   useEffect(() => {
@@ -56,10 +57,14 @@ const Properties = () => {
   }, [searchParams, setSearchParams, user]);
 
   const handleAddProperty = async () => {
-    if (!newProp.name.trim() || !newProp.street.trim() || !newProp.zip.trim() || !newProp.city.trim()) {
-      toast({ title: "Fehler", description: "Bitte alle Pflichtfelder ausfuellen.", variant: "destructive" });
-      return;
-    }
+    const errors = {
+      name: !newProp.name.trim(),
+      street: !newProp.street.trim(),
+      zip: !newProp.zip.trim(),
+      city: !newProp.city.trim(),
+    };
+    setPropErrors(errors);
+    if (Object.values(errors).some(Boolean)) return;
     try {
       await createProperty.mutateAsync({
         name: newProp.name.trim(),
@@ -69,6 +74,7 @@ const Properties = () => {
       });
       toast({ title: "Erstellt", description: `${newProp.name} wurde angelegt.` });
       setNewProp({ name: "", street: "", zip: "", city: "" });
+      setPropErrors({ name: false, street: false, zip: false, city: false });
       setAddOpen(false);
     } catch {
       toast({ title: "Fehler", description: "Immobilie konnte nicht erstellt werden.", variant: "destructive" });
@@ -278,48 +284,56 @@ const Properties = () => {
       </main>
 
       {/* Add Property Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={addOpen} onOpenChange={(o) => { setAddOpen(o); if (!o) { setNewProp({ name: "", street: "", zip: "", city: "" }); setPropErrors({ name: false, street: false, zip: false, city: false }); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Neue Immobilie anlegen</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label htmlFor="prop-name">Name *</Label>
+              <Label htmlFor="prop-name" className={propErrors.name ? "text-destructive" : ""}>Name *</Label>
               <Input
                 id="prop-name"
                 value={newProp.name}
-                onChange={(e) => setNewProp((p) => ({ ...p, name: e.target.value }))}
+                onChange={(e) => { setNewProp((p) => ({ ...p, name: e.target.value })); if (e.target.value.trim()) setPropErrors((er) => ({ ...er, name: false })); }}
                 placeholder="z.B. Wohnanlage Am Park"
+                className={propErrors.name ? "border-destructive focus-visible:ring-destructive" : ""}
               />
+              {propErrors.name && <p className="text-xs text-destructive">Pflichtfeld</p>}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="prop-street">Straße *</Label>
+              <Label htmlFor="prop-street" className={propErrors.street ? "text-destructive" : ""}>Straße *</Label>
               <Input
                 id="prop-street"
                 value={newProp.street}
-                onChange={(e) => setNewProp((p) => ({ ...p, street: e.target.value }))}
+                onChange={(e) => { setNewProp((p) => ({ ...p, street: e.target.value })); if (e.target.value.trim()) setPropErrors((er) => ({ ...er, street: false })); }}
                 placeholder="z.B. Musterstr. 1"
+                className={propErrors.street ? "border-destructive focus-visible:ring-destructive" : ""}
               />
+              {propErrors.street && <p className="text-xs text-destructive">Pflichtfeld</p>}
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="prop-zip">PLZ *</Label>
+                <Label htmlFor="prop-zip" className={propErrors.zip ? "text-destructive" : ""}>PLZ *</Label>
                 <Input
                   id="prop-zip"
                   value={newProp.zip}
-                  onChange={(e) => setNewProp((p) => ({ ...p, zip: e.target.value }))}
+                  onChange={(e) => { setNewProp((p) => ({ ...p, zip: e.target.value })); if (e.target.value.trim()) setPropErrors((er) => ({ ...er, zip: false })); }}
                   placeholder="10115"
+                  className={propErrors.zip ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
+                {propErrors.zip && <p className="text-xs text-destructive">Pflichtfeld</p>}
               </div>
               <div className="grid gap-2 col-span-2">
-                <Label htmlFor="prop-city">Stadt *</Label>
+                <Label htmlFor="prop-city" className={propErrors.city ? "text-destructive" : ""}>Stadt *</Label>
                 <Input
                   id="prop-city"
                   value={newProp.city}
-                  onChange={(e) => setNewProp((p) => ({ ...p, city: e.target.value }))}
+                  onChange={(e) => { setNewProp((p) => ({ ...p, city: e.target.value })); if (e.target.value.trim()) setPropErrors((er) => ({ ...er, city: false })); }}
                   placeholder="Berlin"
+                  className={propErrors.city ? "border-destructive focus-visible:ring-destructive" : ""}
                 />
+                {propErrors.city && <p className="text-xs text-destructive">Pflichtfeld</p>}
               </div>
             </div>
           </div>

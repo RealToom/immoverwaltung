@@ -144,7 +144,7 @@ export function parseDate(germanDate: string): string {
 
 // ─── Currency Formatting ─────────────────────────────────────
 export function formatCurrency(amount: number): string {
-  return `€ ${amount.toLocaleString("de-DE")}`;
+  return `€ ${amount.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // ─── Month Abbreviation (for Charts) ────────────────────────

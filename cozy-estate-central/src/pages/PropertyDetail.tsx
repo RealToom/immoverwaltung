@@ -708,8 +708,9 @@ const PropertyDetail = () => {
                       <TrendingUp className="h-5 w-5 text-success" />
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Einnahmen</p>
+                      <p className="text-xs text-muted-foreground">Gebuchte Einnahmen</p>
                       <p className="text-xl font-heading font-bold text-success">{formatCurrency(propIncome)}</p>
+                      {monthlyRevenue > 0 && <p className="text-xs text-muted-foreground">Sollmiete: {formatCurrency(monthlyRevenue)}/Mo.</p>}
                     </div>
                   </CardContent>
                 </Card>
