@@ -138,6 +138,10 @@ const SettingsPage = () => {
     website: "",
   });
   const [autoSave, setAutoSave] = useState(() => localStorage.getItem("autoSave") !== "false");
+  const [eveningDuration, setEveningDuration] = useState<number>(() => {
+    const saved = localStorage.getItem("eveningEventDurationMin");
+    return saved ? parseInt(saved, 10) : 60;
+  });
   const [companyInitialized, setCompanyInitialized] = useState(false);
 
   useEffect(() => {
@@ -522,6 +526,33 @@ const SettingsPage = () => {
                         {updateCompany.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Speichern
                       </Button>
                     </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Kalender</CardTitle>
+                    <CardDescription>Standard-Dauer für Abendtermine (ab 20:00 Uhr)</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Input
+                        type="number" min={15} max={480} step={15}
+                        value={eveningDuration}
+                        onChange={(e) => setEveningDuration(Math.max(15, Number(e.target.value)))}
+                        className="w-24"
+                      />
+                      <span className="text-sm text-muted-foreground">Minuten</span>
+                      <Button size="sm" variant="outline" onClick={() => {
+                        localStorage.setItem("eveningEventDurationMin", String(eveningDuration));
+                        toast({ title: "Gespeichert", description: `Abendtermin Standard-Dauer: ${eveningDuration} Min.` });
+                      }}>
+                        <Save className="h-4 w-4 mr-1" /> Speichern
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Neue Termine ab 20:00 Uhr werden automatisch auf diese Dauer gesetzt. Ohne Einstellung: 60 Minuten.
+                    </p>
                   </CardContent>
                 </Card>
 

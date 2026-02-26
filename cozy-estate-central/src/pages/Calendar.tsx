@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Calendar, dateFnsLocalizer, View } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from "date-fns";
 import { de } from "date-fns/locale/de";
@@ -15,6 +15,14 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent } from "@/hooks/api/useCalendarEvents";
 import { toast } from "sonner";
+
+const EVENING_DURATION_KEY = "eveningEventDurationMin";
+const EVENING_HOUR = 20;
+
+const getEveningDefault = () => {
+  const saved = localStorage.getItem(EVENING_DURATION_KEY);
+  return saved ? parseInt(saved, 10) : 60;
+};
 
 const locales = { de };
 const localizer = dateFnsLocalizer({
@@ -49,6 +57,7 @@ export default function CalendarPage() {
   const [newEventOpen, setNewEventOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newStart, setNewStart] = useState("");
+  const [newDuration, setNewDuration] = useState<number>(0);
   const [selectedEvent, setSelectedEvent] = useState<(typeof events)[0] | null>(null);
 
   const from = subMonths(currentDate, 1);
@@ -57,13 +66,29 @@ export default function CalendarPage() {
   const createEvent = useCreateCalendarEvent();
   const updateEvent = useUpdateCalendarEvent();
 
+  // Auto-fill duration when time is set to ≥ 20:00
+  useEffect(() => {
+    if (!newStart) return;
+    const hour = new Date(newStart).getHours();
+    if (hour >= EVENING_HOUR) {
+      setNewDuration(getEveningDefault());
+    }
+  }, [newStart]);
+
   const events = useMemo(() =>
-    (data?.data ?? []).map((e) => ({
-      ...e,
-      start: new Date(e.start),
-      end: e.end ? new Date(e.end) : new Date(e.start),
-      resource: e,
-    })), [data]);
+    (data?.data ?? []).map((e) => {
+      const start = new Date(e.start);
+      let end: Date;
+      if (e.end) {
+        end = new Date(e.end);
+      } else if (!e.allDay && start.getHours() >= EVENING_HOUR) {
+        // Fallback: visualize evening events without explicit end as 1h block
+        end = new Date(start.getTime() + 60 * 60 * 1000);
+      } else {
+        end = start;
+      }
+      return { ...e, start, end, resource: e };
+    }), [data]);
 
   const upcoming = useMemo(() =>
     (data?.data ?? [])
@@ -73,12 +98,21 @@ export default function CalendarPage() {
 
   const handleCreate = async () => {
     if (!newTitle || !newStart) return;
+    const start = new Date(newStart);
+    const hasTime = newDuration > 0;
+    const end = hasTime ? new Date(start.getTime() + newDuration * 60 * 1000) : undefined;
     try {
-      await createEvent.mutateAsync({ title: newTitle, start: new Date(newStart).toISOString(), allDay: true });
+      await createEvent.mutateAsync({
+        title: newTitle,
+        start: start.toISOString(),
+        end: end?.toISOString(),
+        allDay: !hasTime,
+      });
       toast.success("Termin erstellt");
       setNewEventOpen(false);
       setNewTitle("");
       setNewStart("");
+      setNewDuration(0);
     } catch {
       toast.error("Fehler beim Erstellen");
     }
@@ -110,6 +144,14 @@ export default function CalendarPage() {
       padding: "2px 4px",
     },
   });
+
+  const durationLabel = (min: number) => {
+    if (min === 0) return "";
+    if (min < 60) return `${min} Min.`;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return m > 0 ? `${h}h ${m}min` : `${h}h`;
+  };
 
   return (
     <div className="flex flex-col h-screen">
@@ -247,7 +289,10 @@ export default function CalendarPage() {
       </Dialog>
 
       {/* Neuer Termin Dialog */}
-      <Dialog open={newEventOpen} onOpenChange={setNewEventOpen}>
+      <Dialog open={newEventOpen} onOpenChange={(open) => {
+        setNewEventOpen(open);
+        if (!open) { setNewTitle(""); setNewStart(""); setNewDuration(0); }
+      }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Neuer Termin</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-4 py-2">
@@ -256,8 +301,33 @@ export default function CalendarPage() {
               <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Terminbezeichnung" />
             </div>
             <div>
-              <Label>Datum</Label>
+              <Label>Datum & Uhrzeit</Label>
               <Input type="datetime-local" value={newStart} onChange={(e) => setNewStart(e.target.value)} />
+            </div>
+            <div>
+              <Label className="flex items-center justify-between">
+                <span>Dauer (Minuten)</span>
+                {newStart && new Date(newStart).getHours() >= EVENING_HOUR && newDuration > 0 && (
+                  <span className="text-xs text-primary font-normal">
+                    Abendtermin — {durationLabel(newDuration)} auto gesetzt
+                  </span>
+                )}
+              </Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={0}
+                  step={15}
+                  value={newDuration === 0 ? "" : newDuration}
+                  onChange={(e) => setNewDuration(e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)))}
+                  placeholder="Leer = ganztägig"
+                  className="flex-1"
+                />
+                {newDuration > 0 && (
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">{durationLabel(newDuration)}</span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Leer lassen für ganztägigen Termin</p>
             </div>
           </div>
           <DialogFooter>
