@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 export interface EmailAccount {
   id: number; label: string; email: string; imapHost: string; imapPort: number;
   smtpHost: string; smtpPort: number; isActive: boolean; lastSync: string | null;
+  allowedRoles: string[];
 }
 
 export function useEmailAccounts() {

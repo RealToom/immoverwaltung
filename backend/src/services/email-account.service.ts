@@ -8,7 +8,8 @@ export async function listAccounts(companyId: number) {
   return prisma.emailAccount.findMany({
     where: { companyId },
     select: { id: true, label: true, email: true, imapHost: true, imapPort: true,
-              smtpHost: true, smtpPort: true, isActive: true, lastSync: true, createdAt: true },
+              smtpHost: true, smtpPort: true, isActive: true, lastSync: true, createdAt: true,
+              allowedRoles: true },
     orderBy: { createdAt: "asc" },
   });
 }
@@ -26,7 +27,7 @@ export async function testImapConnection(config: {
 export async function createAccount(companyId: number, data: {
   label: string; email: string; imapHost: string; imapPort: number; imapTls: boolean;
   imapUser: string; password: string; smtpHost: string; smtpPort: number; smtpTls: boolean;
-  skipConnectionTest?: boolean;
+  skipConnectionTest?: boolean; allowedRoles?: string[];
 }) {
   let imapConnected = true;
   // Test IMAP connection before saving (unless skipped)
@@ -44,22 +45,32 @@ export async function createAccount(companyId: number, data: {
     logger.info({ email: data.email }, "IMAP-Verbindungstest übersprungen, Postfach wird als inaktiv gespeichert");
   }
 
-  const { password, skipConnectionTest: _, ...rest } = data;
+  const { password, skipConnectionTest: _, allowedRoles, ...rest } = data;
   return prisma.emailAccount.create({
-    data: { ...rest, encryptedPassword: encryptString(password), companyId, isActive: imapConnected },
+    data: {
+      ...rest,
+      encryptedPassword: encryptString(password),
+      companyId,
+      isActive: imapConnected,
+      allowedRoles: allowedRoles ?? ["ADMIN", "VERWALTER", "BUCHHALTER", "READONLY"],
+    },
   });
 }
 
 export async function updateAccount(companyId: number, id: number, data: {
-  label?: string; isActive?: boolean; password?: string;
+  label?: string; isActive?: boolean; password?: string; allowedRoles?: string[];
 }) {
   const account = await prisma.emailAccount.findFirst({ where: { id, companyId } });
   if (!account) throw new AppError(404, "Postfach nicht gefunden");
 
-  const { password, ...rest } = data;
+  const { password, allowedRoles, ...rest } = data;
   return prisma.emailAccount.update({
     where: { id },
-    data: { ...rest, ...(password ? { encryptedPassword: encryptString(password) } : {}) },
+    data: {
+      ...rest,
+      ...(password ? { encryptedPassword: encryptString(password) } : {}),
+      ...(allowedRoles ? { allowedRoles } : {}),
+    },
   });
 }
 

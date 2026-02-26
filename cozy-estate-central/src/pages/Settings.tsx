@@ -183,10 +183,12 @@ const SettingsPage = () => {
   const createEmailAccount = useCreateEmailAccount();
   const deleteEmailAccount = useDeleteEmailAccount();
   const syncEmailAccount = useSyncEmailAccount();
+  const ALL_ROLES = ["ADMIN", "VERWALTER", "BUCHHALTER", "READONLY"] as const;
   const [mailForm, setMailForm] = useState({
     label: "", email: "", imapHost: "", imapPort: 993, imapTls: true,
     imapUser: "", password: "", smtpHost: "", smtpPort: 587, smtpTls: true,
     skipConnectionTest: false,
+    allowedRoles: ["ADMIN", "VERWALTER", "BUCHHALTER", "READONLY"] as string[],
   });
 
   const handleConnectMailbox = async () => {
@@ -196,7 +198,7 @@ const SettingsPage = () => {
         ? `${mailForm.email} wurde gespeichert (ohne Verbindungstest).`
         : `${mailForm.email} wurde erfolgreich verbunden.`;
       toast({ title: "Postfach gespeichert", description: msg });
-      setMailForm({ label: "", email: "", imapHost: "", imapPort: 993, imapTls: true, imapUser: "", password: "", smtpHost: "", smtpPort: 587, smtpTls: true, skipConnectionTest: false });
+      setMailForm({ label: "", email: "", imapHost: "", imapPort: 993, imapTls: true, imapUser: "", password: "", smtpHost: "", smtpPort: 587, smtpTls: true, skipConnectionTest: false, allowedRoles: ["ADMIN", "VERWALTER", "BUCHHALTER", "READONLY"] });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Verbindung fehlgeschlagen";
       toast({ title: "Fehler", description: msg, variant: "destructive" });
@@ -204,7 +206,7 @@ const SettingsPage = () => {
   };
 
   // ─── Password Change ─────────────────────────────────────
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [pwLoading, setPwLoading] = useState(false);
   const [showCurrent, setShowCurrent] = useState(false);
@@ -251,7 +253,9 @@ const SettingsPage = () => {
             <TabsTrigger value="darstellung" className="gap-1.5"><Moon className="h-4 w-4" /> Darstellung</TabsTrigger>
             <TabsTrigger value="app" className="gap-1.5"><Settings className="h-4 w-4" /> App</TabsTrigger>
             <TabsTrigger value="sicherheit" className="gap-1.5"><Shield className="h-4 w-4" /> Sicherheit</TabsTrigger>
-            <TabsTrigger value="postfaecher" className="gap-1.5"><Inbox className="h-4 w-4" /> Postfächer</TabsTrigger>
+            {user?.role === "ADMIN" && (
+              <TabsTrigger value="postfaecher" className="gap-1.5"><Inbox className="h-4 w-4" /> Postfächer</TabsTrigger>
+            )}
           </TabsList>
 
           {/* Profile Tab */}
@@ -650,12 +654,19 @@ const SettingsPage = () => {
                 )}
                 {emailAccounts?.data?.map((acc) => (
                   <div key={acc.id} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div>
+                    <div className="space-y-1">
                       <p className="font-medium">{acc.label}</p>
                       <p className="text-sm text-muted-foreground">{acc.email}</p>
                       <p className="text-xs text-muted-foreground">
                         Letzter Sync: {acc.lastSync ? formatDate(acc.lastSync) : "Noch nie"}
                       </p>
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {(acc.allowedRoles ?? []).map((r) => (
+                          <span key={r} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                            {roleLabels[r] ?? r}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" title="Jetzt synchronisieren"
@@ -731,6 +742,28 @@ const SettingsPage = () => {
                       <Label>Verbindungstest überspringen</Label>
                       <p className="text-xs text-muted-foreground">Postfach ohne IMAP-Test speichern (z.B. bei lokalem Test-Setup)</p>
                     </div>
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label>Zugriff für Rollen</Label>
+                    <div className="flex flex-wrap gap-3">
+                      {ALL_ROLES.map((role) => (
+                        <label key={role} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={mailForm.allowedRoles.includes(role)}
+                            onChange={(e) => setMailForm((f) => ({
+                              ...f,
+                              allowedRoles: e.target.checked
+                                ? [...f.allowedRoles, role]
+                                : f.allowedRoles.filter((r) => r !== role),
+                            }))}
+                            className="rounded"
+                          />
+                          {roleLabels[role]}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Welche Rollen dieses Postfach sehen und nutzen dürfen</p>
                   </div>
                 </div>
                 <div className="flex justify-end pt-2">

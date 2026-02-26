@@ -8,9 +8,9 @@ import * as ctrl from "../controllers/email-account.controller.js";
 const router = Router();
 
 router.get("/", ctrl.list);
-router.post("/", requireRole("ADMIN", "VERWALTER"), validate({ body: createEmailAccountSchema }), ctrl.create);
-router.patch("/:id", requireRole("ADMIN", "VERWALTER"), validate({ params: idParamSchema, body: updateEmailAccountSchema }), ctrl.update);
-router.delete("/:id", requireRole("ADMIN", "VERWALTER"), validate({ params: idParamSchema }), ctrl.remove);
-router.post("/:id/sync", requireRole("ADMIN", "VERWALTER"), validate({ params: idParamSchema }), ctrl.syncNow);
+router.post("/", requireRole("ADMIN"), validate({ body: createEmailAccountSchema }), ctrl.create);
+router.patch("/:id", requireRole("ADMIN"), validate({ params: idParamSchema, body: updateEmailAccountSchema }), ctrl.update);
+router.delete("/:id", requireRole("ADMIN"), validate({ params: idParamSchema }), ctrl.remove);
+router.post("/:id/sync", requireRole("ADMIN"), validate({ params: idParamSchema }), ctrl.syncNow);
 
 export { router as emailAccountRouter };

@@ -2,7 +2,13 @@ import type { Request, Response } from "express";
 import * as svc from "../services/email-account.service.js";
 
 export async function list(req: Request, res: Response): Promise<void> {
-  res.json({ data: await svc.listAccounts(req.companyId!) });
+  const role = req.user?.role ?? "READONLY";
+  const accounts = await svc.listAccounts(req.companyId!);
+  // ADMIN sees all accounts; other roles only see accounts they are allowed to access
+  const filtered = role === "ADMIN"
+    ? accounts
+    : accounts.filter((a) => a.allowedRoles.includes(role));
+  res.json({ data: filtered });
 }
 
 export async function create(req: Request, res: Response): Promise<void> {

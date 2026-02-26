@@ -37,8 +37,8 @@ const Index = () => {
 
       {/* Content */}
       <main className="flex-1 p-6 space-y-6 overflow-auto">
-        {/* Setup Warnings */}
-        {stats?.setupStatus && (!stats.setupStatus.smtpSet || !stats.setupStatus.nordigenSet || !stats.setupStatus.anthropicSet) && (
+        {/* Setup Warnings – only visible to ADMIN */}
+        {user?.role === "ADMIN" && stats?.setupStatus && (!stats.setupStatus.smtpSet || !stats.setupStatus.nordigenSet || !stats.setupStatus.anthropicSet) && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
             <div className="flex items-center gap-2 text-amber-800">
               <AlertTriangle className="h-5 w-5 text-amber-600" />

@@ -698,6 +698,7 @@ model EmailAccount {
   smtpTls           Boolean   @default(true) @map("smtp_tls")
   lastSync          DateTime? @map("last_sync")
   isActive          Boolean   @default(true) @map("is_active")
+  allowedRoles      String[]  @default(["ADMIN", "VERWALTER", "BUCHHALTER", "READONLY"]) @map("allowed_roles")
   companyId         Int       @map("company_id")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
