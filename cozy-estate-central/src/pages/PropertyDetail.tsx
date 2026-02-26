@@ -33,11 +33,13 @@ import { useHandovers, useCreateHandover, useDeleteHandover } from "@/hooks/api/
 import { mapPropertyStatus, mapUnitStatus, mapUnitType, formatDate, formatCurrency } from "@/lib/mappings";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { Gauge } from "lucide-react";
 
 const PREVIEWABLE_TYPES = new Set(["PDF", "JPG", "JPEG", "PNG"]);
 
 const PropertyDetail = () => {
+  const { user } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -135,7 +137,7 @@ const PropertyDetail = () => {
   const createTransactionMutation = useCreateTransaction();
 
   // Auto-Vertrag state
-  const EMPTY_CONTRACT = { type: "MIETE", startDate: new Date().toISOString().slice(0, 10), endDate: "", monthlyRent: "", deposit: "", noticePeriod: "3", notes: "" };
+  const EMPTY_CONTRACT = { type: "WOHNRAUM", startDate: new Date().toISOString().slice(0, 10), endDate: "", monthlyRent: "", deposit: "", noticePeriod: "3", notes: "" };
   const [autoContractOpen, setAutoContractOpen] = useState(false);
   const [autoContractTenantId, setAutoContractTenantId] = useState<number | null>(null);
   const [autoContractUnitId, setAutoContractUnitId] = useState<number | null>(null);
@@ -743,9 +745,11 @@ const PropertyDetail = () => {
                       <CardTitle className="text-base font-heading font-semibold">Transaktionen</CardTitle>
                       <CardDescription>Alle Buchungen fuer diese Immobilie</CardDescription>
                     </div>
-                    <Button size="sm" className="gap-1.5" onClick={() => { setNewTx(EMPTY_TX); setNewTxOpen(true); }}>
-                      <Plus className="h-4 w-4" />Neue Transaktion
-                    </Button>
+                    {user?.role !== "READONLY" && (
+                      <Button size="sm" className="gap-1.5" onClick={() => { setNewTx(EMPTY_TX); setNewTxOpen(true); }}>
+                        <Plus className="h-4 w-4" />Neue Transaktion
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -1520,9 +1524,10 @@ const PropertyDetail = () => {
                 <Select value={contractForm.type} onValueChange={(v) => setContractForm((c) => ({ ...c, type: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="MIETE">Miete</SelectItem>
-                    <SelectItem value="PACHT">Pacht</SelectItem>
+                    <SelectItem value="WOHNRAUM">Wohnraum</SelectItem>
                     <SelectItem value="GEWERBE">Gewerbe</SelectItem>
+                    <SelectItem value="STAFFEL">Staffelmiete</SelectItem>
+                    <SelectItem value="INDEX">Indexmiete</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

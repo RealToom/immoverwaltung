@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { useContracts, useCreateContract } from "@/hooks/api/useContracts";
 import { useDunning, useSendDunning, useResolveDunning } from "@/hooks/api/useDunning";
 import { useProperties } from "@/hooks/api/useProperties";
@@ -54,6 +55,7 @@ const reminderConfig: Record<string, { color: string; bg: string }> = {
 };
 
 const Contracts = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const sendDunning = useSendDunning();
   const resolveDunning = useResolveDunning();
@@ -67,11 +69,11 @@ const Contracts = () => {
   const [showAddDialog, setShowAddDialog] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get("action") === "add") {
+    if (searchParams.get("action") === "add" && user?.role !== "READONLY") {
       setShowAddDialog(true);
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, user]);
 
   const backendStatus = statusFilter !== "alle" ? toBackendContractStatus(statusFilter) : undefined;
   const backendType = typeFilter !== "alle" ? toBackendContractType(typeFilter) : undefined;
@@ -156,12 +158,14 @@ const Contracts = () => {
           <p className="text-xs text-muted-foreground">Vertragslaufzeiten, Kündigungsfristen & Erinnerungen</p>
         </div>
         <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1.5">
-              <Plus className="h-4 w-4" />
-              Neuer Vertrag
-            </Button>
-          </DialogTrigger>
+          {user?.role !== "READONLY" && (
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                Neuer Vertrag
+              </Button>
+            </DialogTrigger>
+          )}
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle className="font-heading">Neuen Vertrag anlegen</DialogTitle>

@@ -138,5 +138,10 @@ export async function getDashboardStats(companyId: number) {
     monthlyRevenue: monthlyRevenue._sum.rent ?? 0,
     openTickets,
     urgentTickets,
+    setupStatus: {
+      smtpSet: !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS),
+      nordigenSet: !!(process.env.NORDIGEN_SECRET_ID && process.env.NORDIGEN_SECRET_KEY),
+      anthropicSet: !!process.env.ANTHROPIC_API_KEY,
+    }
   };
 }

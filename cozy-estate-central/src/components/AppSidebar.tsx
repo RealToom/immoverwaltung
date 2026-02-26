@@ -15,6 +15,7 @@ import {
   Mail,
   Inbox,
   LayoutTemplate,
+  Scale,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -176,6 +177,35 @@ export function AppSidebar() {
               >
                 <Settings className="h-4 w-4" />
                 <span>Einstellungen</span>
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <div className="flex items-center gap-2 px-3 py-2 text-[11px] text-muted-foreground uppercase tracking-wider font-semibold">
+              Rechtliches
+            </div>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Impressum">
+              <NavLink
+                to="/impressum"
+                className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-xs"
+                activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+              >
+                <Scale className="h-3.5 w-3.5" />
+                <span>Impressum</span>
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Datenschutz">
+              <NavLink
+                to="/datenschutz"
+                className="text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-xs"
+                activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+              >
+                <Scale className="h-3.5 w-3.5" />
+                <span>Datenschutz</span>
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>

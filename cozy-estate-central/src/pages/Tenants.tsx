@@ -21,6 +21,7 @@ import {
   FileText, Upload, Download, Eye, Trash2, ArrowLeft,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTenants, useCreateTenant } from "@/hooks/api/useTenants";
 import { useProperties } from "@/hooks/api/useProperties";
 import {
@@ -32,6 +33,7 @@ import { formatDate } from "@/lib/mappings";
 const PREVIEWABLE_TYPES = new Set(["PDF", "JPG", "JPEG", "PNG"]);
 
 export default function Tenants() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
@@ -53,11 +55,11 @@ export default function Tenants() {
   const [retentionMonths, setRetentionMonths] = useState<string>("0");
 
   useEffect(() => {
-    if (searchParams.get("action") === "add") {
+    if (searchParams.get("action") === "add" && user?.role !== "READONLY") {
       setDialogOpen(true);
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, user]);
 
   const [form, setForm] = useState({
     name: "", email: "", phone: "", unitId: "", rent: "", propertyId: "",
@@ -381,12 +383,14 @@ export default function Tenants() {
           <h1 className="font-heading text-lg font-bold text-foreground">Mieter</h1>
           <p className="text-xs text-muted-foreground">Alle Mieter verwalten</p>
         </div>
-        <div className="ml-auto">
-          <Button onClick={() => setDialogOpen(true)} size="sm">
-            <Plus className="h-4 w-4" />
-            Neuer Mieter
-          </Button>
-        </div>
+        {user?.role !== "READONLY" && (
+          <div className="ml-auto">
+            <Button onClick={() => setDialogOpen(true)} size="sm">
+              <Plus className="h-4 w-4" />
+              Neuer Mieter
+            </Button>
+          </div>
+        )}
       </header>
 
       <div className="p-6 space-y-6">

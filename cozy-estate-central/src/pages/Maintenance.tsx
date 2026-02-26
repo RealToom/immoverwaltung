@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { useMaintenanceTickets, useCreateMaintenanceTicket, useUpdateMaintenanceTicket, useDeleteMaintenanceTicket, type MaintenanceTicketItem } from "@/hooks/api/useMaintenanceTickets";
 import { useMaintenanceSchedules, useCreateMaintenanceSchedule, useDeleteMaintenanceSchedule } from "@/hooks/api/useMaintenanceSchedules";
 import { useProperties } from "@/hooks/api/useProperties";
@@ -85,6 +86,7 @@ const categoryIcons: Record<string, string> = {
 };
 
 const Maintenance = () => {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState("");
@@ -106,11 +108,11 @@ const Maintenance = () => {
   });
 
   useEffect(() => {
-    if (searchParams.get("action") === "add") {
+    if (searchParams.get("action") === "add" && user?.role !== "READONLY") {
       setCreateOpen(true);
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, user]);
 
   const backendStatus = statusFilter !== "alle" ? toBackendMaintenanceStatus(statusFilter) : undefined;
   const backendPriority = priorityFilter !== "alle" ? toBackendMaintenancePriority(priorityFilter) : undefined;
@@ -287,9 +289,11 @@ const Maintenance = () => {
           <p className="text-xs text-muted-foreground">Reparaturanfragen und Instandhaltung</p>
         </div>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="h-4 w-4" /> Neues Ticket</Button>
-          </DialogTrigger>
+          {user?.role !== "READONLY" && (
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="h-4 w-4" /> Neues Ticket</Button>
+            </DialogTrigger>
+          )}
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Neues Wartungsticket</DialogTitle>

@@ -1,7 +1,7 @@
 # Immoverwaltung - Projektdokumentation
 
-> **Letzte Aktualisierung:** 2026-02-25
-> **Status:** Production-Ready + Feature-Backlog vollständig implementiert + DATEV Export + PSD2 Banking (Nordigen/GoCardless)
+> **Letzte Aktualisierung:** 2026-02-26
+> **Status:** Production-Ready + Feature-Backlog vollständig implementiert + DATEV Export + PSD2 Banking (Nordigen/GoCardless) + UAT abgeschlossen
 
 ## Roadmap / Zukünftige Features
 
@@ -52,6 +52,44 @@
 ---
 
 ## Changelog
+
+### 2026-02-26: UAT abgeschlossen + Bugfixes (Finanzen / PropertyDetail)
+
+**Bugfixes:**
+
+- **`PropertyDetail.tsx` Zeile 138** — `EMPTY_CONTRACT.type` war `"MIETE"` (kein gültiger Backend-Enum-Wert).
+  Gefixt zu `"WOHNRAUM"`. Verursachte 400 Bad Request beim automatischen Anlegen eines Vertrags nach Mieter-Zuweisung.
+  Backend-Zod akzeptiert nur `WOHNRAUM | GEWERBE | STAFFEL | INDEX`.
+
+- **`Finances.tsx` Zeilen 882 + 974** — `<SelectItem value="">` ist in Radix UI verboten (leerer String).
+  Gefixt zu `value="none"`. Verursachte React ErrorBoundary-Crash beim Öffnen des "Neue Transaktion"- bzw. "Wiederkehrende Transaktion"-Dialogs.
+  Außerdem: `EMPTY_TX.propertyId` und `EMPTY_RECURRING.propertyId` auf `"none"` gesetzt,
+  Mutation-Guards auf `!== "none"` umgestellt.
+
+**Bugfix Frontend-RBAC (UX):**
+
+- **6 Dateien** (`Properties.tsx`, `Tenants.tsx`, `Finances.tsx`, `Contracts.tsx`, `Maintenance.tsx`, `PropertyDetail.tsx`)
+  — Schreib-Buttons (Neue Immobilie / Neuer Mieter / Neue Transaktion / Neuer Vertrag / Neues Ticket) werden für Readonly-User komplett ausgeblendet (`user?.role !== "READONLY"`).
+- **`Index.tsx`** — `<QuickActions>` wird für Readonly-User nicht gerendert.
+- **4 `useEffect`-Guards** — `?action=add` URL-Parameter öffnet keinen Dialog mehr für Readonly-User.
+- `useAuth` in allen 6 Pages neu importiert + `const { user } = useAuth()` hinzugefügt.
+- TypeScript kompiliert fehlerfrei (`npx tsc --noEmit`). Rebuild des Docker-Containers erforderlich.
+
+**UAT-Ergebnisse (alle bestanden):**
+
+| Feature | Ergebnis |
+|---------|----------|
+| Neue Transaktion anlegen (€1.200 Einnahme, Miete März) | ✅ |
+| Wartungsticket anlegen (Heizung defekt W1, Hoch, Fällig 05.03.2026) | ✅ |
+| Ticket-Status ändern (Offen → In Bearbeitung) | ✅ |
+| Kalendertermin anlegen (Heizungsbesichtigung 10.03.2026) | ✅ |
+| Berichte CSV-Export (Bericht.csv) | ✅ |
+| Berichte PDF-Export (Bericht.pdf) | ✅ |
+| Benutzer anlegen (Test Readonly, Nur-Lesen-Rolle) | ✅ |
+| Mieter-Suche/Filter (18 → 1 Treffer "Max") | ✅ |
+| Abmelden (Redirect auf /login) | ✅ |
+
+---
 
 ### 2026-02-25: DATEV Export + PSD2 Banking (Nordigen/GoCardless)
 

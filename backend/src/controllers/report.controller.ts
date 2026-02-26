@@ -23,8 +23,10 @@ export async function exportReport(req: Request, res: Response): Promise<void> {
     doc.font("Helvetica").moveDown(0.5);
     for (const p of data.properties) {
       doc.fontSize(10).text(
-        `${p.name}  \u2013  ${p.occupiedUnits}/${p.totalUnits} Einheiten  \u2013  ` +
-        `Einnahmen: ${p.monthlyRevenue.toFixed(2).replace(".", ",")} \u20ac/Monat`,
+        `${p.name}  \u2013  ${p.occupiedUnits}/${p.totalUnits} Units  \u2013  ` +
+        `Rent: ${p.monthlyRevenue.toFixed(2).replace(".", ",")} \u20ac  \u2013  ` +
+        `Maintenance: ${p.maintenanceCost.toFixed(2).replace(".", ",")} \u20ac  \u2013  ` +
+        `Tickets: ${p.openTickets}`,
       );
     }
 

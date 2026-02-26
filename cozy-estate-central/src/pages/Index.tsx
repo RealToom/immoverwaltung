@@ -37,6 +37,30 @@ const Index = () => {
 
       {/* Content */}
       <main className="flex-1 p-6 space-y-6 overflow-auto">
+        {/* Setup Warnings */}
+        {stats?.setupStatus && (!stats.setupStatus.smtpSet || !stats.setupStatus.nordigenSet || !stats.setupStatus.anthropicSet) && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-2">
+            <div className="flex items-center gap-2 text-amber-800">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <h3 className="font-semibold text-sm">Systemkonfiguration unvollständig</h3>
+            </div>
+            <ul className="text-xs text-amber-700 list-disc list-inside space-y-1">
+              {!stats.setupStatus.smtpSet && (
+                <li><strong>E-Mail (SMTP):</strong> Passwort-Resets und Benachrichtigungen sind deaktiviert.</li>
+              )}
+              {!stats.setupStatus.nordigenSet && (
+                <li><strong>Bank-Schnittstelle:</strong> Automatische Synchronisierung mit Bankkonten ist nicht möglich.</li>
+              )}
+              {!stats.setupStatus.anthropicSet && (
+                <li><strong>KI-Funktionen:</strong> Beleg-Scan und intelligente E-Mail-Analyse sind deaktiviert.</li>
+              )}
+            </ul>
+            <p className="text-[10px] text-amber-600 mt-2 italic">
+              Bitte bearbeiten Sie die <code className="bg-amber-100 px-1 rounded">.env</code> Datei im Backend-Verzeichnis.
+            </p>
+          </div>
+        )}
+
         {/* KPI Row */}
         {isLoading || !stats ? (
           <div className="flex justify-center py-8">
@@ -87,7 +111,7 @@ const Index = () => {
             <PropertyTable />
           </div>
           <div className="space-y-6">
-            <QuickActions />
+            {user?.role !== "READONLY" && <QuickActions />}
             <RecentActivity />
           </div>
         </div>

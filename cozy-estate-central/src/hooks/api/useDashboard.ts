@@ -10,6 +10,11 @@ interface DashboardStats {
   monthlyRevenue: number;
   openTickets: number;
   urgentTickets: number;
+  setupStatus: {
+    smtpSet: boolean;
+    nordigenSet: boolean;
+    anthropicSet: boolean;
+  };
 }
 
 export function useDashboardStats() {

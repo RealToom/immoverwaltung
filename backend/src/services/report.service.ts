@@ -8,6 +8,8 @@ export interface ReportData {
     totalUnits: number;
     occupiedUnits: number;
     monthlyRevenue: number;
+    maintenanceCost: number;
+    openTickets: number;
   }>;
   income: number;
   expenses: number;
@@ -29,7 +31,12 @@ export async function generateReportData(
   const [properties, incomeAgg, expenseAgg, ticketCount] = await Promise.all([
     prisma.property.findMany({
       where: { companyId },
-      include: { units: { select: { status: true, rent: true } } },
+      include: {
+        units: { select: { status: true, rent: true } },
+        maintenanceTickets: {
+          select: { status: true, cost: true, createdAt: true },
+        }
+      },
     }),
     prisma.transaction.aggregate({
       where: { companyId, type: "EINNAHME", ...txDateFilter },
@@ -47,14 +54,24 @@ export async function generateReportData(
   return {
     from,
     to,
-    properties: properties.map((p) => ({
-      name: p.name,
-      totalUnits: p.units.length,
-      occupiedUnits: p.units.filter((u) => u.status === "VERMIETET").length,
-      monthlyRevenue: p.units
-        .filter((u) => u.status === "VERMIETET")
-        .reduce((s, u) => s + u.rent, 0),
-    })),
+    properties: properties.map((p) => {
+      const propTickets = p.maintenanceTickets.filter((t) => {
+        if (!from && !to) return true;
+        const createdAt = t.createdAt;
+        return (!from || createdAt >= from) && (!to || createdAt <= to);
+      });
+
+      return {
+        name: p.name,
+        totalUnits: p.units.length,
+        occupiedUnits: p.units.filter((u) => u.status === "VERMIETET").length,
+        monthlyRevenue: p.units
+          .filter((u) => u.status === "VERMIETET")
+          .reduce((s, u) => s + u.rent, 0),
+        maintenanceCost: propTickets.reduce((s, t) => s + (t.cost || 0), 0),
+        openTickets: propTickets.filter((t) => t.status !== "ERLEDIGT").length,
+      };
+    }),
     income: incomeAgg._sum.amount ?? 0,
     expenses: Math.abs(expenseAgg._sum.amount ?? 0),
     ticketCount,
@@ -76,11 +93,11 @@ export function generateReportCsv(data: ReportData): Buffer {
     `Zeitraum;${fromStr};bis;${toStr}`,
     "",
     "Immobilien",
-    "Name;Einheiten gesamt;Einheiten belegt;Monatliche Einnahmen (EUR)",
+    "Name;Einheiten gesamt;Einheiten belegt;Einnahmen (EUR);Wartungskosten (EUR);Offene Tickets",
     ...data.properties.map((p) => {
       // Prefix with tab to prevent CSV formula injection (=, +, -, @)
       const safeName = /^[=+\-@]/.test(p.name) ? `\t${p.name}` : p.name;
-      return `${safeName};${p.totalUnits};${p.occupiedUnits};${fmt(p.monthlyRevenue)}`;
+      return `${safeName};${p.totalUnits};${p.occupiedUnits};${fmt(p.monthlyRevenue)};${fmt(p.maintenanceCost)};${p.openTickets}`;
     }),
     "",
     "Finanzsummary",

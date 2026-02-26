@@ -35,8 +35,10 @@ import { useProperties, useCreateProperty } from "@/hooks/api/useProperties";
 import { mapPropertyStatus, formatCurrency } from "@/lib/mappings";
 import { KpiCard } from "@/components/KpiCard";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Properties = () => {
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -47,11 +49,11 @@ const Properties = () => {
   const createProperty = useCreateProperty();
 
   useEffect(() => {
-    if (searchParams.get("action") === "add") {
+    if (searchParams.get("action") === "add" && user?.role !== "READONLY") {
       setAddOpen(true);
       setSearchParams({}, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+  }, [searchParams, setSearchParams, user]);
 
   const handleAddProperty = async () => {
     if (!newProp.name.trim() || !newProp.street.trim() || !newProp.zip.trim() || !newProp.city.trim()) {
@@ -104,10 +106,12 @@ const Properties = () => {
             {properties.length} Objekte verwaltet
           </p>
         </div>
-        <Button size="sm" onClick={() => setAddOpen(true)} className="gap-1.5">
-          <Plus className="h-4 w-4" />
-          Neue Immobilie
-        </Button>
+        {user?.role !== "READONLY" && (
+          <Button size="sm" onClick={() => setAddOpen(true)} className="gap-1.5">
+            <Plus className="h-4 w-4" />
+            Neue Immobilie
+          </Button>
+        )}
       </header>
 
       <main className="flex-1 p-6 space-y-6 overflow-auto">
