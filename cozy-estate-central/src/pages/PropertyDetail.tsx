@@ -755,9 +755,10 @@ const PropertyDetail = () => {
                 </CardHeader>
                 <CardContent className="p-0">
                   {propertyTransactions.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                      <CreditCard className="h-10 w-10 mb-3 opacity-40" />
-                      <p className="text-sm">Keine Transaktionen fuer diese Immobilie.</p>
+                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-1">
+                      <CreditCard className="h-10 w-10 mb-2 opacity-40" />
+                      <p className="text-sm">Keine Transaktionen für diese Immobilie.</p>
+                      <p className="text-xs text-center max-w-sm">Mieteinnahmen werden nicht automatisch gebucht. Erfassen Sie diese manuell über „Neue Transaktion" oder importieren Sie sie über die Bankanbindung.</p>
                     </div>
                   ) : (
                     <Table>

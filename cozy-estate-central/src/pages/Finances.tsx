@@ -375,7 +375,7 @@ const Finances = () => {
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" />
                       <XAxis dataKey="month" className="text-xs" tick={{ fill: "hsl(215, 10%, 48%)" }} />
                       <YAxis className="text-xs" tick={{ fill: "hsl(215, 10%, 48%)" }} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
-                      <ChartTooltip content={<ChartTooltipContent formatter={(value) => `€ ${Number(value).toLocaleString("de-DE")}`} />} />
+                      <ChartTooltip content={<ChartTooltipContent formatter={(value) => `€ ${Number(value).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />} />
                       <Area type="monotone" dataKey="einnahmen" stroke="hsl(152, 60%, 42%)" fill="url(#fillEinnahmen)" strokeWidth={2} />
                       <Area type="monotone" dataKey="ausgaben" stroke="hsl(0, 72%, 51%)" fill="url(#fillAusgaben)" strokeWidth={2} />
                     </AreaChart>
@@ -411,7 +411,7 @@ const Finances = () => {
                               <Cell key={i} fill={entry.color} />
                             ))}
                           </Pie>
-                          <ChartTooltip content={<ChartTooltipContent formatter={(value) => `€ ${Number(value).toLocaleString("de-DE")}`} />} />
+                          <ChartTooltip content={<ChartTooltipContent formatter={(value) => `€ ${Number(value).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />} />
                         </PieChart>
                       </ChartContainer>
                       <div className="space-y-2 mt-2">
@@ -422,7 +422,7 @@ const Finances = () => {
                               <span className="text-muted-foreground">{cat.name}</span>
                             </div>
                             <div className="flex items-center gap-3">
-                              <span className="font-medium text-foreground">€ {cat.value.toLocaleString("de-DE")}</span>
+                              <span className="font-medium text-foreground">€ {cat.value.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               <span className="text-xs text-muted-foreground w-10 text-right">
                                 {totalExpenseAmount > 0 ? Math.round((cat.value / totalExpenseAmount) * 100) : 0}%
                               </span>
@@ -450,7 +450,7 @@ const Finances = () => {
                       <CartesianGrid strokeDasharray="3 3" className="stroke-border/40" horizontal={false} />
                       <XAxis type="number" tick={{ fill: "hsl(215, 10%, 48%)", fontSize: 12 }} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
                       <YAxis type="category" dataKey="name" tick={{ fill: "hsl(215, 10%, 48%)", fontSize: 11 }} width={130} />
-                      <ChartTooltip content={<ChartTooltipContent formatter={(value) => `€ ${Number(value).toLocaleString("de-DE")}`} />} />
+                      <ChartTooltip content={<ChartTooltipContent formatter={(value) => `€ ${Number(value).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />} />
                       <Bar dataKey="einnahmen" stackId="a" fill="hsl(215, 60%, 28%)" radius={[0, 0, 0, 0]} />
                       <Bar dataKey="potenzial" stackId="a" fill="hsl(215, 60%, 28%)" fillOpacity={0.15} radius={[0, 4, 4, 0]} />
                     </BarChart>
@@ -546,7 +546,7 @@ const Finances = () => {
                                   ) : (
                                     <ArrowDownRight className="h-3.5 w-3.5" />
                                   )}
-                                  € {Math.abs(tx.amount).toLocaleString("de-DE")}
+                                  € {Math.abs(tx.amount).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </div>
                               </TableCell>
                             </TableRow>

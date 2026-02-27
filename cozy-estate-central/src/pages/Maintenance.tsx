@@ -72,7 +72,7 @@ const priorityConfig: Record<string, { label: string; class: string }> = {
 const statusConfigMap: Record<string, { label: string; class: string; icon: typeof AlertTriangle }> = {
   offen: { label: "Offen", class: "bg-destructive/10 text-destructive border-destructive/20", icon: AlertTriangle },
   in_bearbeitung: { label: "In Bearbeitung", class: "bg-primary/10 text-primary border-primary/20", icon: Clock },
-  wartend: { label: "Wartend", class: "bg-warning/10 text-warning-foreground border-warning/20", icon: Clock },
+  wartend: { label: "Wartend", class: "bg-warning/10 text-warning border-warning/20", icon: Clock },
   erledigt: { label: "Erledigt", class: "bg-success/10 text-success border-success/20", icon: CheckCircle2 },
 };
 
