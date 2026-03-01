@@ -29,6 +29,7 @@ import { bankingRouter, bankingCallbackHandler } from "./banking.routes.js";
 import { datevRouter } from "./datev.routes.js";
 import { reportRouter } from "./report.routes.js";
 import { importRouter } from "./import.routes.js";
+import { superadminRouter } from "./superadmin.routes.js";
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.use(apiLimiter);
 
 // Public routes
 router.use("/auth", authRouter);
+router.use("/superadmin", superadminRouter);
 
 // Protected routes (require auth + company isolation)
 router.use("/properties", requireAuth, tenantGuard, propertyRouter);
