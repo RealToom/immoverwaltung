@@ -326,6 +326,9 @@ function RoleDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{role ? "Rolle bearbeiten" : "Neue Rolle"}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Rollenname und Seitenzugriff konfigurieren
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1">
@@ -506,11 +509,10 @@ function MitarbeiterTab() {
                         u.customRoleId ? String(u.customRoleId) : "none"
                       }
                       onValueChange={(val) =>
-                        setUserCustomRole.mutate({
-                          userId: u.id,
-                          customRoleId:
-                            val === "none" ? null : parseInt(val),
-                        })
+                        setUserCustomRole.mutate(
+                          { userId: u.id, customRoleId: val === "none" ? null : parseInt(val) },
+                          { onError: () => toast({ title: "Rollenzuweisung fehlgeschlagen", variant: "destructive" }) }
+                        )
                       }
                     >
                       <SelectTrigger className="w-44 h-8">
