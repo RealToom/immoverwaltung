@@ -101,6 +101,7 @@ model CustomRole {
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
   users   User[]
 
+  @@index([companyId])
   @@map("custom_roles")
 }
 
