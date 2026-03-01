@@ -6,16 +6,16 @@ Dieses Dokument beschreibt alle wichtigen Verwaltungsaufgaben für den Betrieb d
 
 ## Server-Infos
 
-| Eigenschaft     | Wert                                      |
-|-----------------|-------------------------------------------|
-| Anbieter        | Hetzner Cloud                             |
-| Server-Typ      | CX21 (2 vCPU, 4 GB RAM)                  |
-| Standort        | Nürnberg, Deutschland                     |
-| Betriebssystem  | Ubuntu 22.04 LTS                          |
-| IP-Adresse      | Hetzner Cloud Console → Server → Details  |
-| Domain          | hasverl.xyz                               |
-| SSH-Zugang      | `ssh root@hasverl.xyz`                    |
-| Verzeichnis     | `/root/immoverwaltung/`                   |
+| Eigenschaft     | Wert                                       |
+|-----------------|--------------------------------------------|
+| Anbieter        | Hetzner Cloud                              |
+| Server-Typ      | CX21 (2 vCPU, 4 GB RAM)                   |
+| Standort        | Nürnberg, Deutschland                      |
+| Betriebssystem  | Ubuntu 22.04 LTS                           |
+| IP-Adresse      | Hetzner Cloud Console → Server → Details   |
+| Domain          | hasverl.xyz                                |
+| SSH-Zugang      | `ssh root@hasverl.xyz`                     |
+| Verzeichnis     | `/root/immoverwaltung/`                    |
 | Repository      | https://github.com/RealToom/immoverwaltung |
 
 ---
@@ -72,65 +72,130 @@ docker compose restart frontend
 
 ---
 
-## Neue Kundenfirma anlegen
+## Kundenverwaltung
+
+### Alle Kunden anzeigen
 
 ```bash
 cd /root/immoverwaltung
-./new-tenant.sh "Firma GmbH" "admin@firma.de" "Passwort123!"
+./list-tenants.sh
 ```
 
-Optional kann ein Admin-Name als 4. Parameter übergeben werden:
+### Neue Kundenfirma anlegen
+
 ```bash
+./new-tenant.sh "Firma GmbH" "admin@firma.de" "Passwort123!"
+# Mit Admin-Name:
 ./new-tenant.sh "Firma GmbH" "admin@firma.de" "Passwort123!" "Max Mustermann"
 ```
 
-Das Script legt automatisch an:
-- Neue Firma in der Datenbank
-- Admin-User mit gehashtem Passwort
-
----
-
-## Passwort zurücksetzen / Account entsperren
-
-Wenn sich ein Admin ausgesperrt hat (falsches Passwort, Account gesperrt):
+### Kundenfirma löschen (unwiderruflich!)
 
 ```bash
-cd /root/immoverwaltung
+./delete-tenant.sh "Firma GmbH"
+```
+
+Das Script fragt zur Bestätigung nochmal den Firmennamen ab und löscht dann alle Daten der Firma (Immobilien, Einheiten, Mieter, Verträge, User usw.).
+
+### Passwort zurücksetzen / Account entsperren
+
+```bash
 ./reset-password.sh "admin@firma.de" "NeuesPasswort123!"
 ```
 
-Das Script:
-- Setzt das Passwort neu (bcrypt-gehasht)
-- Entsperrt den Account (Fehlversuche zurücksetzen)
+---
+
+## Datenbank-Backup
+
+### Manuelles Backup
+
+```bash
+cd /root/immoverwaltung
+./backup.sh
+```
+
+Backups werden in `/root/immoverwaltung/backups/` gespeichert (gzip-komprimiert).
+
+### Backup wiederherstellen
+
+```bash
+zcat backups/immoverwaltung_20260301_020000.sql.gz | docker exec -i immoverwaltung-db psql -U postgres immoverwaltung
+```
+
+### Automatisches tägliches Backup einrichten
+
+Einmalig auf dem Server ausführen:
+
+```bash
+(crontab -l 2>/dev/null; echo '0 2 * * * /root/immoverwaltung/backup.sh >> /root/immoverwaltung/backups/backup.log 2>&1') | crontab -
+```
+
+Backups älter als 7 Tage werden automatisch gelöscht.
 
 ---
 
 ## SSL-Zertifikate
 
-Zertifikate liegen auf dem Host unter `/etc/letsencrypt/live/hasverl.xyz/` und werden
-als echte Dateien nach `/root/immoverwaltung/ssl/` kopiert (da Docker Let's Encrypt
-Symlinks nicht folgen kann).
+Zertifikate liegen unter `/etc/letsencrypt/live/hasverl.xyz/` und werden als echte Dateien
+nach `/root/immoverwaltung/ssl/` kopiert (Docker kann Let's Encrypt Symlinks nicht folgen).
 
-### Zertifikat manuell erneuern
+### Automatische Erneuerung einrichten (einmalig auf Server)
 
 ```bash
-certbot renew --standalone --pre-hook "docker compose -f /root/immoverwaltung/docker-compose.yml stop frontend" --post-hook "cp -L /etc/letsencrypt/live/hasverl.xyz/fullchain.pem /root/immoverwaltung/ssl/ && cp -L /etc/letsencrypt/live/hasverl.xyz/privkey.pem /root/immoverwaltung/ssl/ && docker compose -f /root/immoverwaltung/docker-compose.yml start frontend"
+(crontab -l 2>/dev/null; echo '0 3 1 * * certbot renew --quiet --deploy-hook "cp -L /etc/letsencrypt/live/hasverl.xyz/fullchain.pem /root/immoverwaltung/ssl/ && cp -L /etc/letsencrypt/live/hasverl.xyz/privkey.pem /root/immoverwaltung/ssl/ && docker compose -f /root/immoverwaltung/docker-compose.yml restart frontend"') | crontab -
 ```
 
-### Automatische Erneuerung (Cronjob)
+### Manuell erneuern
 
-Eingerichtet am 2026-03-01. Läuft jeden 1. des Monats um 03:00 Uhr:
-```
-0 3 1 * * cp -L /etc/letsencrypt/live/hasverl.xyz/fullchain.pem /root/immoverwaltung/ssl/ && ...
+```bash
+certbot renew --quiet
+cp -L /etc/letsencrypt/live/hasverl.xyz/fullchain.pem /root/immoverwaltung/ssl/
+cp -L /etc/letsencrypt/live/hasverl.xyz/privkey.pem /root/immoverwaltung/ssl/
+docker compose -f /root/immoverwaltung/docker-compose.yml restart frontend
 ```
 
-Cronjobs anzeigen: `crontab -l`
+Zertifikat läuft ab: `certbot certificates` zeigt das Ablaufdatum.
+
+---
+
+## Container-Überwachung (Health Check)
+
+### Automatischen Health Check einrichten (einmalig auf Server)
+
+```bash
+chmod +x /root/immoverwaltung/health-check.sh
+(crontab -l 2>/dev/null; echo '*/5 * * * * /root/immoverwaltung/health-check.sh >> /root/immoverwaltung/health-check.log 2>&1') | crontab -
+```
+
+Das Script prüft alle 5 Minuten ob alle Container laufen. Bei einem Absturz:
+- Wird ins Log geschrieben (`health-check.log`)
+- Versucht automatisch neu zu starten
+
+### Health Check Log anzeigen
+
+```bash
+tail -f /root/immoverwaltung/health-check.log
+```
+
+---
+
+## Uptime-Monitoring mit UptimeRobot (kostenlos)
+
+UptimeRobot prüft die Website alle 5 Minuten und schickt eine E-Mail wenn sie nicht erreichbar ist.
+
+1. Kostenloses Konto erstellen: https://uptimerobot.com
+2. **Add New Monitor** klicken
+3. Einstellungen:
+   - Monitor Type: `HTTPS`
+   - Friendly Name: `Immoverwaltung`
+   - URL: `https://hasverl.xyz`
+   - Monitoring Interval: `5 minutes`
+4. E-Mail-Benachrichtigung aktivieren
+5. **Create Monitor** klicken
 
 ---
 
 ## Datenbank-Zugang
-
-Direkt in die Datenbank verbinden:
 
 ```bash
 docker exec -it immoverwaltung-db psql -U postgres -d immoverwaltung
@@ -138,14 +203,10 @@ docker exec -it immoverwaltung-db psql -U postgres -d immoverwaltung
 
 Nützliche SQL-Befehle:
 ```sql
--- Alle Firmen anzeigen
-SELECT id, name, slug FROM "Company";
-
--- Alle User anzeigen
-SELECT id, name, email, role, "companyId" FROM "User";
-
--- Datenbank verlassen
-\q
+SELECT id, name, slug FROM "Company";                          -- Alle Firmen
+SELECT id, name, email, role, "companyId" FROM "User";        -- Alle User
+SELECT pg_size_pretty(pg_database_size('immoverwaltung'));     -- DB-Größe
+\q                                                             -- Beenden
 ```
 
 ---
@@ -153,48 +214,22 @@ SELECT id, name, email, role, "companyId" FROM "User";
 ## Speicherplatz & Ressourcen
 
 ```bash
-# Festplattennutzung
-df -h
-
-# Docker-Speicher
-docker system df
-
-# RAM & CPU
-htop
-
-# Datenbankgröße
-docker exec immoverwaltung-db psql -U postgres -d immoverwaltung -c "SELECT pg_size_pretty(pg_database_size('immoverwaltung'));"
-```
-
-### Aufräumen (alte Docker-Images löschen)
-
-```bash
-docker system prune -f
-```
-
----
-
-## Datenbank-Backup
-
-Backup erstellen:
-```bash
-docker exec immoverwaltung-db pg_dump -U postgres immoverwaltung > backup_$(date +%Y%m%d).sql
-```
-
-Backup wiederherstellen:
-```bash
-docker exec -i immoverwaltung-db psql -U postgres immoverwaltung < backup_20260301.sql
+df -h                   # Festplattennutzung
+docker system df        # Docker-Speicher
+htop                    # RAM & CPU
+docker system prune -f  # Alte Images löschen
 ```
 
 ---
 
 ## Notfall-Checkliste
 
-| Problem                        | Lösung                                               |
-|-------------------------------|------------------------------------------------------|
-| Website nicht erreichbar       | `docker compose ps` → crashed Container neu starten  |
-| SSL-Fehler                     | `cp -L /etc/letsencrypt/live/hasverl.xyz/*.pem ssl/` |
-| Login funktioniert nicht       | `./reset-password.sh email passwort`                 |
-| Backend-Fehler                 | `docker compose logs backend --tail=50`              |
-| Datenbank nicht erreichbar     | `docker compose restart postgres`                    |
-| Festplatte voll                | `docker system prune -f`                             |
+| Problem                        | Lösung                                                      |
+|-------------------------------|-------------------------------------------------------------|
+| Website nicht erreichbar       | `docker compose ps` → crashed Container neu starten         |
+| SSL-Fehler                     | `cp -L /etc/letsencrypt/live/hasverl.xyz/*.pem ssl/`        |
+| Login funktioniert nicht       | `./reset-password.sh email passwort`                        |
+| Backend-Fehler                 | `docker compose logs backend --tail=50`                     |
+| Datenbank nicht erreichbar     | `docker compose restart postgres`                           |
+| Festplatte voll                | `docker system prune -f` dann `./backup.sh` prüfen         |
+| Container crasht dauerhaft     | `docker compose logs <name> --tail=100` → Fehler analysieren |
