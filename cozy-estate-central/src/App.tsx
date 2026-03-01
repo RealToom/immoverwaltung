@@ -2,11 +2,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { SuperAdminProvider, useSuperAdminAuth } from "@/contexts/SuperAdminContext";
 import Index from "./pages/Index";
 import Properties from "./pages/Properties";
 import PropertyDetail from "./pages/PropertyDetail";
@@ -28,6 +29,8 @@ import Templates from "./pages/Templates";
 import ImportPage from "./pages/Import";
 import Impressum from "./pages/Impressum";
 import Datenschutz from "./pages/Datenschutz";
+import SuperAdminLogin from "./pages/SuperAdminLogin";
+import SuperAdminDashboard from "./pages/SuperAdmin";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,25 +72,42 @@ const AppLayout = () => (
   </SidebarProvider>
 );
 
+function SuperAdminGuard({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useSuperAdminAuth();
+  if (!isAuthenticated) return <Navigate to="/superadmin/login" replace />;
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
-        </AuthProvider>
+        <SuperAdminProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/superadmin/login" element={<SuperAdminLogin />} />
+              <Route
+                path="/superadmin"
+                element={
+                  <SuperAdminGuard>
+                    <SuperAdminDashboard />
+                  </SuperAdminGuard>
+                }
+              />
+              <Route
+                path="/*"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </AuthProvider>
+        </SuperAdminProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
