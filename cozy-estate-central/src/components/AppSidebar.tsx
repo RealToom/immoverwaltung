@@ -16,6 +16,7 @@ import {
   Inbox,
   LayoutTemplate,
   Scale,
+  FileInput,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -44,6 +45,7 @@ const mainNav = [
 const secondaryNav = [
   { title: "Wartung", url: "/maintenance", icon: Wrench },
   { title: "Vorlagen", url: "/vorlagen", icon: LayoutTemplate },
+  { title: "Datenimport", url: "/import", icon: FileInput },
   { title: "Berichte", url: "/reports", icon: BarChart3 },
   { title: "Benachrichtigungen", url: "/notifications", icon: Bell },
 ];

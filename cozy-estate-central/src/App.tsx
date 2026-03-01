@@ -25,6 +25,7 @@ import CalendarPage from "./pages/Calendar";
 import Postfach from "./pages/Postfach";
 import Anfragen from "./pages/Anfragen";
 import Templates from "./pages/Templates";
+import ImportPage from "./pages/Import";
 import Impressum from "./pages/Impressum";
 import Datenschutz from "./pages/Datenschutz";
 
@@ -59,6 +60,7 @@ const AppLayout = () => (
         <Route path="/postfach" element={<Postfach />} />
         <Route path="/anfragen" element={<Anfragen />} />
         <Route path="/vorlagen" element={<Templates />} />
+        <Route path="/import" element={<ImportPage />} />
         <Route path="/impressum" element={<Impressum />} />
         <Route path="/datenschutz" element={<Datenschutz />} />
         <Route path="*" element={<NotFound />} />
