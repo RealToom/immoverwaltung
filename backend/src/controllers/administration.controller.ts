@@ -73,15 +73,16 @@ export async function testSmtpHandler(req: Request, res: Response) {
 
   // Send test mail to the current admin user
   const adminUser = await prisma.user.findUnique({ where: { id: req.user!.id } });
+  if (!adminUser) throw new AppError(404, "Admin-Benutzer nicht gefunden");
 
   try {
     await transporter.sendMail({
       from: `"${smtp.fromName}" <${smtp.fromAddress}>`,
-      to: adminUser!.email,
+      to: adminUser.email,
       subject: "SMTP Test — ImmoVerwalt",
       html: "<p>Der SMTP-Versand funktioniert korrekt.</p>",
     });
-    res.json({ data: { success: true, message: `Test-Mail an ${adminUser!.email} gesendet` } });
+    res.json({ data: { success: true, message: `Test-Mail an ${adminUser.email} gesendet` } });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unbekannter Fehler";
     throw new AppError(502, `SMTP-Test fehlgeschlagen: ${message}`);
@@ -115,6 +116,7 @@ export async function createRoleHandler(req: Request, res: Response) {
 
 export async function updateRoleHandler(req: Request, res: Response) {
   const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) throw new AppError(400, "Ungueltige ID");
   const { name, pages } = req.body as { name?: string; pages?: string[] };
 
   // Verify role belongs to this company
@@ -137,6 +139,7 @@ export async function updateRoleHandler(req: Request, res: Response) {
 
 export async function deleteRoleHandler(req: Request, res: Response) {
   const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) throw new AppError(400, "Ungueltige ID");
 
   const existing = await prisma.customRole.findFirst({
     where: { id, companyId: req.companyId! },
@@ -154,6 +157,7 @@ export async function deleteRoleHandler(req: Request, res: Response) {
 
 export async function setUserCustomRoleHandler(req: Request, res: Response) {
   const userId = Number(req.params.id);
+  if (!Number.isInteger(userId) || userId < 1) throw new AppError(400, "Ungueltige ID");
   const { customRoleId } = req.body as { customRoleId: number | null };
 
   // Verify user belongs to this company
