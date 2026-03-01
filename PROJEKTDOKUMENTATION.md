@@ -96,6 +96,23 @@ Neue Seite `/administration` (nur ADMIN) ersetzt `/users`. 5 Tabs: Mitarbeiter, 
 
 ---
 
+### 2026-03-01: Administrations-Bereich vollständig ausgebaut (Firma, Bank, DATEV, E-Mail/IMAP)
+
+**Commit `a34f6c1`** — Administration-Seite um 4 vollständige Tabs erweitert; bisherige Platzhalter-Tabs durch echte Implementierungen ersetzt. Gleichzeitig wurden Settings.tsx und AppSidebar bereinigt.
+
+**Änderungen:**
+
+- `cozy-estate-central/src/hooks/api/useDatevSettings.ts` — **NEU**: `useDatevSettings` + `useUpdateDatevSettings` für `GET/PUT /finance/datev/settings`
+- `cozy-estate-central/src/pages/Administration.tsx` — Komplette Überarbeitung:
+  - **E-Mail-Tab:** System-SMTP-Formular (bisher SmtpTab) + Postfächer-Verwaltung (IMAP-Host/-Port/TLS, SMTP-Host/-Port/TLS, Benutzer, Passwort, `skipConnectionTest`, `allowedRoles`)
+  - **Firma-Tab:** Unternehmensdaten (Name, Steuernummer, Adresse, Website) + Anwendungskonfiguration (Währung, Sprache, Datumsformat, Einträge/Seite) via `useCompanySettings`
+  - **Bankanbindung-Tab:** KPI-Karten (Gesamtsaldo, aktive Konten), Konten-Grid mit Sync-Button, „Bank verbinden"-Dialog, CSV-Import-Dialog via `useBankAccounts`
+  - **DATEV-Tab:** Beraternummer (1001–9999999), Mandantennummer (1–99999), Kontenrahmen (SKR03/SKR04), Geschäftsjahresbeginn (Monat 1–12), Standard-Kontonummern (4-stellig: Bank, Einnahmen, Ausgaben)
+- `cozy-estate-central/src/pages/Settings.tsx` — Firmeneinstellungen, App-Konfiguration und Postfächer-Tab entfernt; App-Tab enthält nur noch benutzerindividuelle Einstellungen (autoSave, Kalender)
+- `cozy-estate-central/src/components/AppSidebar.tsx` — „Bankanbindung"-Eintrag aus der Hauptnavigation entfernt (Banking nur noch über Administration → Bankanbindung erreichbar)
+
+---
+
 ### 2026-03-01: CSV-Import-Wizard + Admin-Scripts + Superadmin-Panel
 
 #### CSV-Import-Wizard
