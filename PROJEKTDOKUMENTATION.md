@@ -1,7 +1,7 @@
 # Immoverwaltung - Projektdokumentation
 
 > **Letzte Aktualisierung:** 2026-03-01
-> **Status:** Production-Ready + Administrations-Bereich (SMTP + Custom Roles) deployed
+> **Status:** Production-Ready + Administrations-Bereich vollständig (Firma, Bank, DATEV, E-Mail mit IMAP)
 
 ## Roadmap / Zukünftige Features
 
