@@ -14,13 +14,13 @@ fi
 
 # Firma und Statistik anzeigen
 echo "==> Suche Firma: $COMPANY_NAME"
-INFO=$(docker exec immoverwaltung-db psql -U postgres -d immoverwaltung -tAc "
+INFO=$(docker exec immoverwaltung-db psql -U immo -d immoverwaltung -tAc "
 SELECT
   c.id || '|' || c.name || '|' ||
-  (SELECT COUNT(*) FROM \"User\" WHERE \"companyId\" = c.id) || ' User|' ||
-  (SELECT COUNT(*) FROM \"Property\" WHERE \"companyId\" = c.id) || ' Immobilien|' ||
-  (SELECT COUNT(*) FROM \"Tenant\" WHERE \"companyId\" = c.id) || ' Mieter'
-FROM \"Company\" c
+  (SELECT COUNT(*) FROM users WHERE company_id = c.id) || ' User|' ||
+  (SELECT COUNT(*) FROM properties WHERE company_id = c.id) || ' Immobilien|' ||
+  (SELECT COUNT(*) FROM tenants WHERE company_id = c.id) || ' Mieter'
+FROM companies c
 WHERE c.name = '$COMPANY_NAME';
 ")
 
@@ -46,28 +46,36 @@ fi
 echo ""
 echo "==> Lösche alle Daten der Firma..."
 
-docker exec immoverwaltung-db psql -U postgres -d immoverwaltung -c "
+docker exec immoverwaltung-db psql -U immo -d immoverwaltung -c "
 DO \$\$
 DECLARE cid INT := $COMPANY_ID;
 BEGIN
-  DELETE FROM \"AuditLog\"              WHERE \"companyId\" = cid;
-  DELETE FROM \"UtilityStatementItem\"  WHERE \"utilityStatementId\" IN (SELECT id FROM \"UtilityStatement\" WHERE \"companyId\" = cid);
-  DELETE FROM \"UtilityStatement\"      WHERE \"companyId\" = cid;
-  DELETE FROM \"RentPayment\"           WHERE \"contractId\" IN (SELECT id FROM \"Contract\" WHERE \"companyId\" = cid);
-  DELETE FROM \"Contract\"              WHERE \"companyId\" = cid;
-  DELETE FROM \"Document\"              WHERE \"companyId\" = cid;
-  DELETE FROM \"MeterReading\"          WHERE \"meterId\" IN (SELECT id FROM \"Meter\" WHERE \"propertyId\" IN (SELECT id FROM \"Property\" WHERE \"companyId\" = cid));
-  DELETE FROM \"Meter\"                 WHERE \"propertyId\" IN (SELECT id FROM \"Property\" WHERE \"companyId\" = cid);
-  DELETE FROM \"MaintenanceRequest\"    WHERE \"companyId\" = cid;
-  DELETE FROM \"Unit\"                  WHERE \"propertyId\" IN (SELECT id FROM \"Property\" WHERE \"companyId\" = cid);
-  DELETE FROM \"Property\"              WHERE \"companyId\" = cid;
-  DELETE FROM \"Tenant\"                WHERE \"companyId\" = cid;
-  DELETE FROM \"Transaction\"           WHERE \"bankAccountId\" IN (SELECT id FROM \"BankAccount\" WHERE \"companyId\" = cid);
-  DELETE FROM \"BankAccount\"           WHERE \"companyId\" = cid;
-  DELETE FROM \"RefreshToken\"          WHERE \"userId\" IN (SELECT id FROM \"User\" WHERE \"companyId\" = cid);
-  DELETE FROM \"User\"                  WHERE \"companyId\" = cid;
-  DELETE FROM \"CompanyAccountingSettings\" WHERE \"companyId\" = cid;
-  DELETE FROM \"Company\"               WHERE id = cid;
+  DELETE FROM audit_logs                WHERE company_id = cid;
+  DELETE FROM dunning_records           WHERE contract_id IN (SELECT id FROM contracts WHERE company_id = cid);
+  DELETE FROM rent_payments             WHERE contract_id IN (SELECT id FROM contracts WHERE company_id = cid);
+  DELETE FROM contracts                 WHERE company_id = cid;
+  DELETE FROM documents                 WHERE company_id = cid;
+  DELETE FROM document_templates        WHERE company_id = cid;
+  DELETE FROM meter_readings            WHERE meter_id IN (SELECT id FROM meters WHERE property_id IN (SELECT id FROM properties WHERE company_id = cid));
+  DELETE FROM meters                    WHERE property_id IN (SELECT id FROM properties WHERE company_id = cid);
+  DELETE FROM maintenance_tickets       WHERE property_id IN (SELECT id FROM properties WHERE company_id = cid);
+  DELETE FROM maintenance_schedules     WHERE property_id IN (SELECT id FROM properties WHERE company_id = cid);
+  DELETE FROM handover_protocols        WHERE unit_id IN (SELECT id FROM units WHERE property_id IN (SELECT id FROM properties WHERE company_id = cid));
+  DELETE FROM units                     WHERE property_id IN (SELECT id FROM properties WHERE company_id = cid);
+  DELETE FROM properties                WHERE company_id = cid;
+  DELETE FROM tenants                   WHERE company_id = cid;
+  DELETE FROM bank_transactions         WHERE bank_account_id IN (SELECT id FROM bank_accounts WHERE company_id = cid);
+  DELETE FROM transactions              WHERE company_id = cid;
+  DELETE FROM recurring_transactions    WHERE company_id = cid;
+  DELETE FROM bank_accounts             WHERE company_id = cid;
+  DELETE FROM calendar_events           WHERE company_id = cid;
+  DELETE FROM email_attachments         WHERE message_id IN (SELECT id FROM email_messages WHERE account_id IN (SELECT id FROM email_accounts WHERE company_id = cid));
+  DELETE FROM email_messages            WHERE account_id IN (SELECT id FROM email_accounts WHERE company_id = cid);
+  DELETE FROM email_accounts            WHERE company_id = cid;
+  DELETE FROM company_accounting_settings WHERE company_id = cid;
+  DELETE FROM refresh_tokens            WHERE user_id IN (SELECT id FROM users WHERE company_id = cid);
+  DELETE FROM users                     WHERE company_id = cid;
+  DELETE FROM companies                 WHERE id = cid;
 END \$\$;
 " > /dev/null
 

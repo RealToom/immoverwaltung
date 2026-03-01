@@ -19,9 +19,9 @@ bcrypt.hash(process.argv[1], 12).then(h => { process.stdout.write(h); process.ex
 " "$NEW_PASSWORD")
 
 echo "==> Passwort wird gesetzt und Account entsperrt..."
-ROWS=$(docker exec immoverwaltung-db psql -U postgres -d immoverwaltung -tAc "
-UPDATE \"User\"
-SET password_hash='$HASH', \"failedLoginAttempts\"=0, \"lockedUntil\"=NULL, \"updatedAt\"=NOW()
+ROWS=$(docker exec immoverwaltung-db psql -U immo -d immoverwaltung -tAc "
+UPDATE users
+SET password_hash='$HASH', failed_login_attempts=0, locked_until=NULL, updated_at=NOW()
 WHERE email='$EMAIL'
 RETURNING id;
 ")

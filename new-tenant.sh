@@ -30,8 +30,8 @@ bcrypt.hash(process.argv[1], 12).then(h => { process.stdout.write(h); process.ex
 " "$ADMIN_PASSWORD")
 
 echo "==> Firma wird angelegt..."
-COMPANY_ID=$(docker exec immoverwaltung-db psql -U postgres -d immoverwaltung -tAc "
-INSERT INTO \"Company\" (name, slug, address, tax_number, \"createdAt\", \"updatedAt\")
+COMPANY_ID=$(docker exec immoverwaltung-db psql -U immo -d immoverwaltung -tAc "
+INSERT INTO companies (name, slug, address, tax_number, created_at, updated_at)
 VALUES ('$COMPANY_NAME', '$SLUG', '', '', NOW(), NOW())
 RETURNING id;
 ")
@@ -42,8 +42,8 @@ if [ -z "$COMPANY_ID" ]; then
 fi
 
 echo "==> User wird angelegt..."
-docker exec immoverwaltung-db psql -U postgres -d immoverwaltung -c "
-INSERT INTO \"User\" (email, password_hash, name, role, \"companyId\", \"createdAt\", \"updatedAt\")
+docker exec immoverwaltung-db psql -U immo -d immoverwaltung -c "
+INSERT INTO users (email, password_hash, name, role, company_id, created_at, updated_at)
 VALUES ('$ADMIN_EMAIL', '$HASH', '$ADMIN_NAME', 'ADMIN', $COMPANY_ID, NOW(), NOW());
 " > /dev/null
 
