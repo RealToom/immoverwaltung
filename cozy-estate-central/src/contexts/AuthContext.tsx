@@ -1,11 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import { api, setToken, clearToken, ApiError } from "@/lib/api";
-
-interface CustomRole {
-  id: number;
-  name: string;
-  pages: string[];
-}
+import type { CustomRole } from "@/lib/permissions";
 
 interface User {
   id: number;

@@ -19,7 +19,7 @@ export type PageKey = typeof PAGE_KEYS[number];
 export interface CustomRole {
   id: number;
   name: string;
-  pages: string[];
+  pages: PageKey[];
 }
 
 export function canAccess(
