@@ -11,6 +11,7 @@ export interface UserItem {
   failedLoginAttempts: number;
   createdAt: string;
   updatedAt: string;
+  customRoleId?: number | null;
 }
 
 export function useUsers() {
