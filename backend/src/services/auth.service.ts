@@ -196,7 +196,7 @@ export async function revokeRefreshTokens(userId: number) {
 export async function getProfile(userId: number) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    include: { company: true },
+    include: { company: true, customRole: true },
   });
 
   if (!user) {
