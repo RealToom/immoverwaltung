@@ -10,7 +10,7 @@ import {
   Bell,
   LogOut,
   Landmark,
-  UserCog,
+  Shield,
   CalendarDays,
   Mail,
   Inbox,
@@ -128,14 +128,14 @@ export function AppSidebar() {
               ))}
               {isAdmin && (
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild tooltip="Benutzer">
+                  <SidebarMenuButton asChild tooltip="Administration">
                     <NavLink
-                      to="/users"
+                      to="/administration"
                       className="text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                       activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                     >
-                      <UserCog className="h-4 w-4" />
-                      <span>Benutzer</span>
+                      <Shield className="h-4 w-4" />
+                      <span>Administration</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

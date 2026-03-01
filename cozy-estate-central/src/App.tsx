@@ -21,7 +21,7 @@ import SettingsPage from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import BankIntegration from "./pages/BankIntegration";
-import UsersPage from "./pages/Users";
+import Administration from "./pages/Administration";
 import CalendarPage from "./pages/Calendar";
 import Postfach from "./pages/Postfach";
 import Anfragen from "./pages/Anfragen";
@@ -58,7 +58,8 @@ const AppLayout = () => (
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/bank" element={<BankIntegration />} />
-        <Route path="/users" element={<UsersPage />} />
+        <Route path="/administration" element={<Administration />} />
+        <Route path="/users" element={<Navigate to="/administration" replace />} />
         <Route path="/calendar" element={<CalendarPage />} />
         <Route path="/postfach" element={<Postfach />} />
         <Route path="/anfragen" element={<Anfragen />} />
