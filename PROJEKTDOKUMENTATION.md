@@ -53,6 +53,15 @@
 
 ## Changelog
 
+### 2026-03-01: Bugfix — Zähler hinzufügen Dialog (ErrorBoundary Crash)
+
+**Problem:** Dialog "Zähler hinzufügen" in `PropertyDetail.tsx` crashte beim Öffnen mit einem ErrorBoundary weil `<SelectItem value="">` verwendet wurde. Radix UI verbietet leere Strings als `value` (reserviert für "Auswahl löschen").
+
+**Fix (`6683aa9`):**
+- `cozy-estate-central/src/pages/PropertyDetail.tsx`: `<SelectItem value="">` → `<SelectItem value="none">`, Mutations-Guard ergänzt um `&& newMeter.unitId !== "none"`
+
+---
+
 ### 2026-03-01: Administrations-Bereich (SMTP + Custom Roles + Benutzerverwaltung)
 
 Neue Seite `/administration` (nur ADMIN) ersetzt `/users`. 5 Tabs: Mitarbeiter, E-Mail, Firma, Bankanbindung, DATEV.
