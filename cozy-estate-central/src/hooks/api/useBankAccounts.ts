@@ -79,8 +79,8 @@ export function useImportTransactions() {
         onSuccess: () => {
             // Invalidate both bank accounts (balances might change) and finance queries (transactions added)
             queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
-            queryClient.invalidateQueries({ queryKey: ["transactions"] });
-            queryClient.invalidateQueries({ queryKey: ["finance-kpis"] });
+            queryClient.invalidateQueries({ queryKey: ["finance", "transactions"] });
+            queryClient.invalidateQueries({ queryKey: ["finance", "summary"] });
         },
     });
 }

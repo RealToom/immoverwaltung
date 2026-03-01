@@ -122,7 +122,7 @@ const Contracts = () => {
     .reduce((s, c) => s + c.monthlyRent, 0);
 
   const handleAddContract = async () => {
-    if (!newContract.tenantId || !newContract.propertyId || !newContract.startDate || !newContract.monthlyRent) {
+    if (!newContract.tenantId || !newContract.propertyId || !newContract.unitId || !newContract.startDate || !newContract.monthlyRent) {
       toast({ title: "Fehler", description: "Bitte füllen Sie alle Pflichtfelder aus.", variant: "destructive" });
       return;
     }

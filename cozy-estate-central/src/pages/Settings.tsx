@@ -223,7 +223,7 @@ const SettingsPage = () => {
     }
     setPwLoading(true);
     try {
-      await api("/api/auth/me/password", {
+      await api("/auth/me/password", {
         method: "PATCH",
         body: { currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword },
       });
