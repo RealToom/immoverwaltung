@@ -1,7 +1,7 @@
 # Immoverwaltung - Projektdokumentation
 
-> **Letzte Aktualisierung:** 2026-02-26
-> **Status:** Production-Ready + Feature-Backlog vollständig implementiert + DATEV Export + PSD2 Banking (Nordigen/GoCardless) + UAT abgeschlossen
+> **Letzte Aktualisierung:** 2026-03-01
+> **Status:** Production-Ready + CSV-Import-Wizard + Admin-Scripts + Superadmin-Panel deployed
 
 ## Roadmap / Zukünftige Features
 
@@ -52,6 +52,96 @@
 ---
 
 ## Changelog
+
+### 2026-03-01: CSV-Import-Wizard + Admin-Scripts + Superadmin-Panel
+
+#### CSV-Import-Wizard
+
+Neue Seite `/import` — 3-Schritte-Wizard zum Massenimport bestehender Kundendaten.
+
+**Backend:**
+- `backend/src/schemas/import.schema.ts` — Zod-Schemas für CSV-Zeilen (Immobilien, Mieter, Verträge); Datumsformat `DD.MM.YYYY`
+- `backend/src/services/import.service.ts` — `importProperties`, `importTenants`, `importContracts` (Prisma-Transaktionen, idempotent)
+- `backend/src/controllers/import.controller.ts` — Zod `safeParse` mit strukturierter Fehler-Liste
+- `backend/src/routes/import.routes.ts` — 3 POST-Endpunkte, RBAC: ADMIN/VERWALTER
+
+| Method | Path | Beschreibung |
+|--------|------|--------------|
+| POST | `/api/import/properties` | Immobilien-CSV importieren |
+| POST | `/api/import/tenants` | Mieter-CSV importieren |
+| POST | `/api/import/contracts` | Verträge-CSV importieren |
+
+**Frontend:**
+- `cozy-estate-central/src/hooks/api/useImport.ts` — `useImportProperties`, `useImportTenants`, `useImportContracts` Mutations
+- `cozy-estate-central/src/pages/Import.tsx` — Stepper-Wizard (CSV hochladen → Vorschau → Import), CsvUploadZone-Komponente
+- Sidebar: "Daten importieren"-Link (nur ADMIN/VERWALTER sichtbar)
+
+---
+
+#### Admin-Scripts (Server-Kommandozeile)
+
+Alle Scripts liegen in `/root/immoverwaltung/` und laufen direkt auf dem Server:
+
+| Script | Beschreibung |
+|--------|--------------|
+| `new-tenant.sh "Firma" "email" "pw"` | Neue Kundenfirma + Admin-User anlegen, Willkommens-Mail (wenn SMTP konfiguriert) |
+| `reset-password.sh "email" "pw"` | Passwort zurücksetzen + Account-Sperre aufheben |
+| `list-tenants.sh` | Alle Firmen mit Admin-Email anzeigen |
+| `delete-tenant.sh "Firma"` | Firma + alle Daten unwiderruflich löschen (Bestätigungsdialog) |
+| `backup.sh` | Datenbank sichern (pg_dump + gzip, 7-Tage-Retention → `backups/`) |
+| `export-tenant.sh "Firma"` | DSGVO-Datenauskunft als ZIP (CSV-Dateien für alle Entitäten) |
+| `health-check.sh` | Container-Health prüfen, bei Absturz automatisch neu starten (für Cronjob) |
+
+**Alle Scripts** verwenden snake_case Tabellennamen (via Prisma `@@map`) und DB-User `immo`.
+
+---
+
+#### Superadmin-Panel (Web-UI)
+
+Separates Web-Panel zur Verwaltung aller Kundenfirmen — isoliert von der normalen Tenant-Auth.
+
+**URL:** `https://hasverl.xyz/superadmin/login`
+**Auth:** Master-Passwort aus `.env` → gibt 8h-JWT zurück (signiert mit `SUPERADMIN_JWT_SECRET`)
+
+**Backend:**
+- `backend/src/config/env.ts` — `SUPERADMIN_SECRET` + `SUPERADMIN_JWT_SECRET` (mit Dev-Fallbacks)
+- `backend/src/middleware/requireSuperAdmin.ts` — JWT-Validierung mit separatem Secret
+- `backend/src/controllers/superadmin.controller.ts` — login, getStats, getCompanies, createCompany, resetPassword, deleteCompany
+- `backend/src/routes/superadmin.routes.ts` — `/api/superadmin/*`, ohne requireAuth/tenantGuard
+
+| Method | Path | Auth | Beschreibung |
+|--------|------|------|--------------|
+| POST | `/api/superadmin/login` | public | Master-Passwort → JWT |
+| GET | `/api/superadmin/stats` | superadmin | DB-Counts + Server-Ressourcen |
+| GET | `/api/superadmin/companies` | superadmin | Alle Firmen mit `_count` |
+| POST | `/api/superadmin/companies` | superadmin | Neue Firma + Admin-User anlegen |
+| POST | `/api/superadmin/companies/:id/reset-password` | superadmin | Passwort zurücksetzen |
+| DELETE | `/api/superadmin/companies/:id` | superadmin | Firma + alle Daten löschen |
+
+`getStats` liefert:
+```json
+{
+  "db": { "companies", "users", "properties", "tenants", "contracts" },
+  "server": {
+    "memory": { "total", "used", "free" },
+    "disk": { "total", "used", "free" },
+    "lastBackup": "ISO-String oder null",
+    "uptime": 103402
+  }
+}
+```
+Server-Stats via Node.js `os`-Modul + `df -k /`. `lastBackup` = `mtime` der neuesten `.sql.gz`-Datei in `backups/`.
+
+**Frontend:**
+- `cozy-estate-central/src/contexts/SuperAdminContext.tsx` — Token in `localStorage` (`superadmin_token`), isoliert von `AuthContext`
+- `cozy-estate-central/src/hooks/api/useSuperAdmin.ts` — typisierte Hooks (Stats, Companies, Login, Create, ResetPW, Delete)
+- `cozy-estate-central/src/pages/SuperAdminLogin.tsx` — Passwort-Login-Seite (`/superadmin/login`)
+- `cozy-estate-central/src/pages/SuperAdmin.tsx` — Dashboard mit DB-Stat-Kacheln, Server-Kacheln (RAM/Disk mit Balken + Uptime/Backup), Firmentabelle mit Aktionen
+- `cozy-estate-central/src/App.tsx` — `SuperAdminProvider` + `SuperAdminGuard` + 2 neue Routes außerhalb `ProtectedRoute`
+
+**docker-compose.yml:** `SUPERADMIN_SECRET` + `SUPERADMIN_JWT_SECRET` in `environment:` des Backend-Services (mit Dev-Defaults).
+
+---
 
 ### 2026-02-26: UAT abgeschlossen + Bugfixes (Finanzen / PropertyDetail)
 
@@ -512,6 +602,9 @@ immoverwaltung/
 | Bankanbindung | `/bank` | Mock/API | Bankkonten verwalten, Transaktions-Import (CSV), Kontostand-Übersicht |
 | Benutzerverwaltung | `/users` | API | CRUD Benutzer, Rollen, Passwort-Reset, Account-Entsperren (ADMIN only) |
 | Einstellungen | `/settings` | API | Profil, Benachrichtigungen, Darstellung (Theme), App-Config, Firmendaten, **Sicherheit (Passwort ändern)** |
+| Daten-Import | `/import` | API | CSV-Import-Wizard (Immobilien, Mieter, Verträge) — 3-Schritte: Upload → Vorschau → Import |
+| Superadmin-Login | `/superadmin/login` | superadmin | Master-Passwort-Login (isoliert von Tenant-Auth) |
+| Superadmin-Panel | `/superadmin` | superadmin | DB-Stats, Server-Ressourcen (RAM/Disk/Uptime/Backup), Firmenverwaltung (anlegen/reset/löschen) |
 
 ### Backend (abgeschlossen)
 
@@ -531,6 +624,9 @@ immoverwaltung/
 - [x] Nebenkostenabrechnung - PATCH /transactions/:id (allocatable) + GET /utility-statement
 - [x] ROI-Dashboard - GET /finance/roi (Brutto/Netto/EK-Rendite)
 - [x] DSGVO Audit-Log in DB (AuditLog Model, 90-Tage-Retention)
+- [x] CSV-Import — POST /import/properties + /tenants + /contracts (ADMIN/VERWALTER)
+- [x] Superadmin-Panel — /api/superadmin/* mit separatem JWT-Secret (Firma CRUD + Server-Stats)
+- [x] Admin-Scripts — new-tenant, reset-password, list-tenants, delete-tenant, backup, export-tenant, health-check
 - [ ] PDF-Export (Berichte)
 
 ### Frontend-Backend-Integration (Phase 2 - abgeschlossen)
