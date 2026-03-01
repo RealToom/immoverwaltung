@@ -47,7 +47,7 @@ export function useCreateRecurring() {
     mutationFn: (data: CreateRecurringInput) =>
       api<{ data: RecurringTransaction }>("/recurring-transactions", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEY }),
   });
@@ -59,7 +59,7 @@ export function useUpdateRecurring() {
     mutationFn: ({ id, data }: { id: number; data: Partial<{ description: string; amount: number; isActive: boolean; endDate: string }> }) =>
       api<{ data: RecurringTransaction }>(`/recurring-transactions/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(data),
+        body: data,
       }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: QUERY_KEY }),
   });

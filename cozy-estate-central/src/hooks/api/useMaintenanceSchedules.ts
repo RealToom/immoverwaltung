@@ -40,7 +40,7 @@ export function useCreateMaintenanceSchedule() {
     }) =>
       api<{ data: MaintenanceSchedule }>("/maintenance-schedules", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["maintenance-schedules"] }),
   });
@@ -52,7 +52,7 @@ export function useUpdateMaintenanceSchedule() {
     mutationFn: ({ id, ...data }: { id: number } & Record<string, unknown>) =>
       api<{ data: MaintenanceSchedule }>(`/maintenance-schedules/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(data),
+        body: data,
       }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["maintenance-schedules"] }),
   });

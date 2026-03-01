@@ -25,7 +25,7 @@ export function useCreateDocumentTemplate() {
     mutationFn: (data: { name: string; category: string; content: string }) =>
       api<{ data: DocumentTemplate }>("/document-templates", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["document-templates"] }),
   });
@@ -37,7 +37,7 @@ export function useUpdateDocumentTemplate() {
     mutationFn: ({ id, ...data }: { id: number; name?: string; category?: string; content?: string }) =>
       api<{ data: DocumentTemplate }>(`/document-templates/${id}`, {
         method: "PATCH",
-        body: JSON.stringify(data),
+        body: data,
       }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["document-templates"] }),
   });

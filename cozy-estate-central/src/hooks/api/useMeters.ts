@@ -39,7 +39,7 @@ export function useCreateMeter(propertyId: number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: { label: string; type: string; propertyId: number; unitId?: number }) =>
-      api<{ data: Meter }>("/meters", { method: "POST", body: JSON.stringify(data) }).then(
+      api<{ data: Meter }>("/meters", { method: "POST", body: data }).then(
         (r) => r.data,
       ),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["meters", propertyId] }),
@@ -52,7 +52,7 @@ export function useAddMeterReading(meterId: number, propertyId: number) {
     mutationFn: (data: { value: number; readAt: string; note?: string }) =>
       api<{ data: MeterReading }>(`/meters/${meterId}/readings`, {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["meter-readings", meterId] });

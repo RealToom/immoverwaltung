@@ -27,7 +27,7 @@ export function useCreateBankAccount() {
         mutationFn: (data: { name: string; iban: string; bic?: string }) =>
             api<{ data: BankAccount }>(`/bank-accounts`, {
                 method: "POST",
-                body: JSON.stringify(data),
+                body: data,
             }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
@@ -74,7 +74,7 @@ export function useImportTransactions() {
         mutationFn: (transactions: CsvTransaction[]) =>
             api<{ data: { imported: number } }>(`/bank-accounts/import`, {
                 method: "POST",
-                body: JSON.stringify({ transactions }),
+                body: { transactions },
             }),
         onSuccess: () => {
             // Invalidate both bank accounts (balances might change) and finance queries (transactions added)

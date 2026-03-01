@@ -52,7 +52,7 @@ export function useCreateHandover(unitId?: number) {
     mutationFn: (data: CreateHandoverInput) =>
       api<{ data: HandoverProtocol }>("/handover-protocols", {
         method: "POST",
-        body: JSON.stringify(data),
+        body: data,
       }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["handovers", unitId] }),
   });
