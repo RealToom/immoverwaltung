@@ -28,6 +28,7 @@ import { documentTemplateRouter } from "./document-template.routes.js";
 import { bankingRouter, bankingCallbackHandler } from "./banking.routes.js";
 import { datevRouter } from "./datev.routes.js";
 import { reportRouter } from "./report.routes.js";
+import { importRouter } from "./import.routes.js";
 
 const router = Router();
 
@@ -68,5 +69,6 @@ router.get("/banking/callback", bankingCallbackHandler);
 router.use("/banking", requireAuth, tenantGuard, bankingRouter);
 router.use("/finance/datev", requireAuth, tenantGuard, datevRouter);
 router.use("/reports", requireAuth, tenantGuard, reportRouter);
+router.use("/import", requireAuth, tenantGuard, importRouter);
 
 export { router as apiRouter };
