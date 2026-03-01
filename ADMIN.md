@@ -89,6 +89,18 @@ cd /root/immoverwaltung
 ./new-tenant.sh "Firma GmbH" "admin@firma.de" "Passwort123!" "Max Mustermann"
 ```
 
+### DSGVO-Datenauskunft exportieren
+
+```bash
+./export-tenant.sh "Firma GmbH"
+```
+
+Erstellt eine ZIP-Datei mit allen Daten der Firma (Immobilien, Mieter, Verträge, Transaktionen usw.) als CSV-Dateien. Zum Herunterladen auf den eigenen PC:
+
+```bash
+scp root@hasverl.xyz:/root/immoverwaltung/dsgvo_*.zip .
+```
+
 ### Kundenfirma löschen (unwiderruflich!)
 
 ```bash

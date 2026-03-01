@@ -53,3 +53,37 @@ echo "  Firma-ID:  $COMPANY_ID"
 echo "  Firma:     $COMPANY_NAME"
 echo "  Login:     $ADMIN_EMAIL"
 echo "  Passwort:  $ADMIN_PASSWORD"
+
+# Willkommens-E-Mail senden (nur wenn SMTP konfiguriert)
+echo ""
+echo "==> Willkommens-E-Mail wird gesendet..."
+docker exec immoverwaltung-backend node -e "
+import('nodemailer').then(({ default: nodemailer }) => {
+  if (!process.env.SMTP_HOST) { console.log('SMTP nicht konfiguriert, E-Mail übersprungen.'); process.exit(0); }
+  const t = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_PORT === '465',
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  });
+  return t.sendMail({
+    from: process.env.SMTP_FROM,
+    to: process.argv[1],
+    subject: 'Willkommen bei Immoverwalt – Ihre Zugangsdaten',
+    html: \`
+      <div style=\"font-family:sans-serif;max-width:520px;margin:0 auto\">
+        <h2 style=\"color:#1a1a1a\">Willkommen bei Immoverwalt!</h2>
+        <p>Hallo ${ADMIN_NAME},</p>
+        <p>Ihr Zugang für <strong>${COMPANY_NAME}</strong> wurde eingerichtet. Sie können sich ab sofort einloggen:</p>
+        <div style=\"background:#f5f5f5;border-radius:8px;padding:16px;margin:20px 0\">
+          <p style=\"margin:4px 0\"><strong>Login-Seite:</strong> <a href=\"https://hasverl.xyz\">https://hasverl.xyz</a></p>
+          <p style=\"margin:4px 0\"><strong>E-Mail:</strong> ${ADMIN_EMAIL}</p>
+          <p style=\"margin:4px 0\"><strong>Passwort:</strong> ${ADMIN_PASSWORD}</p>
+        </div>
+        <p style=\"color:#666;font-size:13px\">Bitte ändern Sie Ihr Passwort nach dem ersten Login unter Einstellungen → Sicherheit.</p>
+        <p style=\"color:#666;font-size:13px\">Bei Fragen antworten Sie einfach auf diese E-Mail.</p>
+      </div>
+    \`,
+  });
+}).then(() => console.log('✓ E-Mail gesendet')).catch(e => console.log('E-Mail fehlgeschlagen:', e.message));
+" "$ADMIN_EMAIL"
