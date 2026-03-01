@@ -263,12 +263,7 @@ const Finances = () => {
           <h1 className="font-heading text-lg font-semibold text-foreground">Finanzen</h1>
           <p className="text-xs text-muted-foreground">Einnahmen, Ausgaben & Analysen</p>
         </div>
-        {user?.role !== "READONLY" && (
-          <Button size="sm" onClick={openCreateDialog} className="gap-1.5">
-            <Plus className="h-4 w-4" />
-            Neue Transaktion
-          </Button>
-        )}
+
         <Select value={period} onValueChange={setPeriod}>
           <SelectTrigger className="w-[160px]">
             <SelectValue />
