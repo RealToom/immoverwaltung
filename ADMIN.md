@@ -72,6 +72,21 @@ docker compose restart frontend
 
 ---
 
+## Superadmin-Panel
+
+Das Web-Panel zur Kundenverwaltung ist erreichbar unter:
+
+**URL:** https://hasverl.xyz/superadmin/login
+**Passwort:** `4Il8bPZvg8gNxMMn`
+
+Das Panel zeigt Datenbankstatistiken (Firmen, User, Immobilien, Mieter, Verträge),
+Server-Auslastung (RAM, Festplatte, letztes Backup, Uptime) sowie die vollständige
+Firmenliste mit Anlegen / Passwort-Reset / Löschen direkt im Browser.
+
+Das Passwort liegt auf dem Server in `/root/immoverwaltung/.env` als `SUPERADMIN_SECRET`.
+
+---
+
 ## Kundenverwaltung
 
 ### Alle Kunden anzeigen
