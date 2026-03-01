@@ -30,6 +30,7 @@ import { datevRouter } from "./datev.routes.js";
 import { reportRouter } from "./report.routes.js";
 import { importRouter } from "./import.routes.js";
 import { superadminRouter } from "./superadmin.routes.js";
+import { administrationRouter } from "./administration.routes.js";
 
 const router = Router();
 
@@ -72,5 +73,6 @@ router.use("/banking", requireAuth, tenantGuard, bankingRouter);
 router.use("/finance/datev", requireAuth, tenantGuard, datevRouter);
 router.use("/reports", requireAuth, tenantGuard, reportRouter);
 router.use("/import", requireAuth, tenantGuard, importRouter);
+router.use("/administration", requireAuth, tenantGuard, administrationRouter);
 
 export { router as apiRouter };
