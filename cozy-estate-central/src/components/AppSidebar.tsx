@@ -9,7 +9,6 @@ import {
   CreditCard,
   Bell,
   LogOut,
-  Landmark,
   Shield,
   CalendarDays,
   Mail,
@@ -39,7 +38,6 @@ const mainNav = [
   { title: "Mieter", url: "/tenants", icon: Users },
   { title: "Verträge", url: "/contracts", icon: FileText },
   { title: "Finanzen", url: "/finances", icon: CreditCard },
-  { title: "Bankanbindung", url: "/bank", icon: Landmark },
 ];
 
 const secondaryNav = [
