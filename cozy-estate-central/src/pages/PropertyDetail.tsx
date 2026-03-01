@@ -859,7 +859,9 @@ const PropertyDetail = () => {
                               <Checkbox
                                 checked={tx.allocatable ?? false}
                                 onCheckedChange={(checked) => {
-                                  updateTransactionMutation.mutate({ id: tx.id, data: { allocatable: !!checked } });
+                                  updateTransactionMutation.mutate({ id: tx.id, data: { allocatable: !!checked } }, {
+                                    onError: () => toast({ title: "Fehler beim Speichern", variant: "destructive" }),
+                                  });
                                 }}
                               />
                             </TableCell>
@@ -968,7 +970,9 @@ const PropertyDetail = () => {
                           <Button size="sm" variant="outline" onClick={() => setAddReadingMeterId(meter.id)}>
                             <Plus className="h-3 w-3 mr-1" /> Ablesung
                           </Button>
-                          <Button size="sm" variant="ghost" onClick={() => deleteMeterMutation.mutate(meter.id)}>
+                          <Button size="sm" variant="ghost" onClick={() => deleteMeterMutation.mutate(meter.id, {
+                            onError: () => toast({ title: "Zähler konnte nicht gelöscht werden", variant: "destructive" }),
+                          })}>
                             <Trash2 className="h-3 w-3" />
                           </Button>
                         </div>
@@ -1049,7 +1053,9 @@ const PropertyDetail = () => {
                                 </div>
                               </div>
                               <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"
-                                onClick={() => deleteHandoverMutation.mutate(h.id)}>
+                                onClick={() => deleteHandoverMutation.mutate(h.id, {
+                                onError: () => toast({ title: "Protokoll konnte nicht gelöscht werden", variant: "destructive" }),
+                              })}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
