@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { isEmailEnabled, sendMail } from "../config/email.js";
+import { isEmailEnabled, sendMail, sendMailForCompany } from "../config/email.js";
 
 interface NotificationPrefs {
   emailVertrag?: boolean;
@@ -63,7 +63,7 @@ export async function notifyContractStatusChange(
     </table>
   `);
 
-  await Promise.allSettled(recipients.map((to) => sendMail(to, subject, html)));
+  await Promise.allSettled(recipients.map((to) => sendMailForCompany(companyId, to, subject, html)));
 }
 
 export async function notifyMaintenanceCreated(
@@ -92,7 +92,7 @@ export async function notifyMaintenanceCreated(
     </table>
   `);
 
-  await Promise.allSettled(recipients.map((to) => sendMail(to, subject, html)));
+  await Promise.allSettled(recipients.map((to) => sendMailForCompany(companyId, to, subject, html)));
 }
 
 export async function sendTempPasswordEmail(
@@ -133,7 +133,7 @@ export async function notifyRentPayment(
     </table>
   `);
 
-  await Promise.allSettled(recipients.map((to) => sendMail(to, subject, html)));
+  await Promise.allSettled(recipients.map((to) => sendMailForCompany(companyId, to, subject, html)));
 }
 
 export async function sendDigestEmails(companyId: number, frequency: string): Promise<void> {
@@ -192,5 +192,5 @@ export async function sendDigestEmails(companyId: number, frequency: string): Pr
     </table>
   `);
 
-  await Promise.allSettled(recipients.map((to) => sendMail(to, subject, html)));
+  await Promise.allSettled(recipients.map((to) => sendMailForCompany(companyId, to, subject, html)));
 }

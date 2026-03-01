@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
-import { isEmailEnabled, sendMail } from "../config/email.js";
+import { isEmailEnabled, sendMailForCompany } from "../config/email.js";
 
 export async function listDunning(companyId: number, contractId?: number) {
   return prisma.dunningRecord.findMany({
@@ -57,7 +57,8 @@ export async function sendDunning(companyId: number, contractId: number) {
 
   if (isEmailEnabled) {
     const levelLabels = ["", "Erste Mahnung", "Zweite Mahnung", "Letzte Mahnung"];
-    await sendMail(
+    await sendMailForCompany(
+      companyId,
       contract.tenant.email,
       `${levelLabels[level]}: Ausstehende Mietzahlung`,
       `<p>Sehr geehrte/r ${contract.tenant.name},</p>

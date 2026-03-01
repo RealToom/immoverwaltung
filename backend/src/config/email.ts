@@ -49,10 +49,9 @@ export async function sendMailForCompany(
   subject: string,
   html: string
 ): Promise<boolean> {
-  const config = await getCompanyTransporter(companyId);
-  if (!config) return false;
-
   try {
+    const config = await getCompanyTransporter(companyId);
+    if (!config) return false;
     await config.transporter.sendMail({ from: config.from, to, subject, html });
     return true;
   } catch (err) {
