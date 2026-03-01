@@ -34,7 +34,7 @@ import {
   useCustomRoles, useCreateCustomRole, useUpdateCustomRole, useDeleteCustomRole,
   useSetUserCustomRole, type CustomRoleWithCount,
 } from "@/hooks/api/useCustomRoles";
-import { useUsers } from "@/hooks/api/useUsers";
+import { useUsers, useCreateUser } from "@/hooks/api/useUsers";
 import { PAGE_KEYS } from "@/lib/permissions";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -446,17 +446,39 @@ function RoleDialog({ role, onClose }: { role: CustomRoleWithCount | null; onClo
 }
 
 // ─── Mitarbeiter Tab ──────────────────────────────────────────
+const EMPTY_USER_FORM = { name: "", email: "", password: "", role: "VERWALTER" };
+
 function MitarbeiterTab() {
   const { toast } = useToast();
   const { data: roles = [] } = useCustomRoles();
   const { data: usersData } = useUsers();
   const deleteRole = useDeleteCustomRole();
   const setUserCustomRole = useSetUserCustomRole();
+  const createUser = useCreateUser();
 
   const [editRole, setEditRole] = useState<CustomRoleWithCount | null>(null);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
+  const [showUserDialog, setShowUserDialog] = useState(false);
+  const [userForm, setUserForm] = useState(EMPTY_USER_FORM);
+  const [showPass, setShowPass] = useState(false);
 
   const users = usersData?.data ?? [];
+
+  async function handleCreateUser() {
+    if (!userForm.name.trim() || !userForm.email.trim() || !userForm.password.trim()) {
+      toast({ title: "Bitte alle Pflichtfelder ausfüllen", variant: "destructive" });
+      return;
+    }
+    try {
+      await createUser.mutateAsync(userForm);
+      toast({ title: "Mitarbeiter angelegt" });
+      setShowUserDialog(false);
+      setUserForm(EMPTY_USER_FORM);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Fehler beim Anlegen";
+      toast({ title: msg, variant: "destructive" });
+    }
+  }
 
   async function handleDeleteRole(role: CustomRoleWithCount) {
     if (role._count.users > 0) {
@@ -526,7 +548,12 @@ function MitarbeiterTab() {
 
       {/* Users section */}
       <div className="space-y-3">
-        <h3 className="text-base font-semibold">Mitarbeiter</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-semibold">Mitarbeiter</h3>
+          <Button size="sm" onClick={() => { setUserForm(EMPTY_USER_FORM); setShowPass(false); setShowUserDialog(true); }}>
+            <Plus className="mr-2 h-4 w-4" /> Neuer Mitarbeiter
+          </Button>
+        </div>
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -572,6 +599,59 @@ function MitarbeiterTab() {
       </div>
 
       {showRoleDialog && <RoleDialog role={editRole} onClose={closeRoleDialog} />}
+
+      {/* New User Dialog */}
+      <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Neuer Mitarbeiter</DialogTitle>
+            <DialogDescription>Legen Sie ein neues Benutzerkonto für Ihren Mitarbeiter an.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Name *</Label>
+              <Input value={userForm.name} onChange={(e) => setUserForm((f) => ({ ...f, name: e.target.value }))} placeholder="Max Mustermann" />
+            </div>
+            <div className="space-y-1">
+              <Label>E-Mail *</Label>
+              <Input type="email" value={userForm.email} onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))} placeholder="max@firma.de" />
+            </div>
+            <div className="space-y-1">
+              <Label>Passwort *</Label>
+              <div className="relative">
+                <Input
+                  type={showPass ? "text" : "password"}
+                  value={userForm.password}
+                  onChange={(e) => setUserForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder="Mind. 8 Zeichen, Groß-/Kleinbuchstabe, Ziffer"
+                  className="pr-10"
+                />
+                <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPass((v) => !v)}>
+                  {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>System-Rolle</Label>
+              <Select value={userForm.role} onValueChange={(v) => setUserForm((f) => ({ ...f, role: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ALL_ROLES.map((r) => (
+                    <SelectItem key={r} value={r}>{ROLE_LABELS[r]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUserDialog(false)}>Abbrechen</Button>
+            <Button onClick={handleCreateUser} disabled={createUser.isPending}>
+              {createUser.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Anlegen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
