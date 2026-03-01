@@ -1149,7 +1149,7 @@ const PropertyDetail = () => {
               <Select value={newMeter.unitId} onValueChange={(v) => setNewMeter((m) => ({ ...m, unitId: v }))}>
                 <SelectTrigger><SelectValue placeholder="Hauptzähler (kein Einheitsbezug)" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Hauptzähler</SelectItem>
+                  <SelectItem value="none">Hauptzähler</SelectItem>
                   {property?.units?.map((u: { id: number; number: string }) => (
                     <SelectItem key={u.id} value={String(u.id)}>Einheit {u.number}</SelectItem>
                   ))}
@@ -1162,7 +1162,7 @@ const PropertyDetail = () => {
             <Button disabled={!newMeter.label} onClick={() => {
               createMeterMutation.mutate({
                 label: newMeter.label, type: newMeter.type, propertyId,
-                ...(newMeter.unitId ? { unitId: Number(newMeter.unitId) } : {}),
+                ...(newMeter.unitId && newMeter.unitId !== "none" ? { unitId: Number(newMeter.unitId) } : {}),
               });
               setAddMeterOpen(false);
               setNewMeter({ label: "", type: "STROM", unitId: "" });
