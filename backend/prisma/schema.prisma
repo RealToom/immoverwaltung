@@ -46,6 +46,8 @@ model Company {
   accountingSettings      CompanyAccountingSettings?
   categoryAccountMappings CategoryAccountMapping[]
   datevExportLogs         DatevExportLog[]
+  customRoles             CustomRole[]
+  smtpSettings            CompanySmtpSettings?
 
   @@map("companies")
 }
@@ -63,11 +65,13 @@ model User {
   failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime? @map("locked_until")
   companyId           Int       @map("company_id")
+  customRoleId        Int?      @map("custom_role_id")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
   company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   refreshTokens RefreshToken[]
+  customRole    CustomRole?    @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
 
   @@map("users")
 }
@@ -83,6 +87,40 @@ model RefreshToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("refresh_tokens")
+}
+
+// ─── CustomRole (Benutzerdefinierte Rollen) ──────────────────
+model CustomRole {
+  id        Int      @id @default(autoincrement())
+  companyId Int      @map("company_id")
+  name      String
+  pages     String[] @default([])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users   User[]
+
+  @@map("custom_roles")
+}
+
+// ─── CompanySmtpSettings (Pro-Firma SMTP) ────────────────────
+model CompanySmtpSettings {
+  id            Int     @id @default(autoincrement())
+  companyId     Int     @unique @map("company_id")
+  host          String
+  port          Int     @default(587)
+  secure        Boolean @default(false)
+  user          String
+  encryptedPass String  @map("encrypted_pass")
+  fromAddress   String  @map("from_address")
+  fromName      String  @map("from_name")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_smtp_settings")
 }
 
 enum UserRole {
