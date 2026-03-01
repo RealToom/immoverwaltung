@@ -1,7 +1,7 @@
 # Immoverwaltung - Projektdokumentation
 
 > **Letzte Aktualisierung:** 2026-03-01
-> **Status:** Production-Ready + CSV-Import-Wizard + Admin-Scripts + Superadmin-Panel deployed
+> **Status:** Production-Ready + Administrations-Bereich (SMTP + Custom Roles) deployed
 
 ## Roadmap / Zukünftige Features
 
@@ -52,6 +52,40 @@
 ---
 
 ## Changelog
+
+### 2026-03-01: Administrations-Bereich (SMTP + Custom Roles + Benutzerverwaltung)
+
+Neue Seite `/administration` (nur ADMIN) ersetzt `/users`. 5 Tabs: Mitarbeiter, E-Mail, Firma, Bankanbindung, DATEV.
+
+**Backend:**
+- `backend/prisma/schema.prisma` — neue Modelle `CustomRole` (id, companyId, name, pages String[]) und `CompanySmtpSettings` (id, companyId, host, port, secure, user, encryptedPass, fromAddress, fromName); User.customRoleId FK
+- `backend/src/controllers/administration.controller.ts` — 8 Handler: getSmtp, putSmtp, testSmtp, getRoles, createRole, updateRole, deleteRole, setUserCustomRole
+- `backend/src/schemas/administration.schema.ts` — Zod-Schemas für SMTP + Rollen-CRUD + Rollenzuweisung
+- `backend/src/routes/administration.routes.ts` — ADMIN-only (requireRole("ADMIN")), adminActionLimiter auf SMTP-Test
+- `backend/src/config/email.ts` — `sendMailForCompany(companyId, ...)` nutzt per-Firma SMTP oder Server-Fallback; alle Service-Aufrufe migriert
+- `backend/src/services/auth.service.ts` — getProfile() liefert jetzt `customRole` mit aus
+
+| Method | Path | Beschreibung |
+|--------|------|--------------|
+| GET | `/api/administration/smtp` | SMTP-Einstellungen laden (Passwort masked) |
+| PUT | `/api/administration/smtp` | SMTP-Einstellungen speichern (AES-256-GCM verschlüsselt) |
+| POST | `/api/administration/smtp/test` | Test-E-Mail senden (Rate: 5/15min) |
+| GET | `/api/administration/roles` | Alle Custom Roles laden |
+| POST | `/api/administration/roles` | Custom Role erstellen |
+| PATCH | `/api/administration/roles/:id` | Custom Role bearbeiten |
+| DELETE | `/api/administration/roles/:id` | Custom Role löschen |
+| PATCH | `/api/administration/users/:id/role` | Custom Role einem Benutzer zuweisen |
+
+**Frontend:**
+- `cozy-estate-central/src/lib/permissions.ts` — `PAGE_KEYS` (13 Seiten), `canAccess(user, page)` Funktion
+- `cozy-estate-central/src/hooks/api/useAdminSmtp.ts` — useAdminSmtp, useSaveSmtp, useTestSmtp
+- `cozy-estate-central/src/hooks/api/useCustomRoles.ts` — useCustomRoles, useCreateCustomRole, useUpdateCustomRole, useDeleteCustomRole, useSetUserCustomRole
+- `cozy-estate-central/src/pages/Administration.tsx` — ADMIN-Guard, 5 Tabs, RoleDialog mit PAGE_KEYS-Checkboxen
+- `cozy-estate-central/src/App.tsx` — /administration Route, /users → Redirect
+- `cozy-estate-central/src/components/AppSidebar.tsx` — "Administration" (Shield) statt "Benutzer" (UserCog)
+- `cozy-estate-central/src/pages/Users.tsx` — gelöscht (durch Administration.tsx abgelöst)
+
+---
 
 ### 2026-03-01: CSV-Import-Wizard + Admin-Scripts + Superadmin-Panel
 
