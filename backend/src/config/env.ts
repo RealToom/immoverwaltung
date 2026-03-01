@@ -32,4 +32,7 @@ export const env = {
   get NORDIGEN_SECRET_KEY() { return process.env.NORDIGEN_SECRET_KEY || ""; },
   // Base URL for Nordigen OAuth callback redirect (no trailing slash)
   get NORDIGEN_REDIRECT_BASE() { return process.env.NORDIGEN_REDIRECT_BASE || "http://localhost:8080"; },
+  // Superadmin: secret for issuing tokens + secret for verifying them (optional, dev defaults)
+  get SUPERADMIN_SECRET() { return process.env.SUPERADMIN_SECRET || "dev-superadmin-secret"; },
+  get SUPERADMIN_JWT_SECRET() { return process.env.SUPERADMIN_JWT_SECRET || "dev-superadmin-jwt-secret-min32chars"; },
 };
