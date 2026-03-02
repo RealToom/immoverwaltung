@@ -13,6 +13,7 @@ import {
   Loader2,
   ListChecks,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -50,7 +51,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMaintenanceTickets, useCreateMaintenanceTicket, useUpdateMaintenanceTicket, useDeleteMaintenanceTicket, type MaintenanceTicketItem } from "@/hooks/api/useMaintenanceTickets";
-import { useMaintenanceSchedules, useCreateMaintenanceSchedule, useDeleteMaintenanceSchedule } from "@/hooks/api/useMaintenanceSchedules";
+import { useMaintenanceSchedules, useCreateMaintenanceSchedule, useUpdateMaintenanceSchedule, useDeleteMaintenanceSchedule, type MaintenanceSchedule } from "@/hooks/api/useMaintenanceSchedules";
 import { useProperties } from "@/hooks/api/useProperties";
 import {
   mapMaintenanceCategory,
@@ -143,6 +144,48 @@ const Maintenance = () => {
     nextDue: new Date().toISOString().slice(0, 10), assignedTo: "", propertyId: "",
   };
   const [newSchedule, setNewSchedule] = useState(EMPTY_SCHEDULE);
+  const updateSchedule = useUpdateMaintenanceSchedule();
+  const [editSchedule, setEditSchedule] = useState<MaintenanceSchedule | null>(null);
+  const [editScheduleForm, setEditScheduleForm] = useState({
+    title: "",
+    description: "",
+    category: "",
+    interval: "",
+    nextDue: "",
+    assignedTo: "",
+  });
+
+  const openEditSchedule = (s: MaintenanceSchedule) => {
+    setEditSchedule(s);
+    setEditScheduleForm({
+      title: s.title,
+      description: s.description ?? "",
+      category: s.category,
+      interval: s.interval,
+      nextDue: s.nextDue ? (() => { const d = new Date(s.nextDue); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })() : "",
+      assignedTo: s.assignedTo ?? "",
+    });
+  };
+
+  const handleSaveSchedule = async () => {
+    if (!editSchedule) return;
+    try {
+      await updateSchedule.mutateAsync({
+        id: editSchedule.id,
+        title: editScheduleForm.title,
+        description: editScheduleForm.description || undefined,
+        category: editScheduleForm.category || undefined,
+        interval: editScheduleForm.interval || undefined,
+        nextDue: editScheduleForm.nextDue ? new Date(editScheduleForm.nextDue + "T12:00:00Z").toISOString() : undefined,
+        assignedTo: editScheduleForm.assignedTo || undefined,
+      });
+      toast({ title: "Gespeichert", description: "Wartungsplan wurde aktualisiert." });
+      setEditSchedule(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: "Fehler beim Speichern", description: msg, variant: "destructive" });
+    }
+  };
 
   const INTERVAL_LABELS: Record<string, string> = {
     MONATLICH: "Monatlich", VIERTELJAEHRLICH: "Vierteljährlich",
@@ -612,10 +655,28 @@ const Maintenance = () => {
                               </TableCell>
                               <TableCell className="text-sm text-muted-foreground">{s.assignedTo ?? "—"}</TableCell>
                               <TableCell>
-                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive h-8 w-8 p-0"
-                                  onClick={() => deleteSchedule.mutate(s.id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                  {user?.role !== "READONLY" && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8 w-8 p-0"
+                                      onClick={() => openEditSchedule(s)}
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                  {user?.role !== "READONLY" && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                                      onClick={() => deleteSchedule.mutate(s.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
@@ -826,6 +887,91 @@ const Maintenance = () => {
             <Button onClick={handleCreateSchedule} disabled={createSchedule.isPending} className="gap-1.5">
               {createSchedule.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Erstellen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Wartungsplan bearbeiten Dialog */}
+      <Dialog open={!!editSchedule} onOpenChange={(open) => !open && setEditSchedule(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Wartungsplan bearbeiten</DialogTitle>
+            <DialogDescription>
+              {editSchedule?.property?.name ?? ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Titel *</Label>
+              <Input
+                value={editScheduleForm.title}
+                onChange={(e) => setEditScheduleForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="z.B. Heizungswartung"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Beschreibung</Label>
+              <Input
+                value={editScheduleForm.description}
+                onChange={(e) => setEditScheduleForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="Optional"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Kategorie</Label>
+                <Select
+                  value={editScheduleForm.category}
+                  onValueChange={(v) => setEditScheduleForm((f) => ({ ...f, category: v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Intervall</Label>
+                <Select
+                  value={editScheduleForm.interval}
+                  onValueChange={(v) => setEditScheduleForm((f) => ({ ...f, interval: v }))}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(INTERVAL_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Nächste Fälligkeit</Label>
+                <Input
+                  type="date"
+                  value={editScheduleForm.nextDue}
+                  onChange={(e) => setEditScheduleForm((f) => ({ ...f, nextDue: e.target.value }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Zugewiesen an</Label>
+                <Input
+                  value={editScheduleForm.assignedTo}
+                  onChange={(e) => setEditScheduleForm((f) => ({ ...f, assignedTo: e.target.value }))}
+                  placeholder="Handwerker / Firma"
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditSchedule(null)}>Abbrechen</Button>
+            <Button onClick={handleSaveSchedule} disabled={updateSchedule.isPending} className="gap-1.5">
+              {updateSchedule.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Speichern
             </Button>
           </DialogFooter>
         </DialogContent>
