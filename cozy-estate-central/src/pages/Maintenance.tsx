@@ -162,7 +162,7 @@ const Maintenance = () => {
       description: s.description ?? "",
       category: s.category,
       interval: s.interval,
-      nextDue: s.nextDue ? (() => { const d = new Date(s.nextDue); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })() : "",
+      nextDue: s.nextDue ? (() => { const d = new Date(s.nextDue); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`; })() : "",
       assignedTo: s.assignedTo ?? "",
     });
   };
@@ -666,16 +666,6 @@ const Maintenance = () => {
                                       <Pencil className="h-4 w-4" />
                                     </Button>
                                   )}
-                                  {user?.role !== "READONLY" && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-destructive hover:text-destructive h-8 w-8 p-0"
-                                      onClick={() => deleteSchedule.mutate(s.id)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -965,7 +955,24 @@ const Maintenance = () => {
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!editSchedule) return;
+                try {
+                  await deleteSchedule.mutateAsync(editSchedule.id);
+                  toast({ title: "Wartungsplan gelöscht" });
+                  setEditSchedule(null);
+                } catch {
+                  toast({ title: "Fehler", description: "Wartungsplan konnte nicht gelöscht werden.", variant: "destructive" });
+                }
+              }}
+              disabled={deleteSchedule.isPending}
+              className="sm:mr-auto"
+            >
+              {deleteSchedule.isPending ? "Löschen..." : "Löschen"}
+            </Button>
             <Button variant="outline" onClick={() => setEditSchedule(null)}>Abbrechen</Button>
             <Button onClick={handleSaveSchedule} disabled={updateSchedule.isPending} className="gap-1.5">
               {updateSchedule.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
