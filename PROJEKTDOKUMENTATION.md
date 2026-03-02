@@ -1,7 +1,7 @@
 # Immoverwaltung - Projektdokumentation
 
-> **Letzte Aktualisierung:** 2026-03-01
-> **Status:** Production-Ready + Administrations-Bereich vollständig (Firma, Bank, DATEV, E-Mail mit IMAP)
+> **Letzte Aktualisierung:** 2026-03-02
+> **Status:** Production-Ready + Administrations-Bereich vollständig (Firma, Bank, DATEV, E-Mail/IMAP, Datenimport, Mitarbeiter anlegen)
 
 ## Roadmap / Zukünftige Features
 
@@ -110,6 +110,33 @@ Neue Seite `/administration` (nur ADMIN) ersetzt `/users`. 5 Tabs: Mitarbeiter, 
   - **DATEV-Tab:** Beraternummer (1001–9999999), Mandantennummer (1–99999), Kontenrahmen (SKR03/SKR04), Geschäftsjahresbeginn (Monat 1–12), Standard-Kontonummern (4-stellig: Bank, Einnahmen, Ausgaben)
 - `cozy-estate-central/src/pages/Settings.tsx` — Firmeneinstellungen, App-Konfiguration und Postfächer-Tab entfernt; App-Tab enthält nur noch benutzerindividuelle Einstellungen (autoSave, Kalender)
 - `cozy-estate-central/src/components/AppSidebar.tsx` — „Bankanbindung"-Eintrag aus der Hauptnavigation entfernt (Banking nur noch über Administration → Bankanbindung erreichbar)
+
+---
+
+### 2026-03-02: Administration – Datenimport-Tab, Mitarbeiter anlegen, Bugfixes
+
+#### Datenimport in Administration integriert (`9af44e3`)
+
+Der CSV-Import-Wizard wurde aus der eigenständigen Seite `/import` in den Administration-Bereich verschoben.
+
+- `cozy-estate-central/src/pages/Administration.tsx` — neuer Tab „Datenimport" mit `ImportTab`-Komponente (3-Schritte-Wizard: Immobilien → Mieter → Verträge, CSV-Upload, Vorlagen-Download, Vorschau-Tabelle mit Fehlermarkierung)
+- `cozy-estate-central/src/App.tsx` — `/import`-Route leitet per `<Navigate>` auf `/administration` um; `Import.tsx`-Import entfernt
+- `cozy-estate-central/src/components/AppSidebar.tsx` — „Datenimport"-Eintrag aus der Sidebar entfernt
+
+#### Neuer Mitarbeiter anlegen (`2e51884`)
+
+Im Mitarbeiter-Tab der Administration kann ein neues Benutzerkonto direkt angelegt werden.
+
+- `cozy-estate-central/src/pages/Administration.tsx` — Button „Neuer Mitarbeiter" + Dialog mit Feldern: Name, E-Mail, Passwort (mit Sichtbarkeits-Toggle), System-Rolle (ADMIN/VERWALTER/BUCHHALTER/READONLY)
+- Nutzt bestehenden `useCreateUser`-Hook (`POST /api/users`) + Validierung (Pflichtfelder, Passwort-Regex im Backend)
+
+#### Bugfix: Settings-Seite nicht erreichbar (`c45957e`)
+
+- `cozy-estate-central/src/pages/Settings.tsx` — `Save` aus `lucide-react` war beim Cleanup der vorherigen Session aus den Imports entfernt worden, wurde aber auf Zeilen 236 und 327 verwendet → Seite crashte beim Laden. Import wieder hinzugefügt.
+
+#### „Neue Transaktion"-Button entfernt (`34eb9a5`)
+
+- `cozy-estate-central/src/pages/Finances.tsx` — Button „Neue Transaktion" (inkl. READONLY-Guard) aus dem Finanz-Dashboard-Header entfernt. Der Dialog-Code bleibt im Code erhalten, ist aber nicht mehr aufrufbar.
 
 ---
 
