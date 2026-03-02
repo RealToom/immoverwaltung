@@ -812,8 +812,7 @@ const Maintenance = () => {
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
               <Label>Titel *</Label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              <Input
                 value={newSchedule.title}
                 onChange={(e) => setNewSchedule((s) => ({ ...s, title: e.target.value }))}
                 placeholder="z.B. Heizungswartung"
@@ -821,8 +820,7 @@ const Maintenance = () => {
             </div>
             <div className="grid gap-2">
               <Label>Beschreibung</Label>
-              <input
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              <Input
                 value={newSchedule.description}
                 onChange={(e) => setNewSchedule((s) => ({ ...s, description: e.target.value }))}
                 placeholder="Optional"
