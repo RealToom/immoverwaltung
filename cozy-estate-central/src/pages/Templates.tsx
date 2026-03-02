@@ -22,6 +22,7 @@ import { formatDate } from "@/lib/mappings";
 import {
   useDocumentTemplates,
   useCreateDocumentTemplate,
+  useUpdateDocumentTemplate,
   useDeleteDocumentTemplate,
   useRenderDocumentTemplate,
   type DocumentTemplate,
@@ -64,6 +65,15 @@ const Templates = () => {
   // Delete confirm state
   const [deleteId, setDeleteId] = useState<number | null>(null);
 
+  // View dialog state
+  const [viewTemplate, setViewTemplate] = useState<DocumentTemplate | null>(null);
+
+  // Edit dialog state
+  const [editTemplate, setEditTemplate] = useState<DocumentTemplate | null>(null);
+  const [editForm, setEditForm] = useState(EMPTY_FORM);
+
+  const updateTemplate = useUpdateDocumentTemplate();
+
   const handleCreate = async () => {
     if (!form.name.trim() || !form.content.trim()) {
       toast({ title: "Fehler", description: "Name und Inhalt sind Pflichtfelder.", variant: "destructive" });
@@ -102,6 +112,30 @@ const Templates = () => {
       date: new Date().toLocaleDateString("de-DE"), amount: "", landlord: "",
     });
     setRenderOpen(true);
+  };
+
+  const openEditDialog = (t: DocumentTemplate) => {
+    setEditTemplate(t);
+    setEditForm({ name: t.name, category: t.category, content: t.content });
+  };
+
+  const handleUpdate = async () => {
+    if (!editTemplate || !editForm.name.trim() || !editForm.content.trim()) {
+      toast({ title: "Fehler", description: "Name und Inhalt sind Pflichtfelder.", variant: "destructive" });
+      return;
+    }
+    try {
+      await updateTemplate.mutateAsync({
+        id: editTemplate.id,
+        name: editForm.name.trim(),
+        category: editForm.category,
+        content: editForm.content,
+      });
+      toast({ title: "Gespeichert", description: "Vorlage wurde aktualisiert." });
+      setEditTemplate(null);
+    } catch (err) {
+      toast({ title: "Fehler", description: err instanceof Error ? err.message : "Vorlage konnte nicht gespeichert werden.", variant: "destructive" });
+    }
   };
 
   return (
@@ -151,7 +185,11 @@ const Templates = () => {
                     </TableRow>
                   ) : (
                     templates.map((t) => (
-                      <TableRow key={t.id}>
+                      <TableRow
+                        key={t.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => setViewTemplate(t)}
+                      >
                         <TableCell>
                           <div className="font-medium text-sm">{t.name}</div>
                           <div className="text-xs text-muted-foreground truncate max-w-[300px]">
@@ -166,12 +204,19 @@ const Templates = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1 justify-end">
-                            <Button variant="ghost" size="sm" className="h-8 gap-1.5" onClick={() => openRenderDialog(t)}>
+                            <Button variant="ghost" size="sm" className="h-8 gap-1.5"
+                              onClick={(e) => { e.stopPropagation(); openRenderDialog(t); }}>
                               <Download className="h-4 w-4" />
                               PDF
                             </Button>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0"
+                              onClick={(e) => { e.stopPropagation(); openEditDialog(t); }}
+                              title="Bearbeiten">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteId(t.id)}>
+                              onClick={(e) => { e.stopPropagation(); setDeleteId(t.id); }}
+                              title="Löschen">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -288,6 +333,88 @@ const Templates = () => {
               className="gap-1.5">
               {deleteTemplate.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               Löschen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Template Dialog */}
+      <Dialog open={viewTemplate !== null} onOpenChange={(open) => { if (!open) setViewTemplate(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {viewTemplate?.name}
+              {viewTemplate?.category && (
+                <Badge variant="outline" className="text-xs font-normal">{viewTemplate.category}</Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <Textarea
+              value={viewTemplate?.content ?? ""}
+              readOnly
+              rows={14}
+              className="font-mono text-sm resize-none bg-muted/40"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewTemplate(null)}>Schließen</Button>
+            <Button onClick={() => {
+              const t = viewTemplate;
+              setViewTemplate(null);
+              if (t) openEditDialog(t);
+            }} className="gap-1.5">
+              <Pencil className="h-4 w-4" />
+              Bearbeiten
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Template Dialog */}
+      <Dialog open={editTemplate !== null} onOpenChange={(open) => { if (!open) setEditTemplate(null); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Vorlage bearbeiten</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Name *</Label>
+                <Input
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="z.B. Mietvertrag Standard"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Kategorie</Label>
+                <Select value={editForm.category} onValueChange={(v) => setEditForm((f) => ({ ...f, category: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATE_CATEGORIES.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label>Inhalt (Handlebars-Template) *</Label>
+              <Textarea
+                rows={10}
+                value={editForm.content}
+                onChange={(e) => setEditForm((f) => ({ ...f, content: e.target.value }))}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground whitespace-pre">{TEMPLATE_HINTS}</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTemplate(null)}>Abbrechen</Button>
+            <Button onClick={handleUpdate} disabled={updateTemplate.isPending} className="gap-1.5">
+              {updateTemplate.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Speichern
             </Button>
           </DialogFooter>
         </DialogContent>
