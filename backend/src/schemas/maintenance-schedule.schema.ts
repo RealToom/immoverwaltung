@@ -12,6 +12,9 @@ export const createScheduleSchema = z.object({
 
 export const updateScheduleSchema = z.object({
   title: z.string().min(1).optional(),
+  description: z.string().optional(),
+  category: z.enum(["SANITAER", "ELEKTRIK", "HEIZUNG", "GEBAEUDE", "AUSSENANLAGE", "SONSTIGES"]).optional(),
+  interval: z.enum(["MONATLICH", "VIERTELJAEHRLICH", "HALBJAEHRLICH", "JAEHRLICH"]).optional(),
   assignedTo: z.string().optional(),
   isActive: z.boolean().optional(),
   lastDone: z.string().datetime().optional(),
