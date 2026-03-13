@@ -53,6 +53,26 @@
 
 ## Changelog
 
+### 2026-03-13: Production-Readiness Abschlusstest & Security Audits
+
+Letzter Feinschliff vor dem echten Go-Live. Intensive Prüfung des DSGVO- und Sicherheits-Setups.
+
+**Infrastruktur & Umgebung:**
+- `docker-compose.yml`: Fallback-Passwörter für `SUPERADMIN_SECRET` und `SUPERADMIN_JWT_SECRET` entfernt; App crasht nun absichtlich, wenn diese in Production fehlen (Fail-Fast-Prinzip).
+- `.env.example`: `SUPERADMIN_SECRET`, `SUPERADMIN_JWT_SECRET` und `ENCRYPTION_KEY` inklusive Generierungsbefehlen (`openssl rand`) aufgenommen.
+- `scripts/backup.sh`: DB-User von `postgres` (Superuser) auf `immo` korrigiert. 
+
+**Code & Bugfixes:**
+- `health.test.ts`: Veralteten `vi.mock()` Prisma Mock umgeschrieben auf internen State-Setter (`__setDbDown`), da Vitest mit dynamischen Importer-Proxies gecrasht ist.
+- `index.css`: Frontend-Build brach wegen falscher `@import`-Reihenfolge ab. Behoben.
+- `npm audit fix`: 15 Dependency-Updates im Backend und Frontend durchgeführt (u.a. DoS-Schwachstellen in `multer` und `express-rate-limit` geschlossen). Zwei akzeptierte Risiken (`imap-simple` und `vite`) dokumentiert.
+
+**Dokumentation:**
+- `VERARBEITUNGSVERZEICHNIS.md` geprüft und als DSGVO-konform abgenommen.
+- `security_abnahme_bericht.md` erstellt.
+
+---
+
 ### 2026-03-01: Bugfix — Zähler hinzufügen Dialog (ErrorBoundary Crash)
 
 **Problem:** Dialog "Zähler hinzufügen" in `PropertyDetail.tsx` crashte beim Öffnen mit einem ErrorBoundary weil `<SelectItem value="">` verwendet wurde. Radix UI verbietet leere Strings als `value` (reserviert für "Auswahl löschen").

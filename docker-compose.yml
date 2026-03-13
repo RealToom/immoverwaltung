@@ -50,8 +50,8 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-noreply@immoverwalt.de}
-      SUPERADMIN_SECRET: ${SUPERADMIN_SECRET:-dev-superadmin-secret}
-      SUPERADMIN_JWT_SECRET: ${SUPERADMIN_JWT_SECRET:-dev-superadmin-jwt-secret-min32chars}
+      SUPERADMIN_SECRET: ${SUPERADMIN_SECRET:?SUPERADMIN_SECRET muss in .env gesetzt sein (openssl rand -hex 32)}
+      SUPERADMIN_JWT_SECRET: ${SUPERADMIN_JWT_SECRET:?SUPERADMIN_JWT_SECRET muss in .env gesetzt sein (openssl rand -base64 48)}
     volumes:
       - uploads_data:/app/uploads
     entrypoint: ["sh", "docker-entrypoint.sh"]

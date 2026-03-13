@@ -1,14 +1,26 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import request from "supertest";
 
-// Prisma mocken damit kein echter DB-Aufruf stattfindet
-vi.mock("../lib/prisma.js", () => ({
-  prisma: {
-    $queryRaw: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
-  },
-}));
+// Mocking Prisma robust for dynamic imports
+vi.mock("../lib/prisma.js", () => {
+  let isDown = false;
+  return {
+    prisma: {
+      $queryRaw: vi.fn().mockImplementation(() => {
+        if (isDown) return Promise.reject(new Error("DB DOWN"));
+        return Promise.resolve([{ "?column?": 1 }]);
+      }),
+    },
+    __setDbDown: (val: boolean) => { isDown = val; }
+  };
+});
 
 describe("GET /health", () => {
+  afterEach(async () => {
+    const mod = await import("../lib/prisma.js") as any;
+    mod.__setDbDown(false);
+  });
+
   it("antwortet mit 200 und status ok wenn DB erreichbar", async () => {
     const { app } = await import("../app.js");
     const res = await request(app).get("/health");
@@ -16,12 +28,11 @@ describe("GET /health", () => {
     expect(res.status).toBe(200);
     expect(res.body.status).toBe("ok");
     expect(res.body.db).toBe("ok");
-    // timestamp entfernt (Security: verhindert Server-Timing-Analyse)
   });
 
   it("antwortet mit 503 wenn DB nicht erreichbar", async () => {
-    const { prisma } = await import("../lib/prisma.js");
-    vi.mocked(prisma.$queryRaw).mockRejectedValueOnce(new Error("DB down"));
+    const mod = await import("../lib/prisma.js") as any;
+    mod.__setDbDown(true);
 
     const { app } = await import("../app.js");
     const res = await request(app).get("/health");

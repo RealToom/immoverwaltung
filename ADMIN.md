@@ -146,7 +146,7 @@ Backups werden in `/root/immoverwaltung/backups/` gespeichert (gzip-komprimiert)
 ### Backup wiederherstellen
 
 ```bash
-zcat backups/immoverwaltung_20260301_020000.sql.gz | docker exec -i immoverwaltung-db psql -U postgres immoverwaltung
+zcat backups/immoverwaltung_20260301_020000.sql.gz | docker exec -i immoverwaltung-db psql -U immo immoverwaltung
 ```
 
 ### Automatisches tägliches Backup einrichten
@@ -225,7 +225,7 @@ UptimeRobot prüft die Website alle 5 Minuten und schickt eine E-Mail wenn sie n
 ## Datenbank-Zugang
 
 ```bash
-docker exec -it immoverwaltung-db psql -U postgres -d immoverwaltung
+docker exec -it immoverwaltung-db psql -U immo -d immoverwaltung
 ```
 
 Nützliche SQL-Befehle:

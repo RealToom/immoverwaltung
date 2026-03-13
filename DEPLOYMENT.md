@@ -15,18 +15,10 @@ Vor dem ersten Go-Live alle Punkte abhaken:
 - [ ] [Rechtliche Checkliste](file:///c:/Users/tomsc/Documents/Projects/AI-Programming/immoverwaltung/LEGAL_TEMPLATES.md) (Abmahngefahr!)
 - [ ] [Server-Absicherung](file:///c:/Users/tomsc/Documents/Projects/AI-Programming/immoverwaltung/SERVER_SECURITY.md) (SSH/Firewall)
 - [ ] [DNS-Konfiguration](file:///c:/Users/tomsc/Documents/Projects/AI-Programming/immoverwaltung/DNS_CONFIG.md) (E-Mail Zustellbarkeit)
-- [ ] `ENCRYPTION_KEY` generieren und setzen:
-  ```bash
-  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-  ```
+- [ ] `ENCRYPTION_KEY` generieren (AES-256 für IMAP-Passwörter): `openssl rand -hex 32`
 - [ ] `DB_PASSWORD` — starkes, einzigartiges Passwort (mind. 20 Zeichen)
-- [ ] `JWT_ACCESS_SECRET` + `JWT_REFRESH_SECRET` generieren (je 48+ Bytes):
-  ```bash
-  # Linux/Mac:
-  openssl rand -base64 48
-  # Windows PowerShell:
-  [Convert]::ToBase64String((1..48 | ForEach-Object { Get-Random -Max 256 }) -as [byte[]])
-  ```
+- [ ] `JWT_ACCESS_SECRET` + `JWT_REFRESH_SECRET` generieren (je 48+ Bytes Base64)
+- [ ] `SUPERADMIN_SECRET` (Hex 32) + `SUPERADMIN_JWT_SECRET` (Base64 48) generieren
 - [ ] `CORS_ORIGINS` — exakte HTTPS-URL des Frontends (z.B. `https://verwaltung.meine-firma.de`)
 - [ ] `NORDIGEN_SECRET_ID` + `NORDIGEN_SECRET_KEY` — PSD2 Bankanbindung (GoCardless/Nordigen)
 - [ ] SSL-Zertifikate vorhanden (Let's Encrypt empfohlen, siehe unten)
@@ -200,19 +192,33 @@ Dann `.env` bearbeiten:
 DB_PASSWORD=mein-sicheres-db-passwort
 
 # JWT Secrets (AENDERN! Am besten zufaellig generieren)
-# Beispiel: openssl rand -base64 48
 JWT_ACCESS_SECRET=hier-einen-langen-zufaelligen-string
 JWT_REFRESH_SECRET=hier-einen-anderen-langen-zufaelligen-string
 
-# Frontend-URL fuer CORS
+# AES-256-GCM Verschlüsselungsschlüssel für E-Mail-Zugangsdaten (Pflicht!)
+ENCRYPTION_KEY=hier-einen-64-zeichen-hex-string-einfügen
+
+# Superadmin-Zugang (Pflicht, keine Standardwerte nutzen!)
+SUPERADMIN_SECRET=hier-32-zeichen-hex-string
+SUPERADMIN_JWT_SECRET=hier-48-zeichen-base64-string
+
+# Nordigen / GoCardless API für Bankanbindung (Pflicht falls Bank-Sync genutzt)
+NORDIGEN_SECRET_ID=deine-nordigen-id
+NORDIGEN_SECRET_KEY=dein-nordigen-key
+
+# Frontend-URL fuer CORS (z.B. https://deine-domain.de)
 CORS_ORIGINS=http://localhost
 
 # Beim ERSTEN Start auf true setzen (laedt Demo-Daten)
 SEED_DB=true
 ```
 
-**Secrets generieren** (im Terminal):
+**Secrets sicher generieren** (im Terminal):
 ```bash
+# Hex-Strings (für ENCRYPTION_KEY und SUPERADMIN_SECRET):
+openssl rand -hex 32
+
+# Base64-Strings (für JWTs und SUPERADMIN_JWT_SECRET):
 # Linux/Mac:
 openssl rand -base64 48
 
