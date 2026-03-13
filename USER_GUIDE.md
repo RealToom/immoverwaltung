@@ -430,33 +430,29 @@ Für den Steuerberater:
 
 ---
 
-## 12. Hilfe bei Fehlern
+---
 
-### Häufige Probleme
+## 12. Hilfe bei Fehlern (FAQ)
 
-| Problem | Ursache | Lösung |
-|---------|---------|--------|
-| **Weißer Bildschirm** | Seltener JavaScript-Fehler | Seite neu laden (F5). Die ErrorBoundary fängt die meisten Fehler ab. |
-| **Login schlägt fehl** | Falsche Zugangsdaten oder Account gesperrt | Prüfen Sie E-Mail/Passwort. Nach 10 Fehlversuchen: 30 Min warten oder Admin bitten, den Account zu entsperren (`/users`). |
-| **„Zugriff verweigert" (403)** | Fehlende Berechtigung für die Aktion | Prüfen Sie Ihre Rolle. Nur ADMIN/VERWALTER haben volle Schreibrechte. |
-| **E-Mails werden nicht geladen** | IMAP-Verbindung fehlgeschlagen | Einstellungen → Postfächer → Prüfen Sie Host/Port/Passwort. Gmail: App-Passwort verwenden. |
-| **KI-Scan funktioniert nicht** | Kein API-Key konfiguriert | Administrator muss `ANTHROPIC_API_KEY` in der Backend-`.env` setzen. |
-| **Bankanbindung (PSD2) fehlt** | Nordigen-Keys nicht konfiguriert | Administrator muss `NORDIGEN_SECRET_ID` + `NORDIGEN_SECRET_KEY` in `.env` setzen. |
-| **Mahnung sendet keine E-Mail** | SMTP nicht konfiguriert | Administrator muss `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` in `.env` setzen. Die Mahnung wird trotzdem in der DB gespeichert. |
-| **Nebenkosten: „0 €" für alle** | Fehlende Wohnfläche | Alle Einheiten müssen eine **Fläche in m²** eingetragen haben. |
-| **Rendite zeigt „—"** | Kaufpreis nicht eingetragen | Immobilie bearbeiten → **Kaufpreis** und **Eigenkapital** ausfüllen. |
-| **PDF-Download startet nicht** | Pop-up-Blocker | Prüfen Sie, ob der Browser Pop-ups/Downloads erlaubt. |
-| **Dark Mode flackert** | Theme wechselt beim Laden | In Einstellungen → Darstellung: Theme explizit auf „Dunkel" oder „Hell" setzen (nicht „System"). |
-| **Session-Timeout** | Access-Token abgelaufen (15 Min) | Das System erneuert den Token automatisch. Bei Fehler: Neu anmelden. |
+### Häufig gestellte Fragen
 
-### Technischer Support
+**Frage: Wie sicher sind meine Bankdaten?**
+Antwort: Wir nutzen den europäischen Marktführer GoCardless (Nordigen). Ihre Zugangsdaten zur Bank werden niemals in unserer Datenbank gespeichert. Wir erhalten lediglich lesenden Zugriff auf die Transaktionen über einen verschlüsselten Token.
 
-Für technische Probleme, die nicht in der Tabelle oben gelistet sind:
+**Frage: Kann ich Daten aus meiner alten Software importieren?**
+Antwort: Ja. Nutzen Sie den CSV-Import unter „Administration → Datenimport". Dort finden Sie Vorlagen für Immobilien, Mieter und Verträge.
+!!SCREENSHOT:01-login!!
 
-1. **Browser-Konsole prüfen:** `F12` → Tab „Konsole" → Fehlermeldungen notieren
-2. **Backend-Logs:** Der Administrator kann die Logs prüfen (Pino JSON-Format)
-3. **Gesundheits-Check:** `GET /health` im Browser aufrufen — sollte `status: "OK"` zurückgeben
-4. **Datenbank-Problem:** Wenn `/health` den Status `503` zurückgibt, ist die Datenbank nicht erreichbar → Docker-Container prüfen
+**Frage: Funktioniert die Software auch auf dem Tablet?**
+Antwort: Ja, die Immoverwaltung ist „Responsive" gestaltet und lässt sich auf Tablets und Smartphones bequem im Browser bedienen.
+!!SCREENSHOT:02-dashboard!!
+
+**Frage: Was passiert, wenn ich mein Passwort vergesse?**
+Antwort: Wenn Sie Administrator sind, kann ein anderer Administrator Ihr Passwort im Bereich „Benutzer" zurücksetzen. Wenn Sie der einzige Admin sind, muss der System-Administrator das Passwort über die Server-Konsole zurücksetzen.
+
+---
+
+## 13. Technische Details & Support
 
 ### Tastenkürzel
 
@@ -465,8 +461,12 @@ Für technische Probleme, die nicht in der Tabelle oben gelistet sind:
 | `Esc` | Dialog schließen |
 | `Enter` | Formular absenden (in Dialogen) |
 
+!!SCREENSHOT:08-darkmode!!
+
 ---
 
 > **💡 Tipp:** Lesezeichen Sie die wichtigsten Seiten (Dashboard, Finanzen, Wartung) für schnellen Zugriff.
 
 > **🔒 Sicherheitshinweis:** Ändern Sie Ihr Passwort regelmäßig und teilen Sie es nicht mit Kollegen. Verwenden Sie die Benutzerverwaltung, um Mitarbeitern eigene Zugänge mit passenden Rollen zu geben.
+
+!!SCREENSHOT:09-logout!!
