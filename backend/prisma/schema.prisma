@@ -49,6 +49,7 @@ model Company {
   customRoles             CustomRole[]
   smtpSettings            CompanySmtpSettings?
   insurancePolicies       InsurancePolicy[]
+  maintenanceBudgets      MaintenanceBudget[]
 
   @@map("companies")
 }
@@ -156,6 +157,7 @@ model Property {
   recurringTransactions RecurringTransaction[]
   maintenanceSchedules  MaintenanceSchedule[]
   insurancePolicies     InsurancePolicy[]
+  maintenanceBudgets    MaintenanceBudget[]
 
   @@map("properties")
 }
@@ -839,4 +841,23 @@ enum InsuranceStatus {
   AKTIV
   ABGELAUFEN
   GEKUENDIGT
+}
+
+// ─── MaintenanceBudget (Instandhaltungsbudget) ───────────────
+model MaintenanceBudget {
+  id            Int      @id @default(autoincrement())
+  year          Int
+  plannedAmount Float    @map("planned_amount")
+  notes         String?
+  propertyId    Int      @map("property_id")
+  companyId     Int      @map("company_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, propertyId, year])
+  @@index([companyId])
+  @@map("maintenance_budgets")
 }

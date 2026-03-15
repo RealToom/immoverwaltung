@@ -21,7 +21,7 @@ import {
   ArrowLeft, MapPin, Building2, Users, CreditCard, Home, Mail, Phone,
   FileText, Download, Eye, Trash2, Upload, Plus, UserPlus, Loader2,
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Pencil, Car,
-  BarChart3, ClipboardList, ScanLine,
+  BarChart3, ClipboardList, ScanLine, PiggyBank,
 } from "lucide-react";
 import { useProperty, useUpdateProperty, useCreateUnit, useUpdateUnit } from "@/hooks/api/useProperties";
 import { useTenants } from "@/hooks/api/useTenants";
@@ -30,6 +30,7 @@ import { useTransactions, useUpdateTransaction, useUtilityStatement, useCreateTr
 import { useCreateContract } from "@/hooks/api/useContracts";
 import { useMeters, useCreateMeter, useAddMeterReading, useDeleteMeter, scanMeterReadingFile } from "@/hooks/api/useMeters";
 import { type ScanPhase } from "@/lib/api";
+import { useBudgets, useUpsertBudget, useDeleteBudget, useDownloadHandoverPdf } from "@/hooks/api/useBudget";
 import { useHandovers, useCreateHandover, useDeleteHandover } from "@/hooks/api/useHandover";
 import { mapPropertyStatus, mapUnitStatus, mapUnitType, formatDate, formatCurrency } from "@/lib/mappings";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -108,6 +109,17 @@ const PropertyDetail = () => {
   const [newMeterEntry, setNewMeterEntry] = useState({ label: "", value: "", type: "STROM" });
   const createHandoverMutation = useCreateHandover();
   const deleteHandoverMutation = useDeleteHandover();
+
+  // Budget state
+  const currentYear = new Date().getFullYear();
+  const [budgetYear, setBudgetYear] = useState(currentYear);
+  const { data: budgetsData, refetch: refetchBudgets } = useBudgets(propertyId, budgetYear);
+  const budgets = budgetsData ?? [];
+  const upsertBudgetMutation = useUpsertBudget();
+  const deleteBudgetMutation = useDeleteBudget();
+  const downloadHandoverPdf = useDownloadHandoverPdf();
+  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
+  const [budgetForm, setBudgetForm] = useState({ plannedAmount: "", notes: "" });
 
   // Nebenkosten state
   const [nebenkostenYear, setNebenkostenYear] = useState(new Date().getFullYear());
@@ -536,6 +548,10 @@ const PropertyDetail = () => {
             <TabsTrigger value="protokolle" className="gap-1.5">
               <ClipboardList className="h-4 w-4" />
               Protokolle
+            </TabsTrigger>
+            <TabsTrigger value="budget" className="gap-1.5">
+              <PiggyBank className="h-4 w-4" />
+              Budget
             </TabsTrigger>
           </TabsList>
 
@@ -1074,12 +1090,19 @@ const PropertyDetail = () => {
                                   </p>
                                 </div>
                               </div>
-                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"
-                                onClick={() => deleteHandoverMutation.mutate(h.id, {
-                                onError: () => toast({ title: "Protokoll konnte nicht gelöscht werden", variant: "destructive" }),
-                              })}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground"
+                                  onClick={() => downloadHandoverPdf(h.id, `Protokoll_${h.tenantName}_${formatDate(h.date)}`).catch(() => toast({ title: "PDF konnte nicht generiert werden", variant: "destructive" }))}>
+                                  <FileText className="h-4 w-4" />
+                                  PDF
+                                </Button>
+                                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive"
+                                  onClick={() => deleteHandoverMutation.mutate(h.id, {
+                                  onError: () => toast({ title: "Protokoll konnte nicht gelöscht werden", variant: "destructive" }),
+                                })}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           </CardHeader>
                           {(h.rooms.length > 0 || h.meterData.length > 0 || h.notes) && (
@@ -1148,6 +1171,140 @@ const PropertyDetail = () => {
                 </div>
               );
             })()}
+          </TabsContent>
+
+          {/* Budget Tab */}
+          <TabsContent value="budget">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-heading font-semibold text-foreground">Instandhaltungsbudget</h3>
+                  <p className="text-sm text-muted-foreground">Geplante vs. tatsächliche Instandhaltungskosten</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={budgetYear}
+                    onChange={(e) => setBudgetYear(Number(e.target.value))}
+                    className="text-sm border border-border rounded-md px-2 py-1.5 bg-background text-foreground"
+                  >
+                    {Array.from({ length: 6 }, (_, i) => currentYear - 2 + i).map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <Button size="sm" onClick={() => { setBudgetForm({ plannedAmount: "", notes: "" }); setBudgetDialogOpen(true); }} className="gap-1.5">
+                    <Plus className="h-4 w-4" />
+                    Budget festlegen
+                  </Button>
+                </div>
+              </div>
+
+              {budgets.length === 0 ? (
+                <Card className="border border-border/60 shadow-sm">
+                  <CardContent className="p-8 text-center text-muted-foreground">
+                    <PiggyBank className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                    <p className="text-sm">Kein Budget für {budgetYear} festgelegt.</p>
+                    <Button variant="outline" size="sm" className="mt-3 gap-1.5" onClick={() => { setBudgetForm({ plannedAmount: "", notes: "" }); setBudgetDialogOpen(true); }}>
+                      <Plus className="h-4 w-4" />
+                      Budget anlegen
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {budgets.map((b) => {
+                    const planned = b.plannedAmount;
+                    const actual = b.actualAmount;
+                    const pct = planned > 0 ? Math.min(100, Math.round((actual / planned) * 100)) : 0;
+                    const over = actual > planned;
+                    return (
+                      <Card key={b.id} className="border border-border/60 shadow-sm">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <p className="font-medium text-sm">{b.year}</p>
+                              {b.notes && <p className="text-xs text-muted-foreground mt-0.5">{b.notes}</p>}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="sm" onClick={() => { setBudgetForm({ plannedAmount: String(b.plannedAmount), notes: b.notes ?? "" }); setBudgetDialogOpen(true); }}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => deleteBudgetMutation.mutate(b.id, { onError: () => toast({ title: "Budget konnte nicht gelöscht werden", variant: "destructive" }) })}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-3 gap-4 mb-3 text-sm">
+                            <div>
+                              <p className="text-xs text-muted-foreground">Geplant</p>
+                              <p className="font-medium">{planned.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Tatsächlich</p>
+                              <p className={`font-medium ${over ? "text-destructive" : "text-success"}`}>{actual.toLocaleString("de-DE", { style: "currency", currency: "EUR" })}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Auslastung</p>
+                              <p className={`font-medium ${over ? "text-destructive" : ""}`}>{pct}%</p>
+                            </div>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-2">
+                            <div
+                              className={`h-2 rounded-full ${over ? "bg-destructive" : "bg-success"}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Budget Dialog */}
+            <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Budget festlegen</DialogTitle>
+                  <DialogDescription>Geplantes Instandhaltungsbudget für {budgetYear}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  <div>
+                    <Label>Geplanter Betrag (€)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={budgetForm.plannedAmount}
+                      onChange={(e) => setBudgetForm((f) => ({ ...f, plannedAmount: e.target.value }))}
+                      placeholder="z.B. 5000"
+                    />
+                  </div>
+                  <div>
+                    <Label>Notizen (optional)</Label>
+                    <Input
+                      value={budgetForm.notes}
+                      onChange={(e) => setBudgetForm((f) => ({ ...f, notes: e.target.value }))}
+                      placeholder="z.B. Dachsanierung geplant"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setBudgetDialogOpen(false)}>Abbrechen</Button>
+                  <Button onClick={() => {
+                    const amount = parseFloat(budgetForm.plannedAmount);
+                    if (isNaN(amount) || amount < 0) { toast({ title: "Ungültiger Betrag", variant: "destructive" }); return; }
+                    upsertBudgetMutation.mutate(
+                      { propertyId: propertyId!, year: budgetYear, plannedAmount: amount, notes: budgetForm.notes || null },
+                      { onSuccess: () => { setBudgetDialogOpen(false); toast({ title: "Budget gespeichert" }); },
+                        onError: () => toast({ title: "Fehler beim Speichern", variant: "destructive" }) }
+                    );
+                  }} disabled={upsertBudgetMutation.isPending}>
+                    {upsertBudgetMutation.isPending ? "Speichern..." : "Speichern"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
         </Tabs>
       </main>

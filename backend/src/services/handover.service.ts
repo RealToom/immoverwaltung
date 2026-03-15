@@ -37,6 +37,23 @@ export async function getHandover(companyId: number, id: number) {
   return h;
 }
 
+export async function getHandoverForPdf(companyId: number, id: number) {
+  const h = await prisma.handoverProtocol.findFirst({
+    where: { id, companyId },
+    include: {
+      unit: {
+        select: {
+          number: true,
+          property: { select: { name: true, street: true, zip: true, city: true } },
+        },
+      },
+      company: { select: { name: true } },
+    },
+  });
+  if (!h) throw new AppError(404, "Protokoll nicht gefunden");
+  return h;
+}
+
 export async function deleteHandover(companyId: number, id: number) {
   const h = await prisma.handoverProtocol.findFirst({ where: { id, companyId } });
   if (!h) throw new AppError(404, "Protokoll nicht gefunden");
