@@ -15,6 +15,7 @@ import {
   Inbox,
   LayoutTemplate,
   Scale,
+  ShieldCheck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -41,8 +42,8 @@ const mainNav = [
 
 const secondaryNav = [
   { title: "Wartung", url: "/maintenance", icon: Wrench },
+  { title: "Versicherungen", url: "/insurance", icon: ShieldCheck },
   { title: "Vorlagen", url: "/vorlagen", icon: LayoutTemplate },
-
   { title: "Berichte", url: "/reports", icon: BarChart3 },
   { title: "Benachrichtigungen", url: "/notifications", icon: Bell },
 ];

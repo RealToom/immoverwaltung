@@ -31,6 +31,7 @@ import { reportRouter } from "./report.routes.js";
 import { importRouter } from "./import.routes.js";
 import { superadminRouter } from "./superadmin.routes.js";
 import { administrationRouter } from "./administration.routes.js";
+import { insuranceRouter } from "./insurance.routes.js";
 
 const router = Router();
 
@@ -74,5 +75,6 @@ router.use("/finance/datev", requireAuth, tenantGuard, datevRouter);
 router.use("/reports", requireAuth, tenantGuard, reportRouter);
 router.use("/import", requireAuth, tenantGuard, importRouter);
 router.use("/administration", requireAuth, tenantGuard, administrationRouter);
+router.use("/insurance", requireAuth, tenantGuard, insuranceRouter);
 
 export { router as apiRouter };

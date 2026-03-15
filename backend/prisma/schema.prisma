@@ -48,6 +48,7 @@ model Company {
   datevExportLogs         DatevExportLog[]
   customRoles             CustomRole[]
   smtpSettings            CompanySmtpSettings?
+  insurancePolicies       InsurancePolicy[]
 
   @@map("companies")
 }
@@ -154,6 +155,7 @@ model Property {
   meters                Meter[]
   recurringTransactions RecurringTransaction[]
   maintenanceSchedules  MaintenanceSchedule[]
+  insurancePolicies     InsurancePolicy[]
 
   @@map("properties")
 }
@@ -799,4 +801,42 @@ model EmailAttachment {
   company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@map("email_attachments")
+}
+
+// ─── InsurancePolicy (Versicherung) ─────────────────────────
+model InsurancePolicy {
+  id           Int             @id @default(autoincrement())
+  name         String
+  insurer      String
+  policyNumber String?         @map("policy_number")
+  type         InsuranceType
+  status       InsuranceStatus @default(AKTIV)
+  premium      Float
+  startDate    DateTime        @map("start_date")
+  endDate      DateTime?       @map("end_date")
+  notes        String?
+  propertyId   Int?            @map("property_id")
+  companyId    Int             @map("company_id")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("insurance_policies")
+}
+
+enum InsuranceType {
+  GEBAEUDE
+  HAFTPFLICHT
+  ELEMENTAR
+  RECHTSSCHUTZ
+  SONSTIGES
+}
+
+enum InsuranceStatus {
+  AKTIV
+  ABGELAUFEN
+  GEKUENDIGT
 }
