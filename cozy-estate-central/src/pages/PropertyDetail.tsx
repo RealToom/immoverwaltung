@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -21,14 +21,15 @@ import {
   ArrowLeft, MapPin, Building2, Users, CreditCard, Home, Mail, Phone,
   FileText, Download, Eye, Trash2, Upload, Plus, UserPlus, Loader2,
   TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight, Pencil, Car,
-  BarChart3, ClipboardList,
+  BarChart3, ClipboardList, ScanLine,
 } from "lucide-react";
 import { useProperty, useUpdateProperty, useCreateUnit, useUpdateUnit } from "@/hooks/api/useProperties";
 import { useTenants } from "@/hooks/api/useTenants";
 import { useUploadDocument, useDeleteDocument, useDownloadDocument, usePreviewDocument } from "@/hooks/api/useDocuments";
 import { useTransactions, useUpdateTransaction, useUtilityStatement, useCreateTransaction } from "@/hooks/api/useFinance";
 import { useCreateContract } from "@/hooks/api/useContracts";
-import { useMeters, useCreateMeter, useAddMeterReading, useDeleteMeter } from "@/hooks/api/useMeters";
+import { useMeters, useCreateMeter, useAddMeterReading, useDeleteMeter, scanMeterReadingFile } from "@/hooks/api/useMeters";
+import { type ScanPhase } from "@/lib/api";
 import { useHandovers, useCreateHandover, useDeleteHandover } from "@/hooks/api/useHandover";
 import { mapPropertyStatus, mapUnitStatus, mapUnitType, formatDate, formatCurrency } from "@/lib/mappings";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -62,6 +63,27 @@ const PropertyDetail = () => {
   const createMeterMutation = useCreateMeter(propertyId);
   const addReadingMutation = useAddMeterReading(addReadingMeterId ?? 0, propertyId);
   const deleteMeterMutation = useDeleteMeter(propertyId);
+  const [meterScanPhase, setMeterScanPhase] = useState<ScanPhase>("idle");
+  const meterScanInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleMeterScan(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || addReadingMeterId === null) return;
+    try {
+      const result = await scanMeterReadingFile(addReadingMeterId, file, setMeterScanPhase);
+      if (result.value !== null) {
+        setNewReading((r) => ({ ...r, value: String(result.value) }));
+        toast({ title: "Zählerstand erkannt", description: `${result.value}${result.unit ? ` ${result.unit}` : ""}` });
+      } else {
+        toast({ variant: "destructive", title: "Kein Zählerstand erkannt", description: "Bitte manuell eingeben." });
+      }
+    } catch {
+      toast({ variant: "destructive", title: "Scan fehlgeschlagen", description: "Bitte erneut versuchen." });
+    } finally {
+      setMeterScanPhase("idle");
+    }
+  }
 
   const METER_TYPE_LABELS: Record<string, string> = {
     STROM: "Strom (kWh)", WASSER: "Wasser (m³)", GAS: "Gas (m³)",
@@ -1178,12 +1200,27 @@ const PropertyDetail = () => {
       </Dialog>
 
       {/* Add Reading Dialog */}
-      <Dialog open={addReadingMeterId !== null} onOpenChange={(o) => { if (!o) setAddReadingMeterId(null); }}>
+      <Dialog open={addReadingMeterId !== null} onOpenChange={(o) => { if (!o) { setAddReadingMeterId(null); setMeterScanPhase("idle"); } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>Ablesung erfassen</DialogTitle></DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="grid gap-2">
-              <Label>Zählerstand *</Label>
+              <div className="flex items-center justify-between">
+                <Label>Zählerstand *</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={meterScanPhase !== "idle"}
+                  onClick={() => meterScanInputRef.current?.click()}
+                  className="gap-1.5 text-xs"
+                >
+                  {meterScanPhase !== "idle"
+                    ? <><Loader2 className="h-3 w-3 animate-spin" />{meterScanPhase === "uploading" ? "Hochladen…" : "KI liest…"}</>
+                    : <><ScanLine className="h-3 w-3" />KI-Scan</>}
+                </Button>
+                <input ref={meterScanInputRef} type="file" className="hidden" accept="image/jpeg,image/png,image/webp" onChange={handleMeterScan} />
+              </div>
               <Input type="number" value={newReading.value} onChange={(e) => setNewReading((r) => ({ ...r, value: e.target.value }))} placeholder="z.B. 12345.6" />
             </div>
             <div className="grid gap-2">

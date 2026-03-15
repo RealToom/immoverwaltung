@@ -1,5 +1,25 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, uploadFileWithProgress, ScanPhase } from "@/lib/api";
+
+export interface ScannedMeterReading {
+  value: number | null;
+  unit: string | null;
+}
+
+export async function scanMeterReadingFile(
+  meterId: number,
+  file: File,
+  onPhaseChange: (phase: Exclude<ScanPhase, "idle">) => void,
+): Promise<ScannedMeterReading> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const result = await uploadFileWithProgress<{ data: ScannedMeterReading }>(
+    `/meters/${meterId}/scan`,
+    formData,
+    onPhaseChange,
+  );
+  return result.data;
+}
 
 export interface Meter {
   id: number;
