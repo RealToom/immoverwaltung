@@ -724,6 +724,7 @@ enum CalendarEventType {
   AUTO_WARTUNG
   AUTO_MIETE
   AUTO_EMAIL
+  BESICHTIGUNG
 }
 
 // ─── EmailAccount (Verbundene Postfächer) ────────────────────

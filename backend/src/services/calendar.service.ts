@@ -78,9 +78,11 @@ export async function listEvents(companyId: number, from?: Date, to?: Date) {
 
 export async function createEvent(companyId: number, userId: number, data: {
   title: string; description?: string; start: Date; end?: Date; allDay?: boolean; color?: string;
+  type?: "MANUELL" | "BESICHTIGUNG";
 }) {
+  const { type = "MANUELL", ...rest } = data;
   return prisma.calendarEvent.create({
-    data: { ...data, companyId, createdByUserId: userId, type: "MANUELL" },
+    data: { ...rest, companyId, createdByUserId: userId, type },
   });
 }
 
@@ -89,7 +91,8 @@ export async function updateEvent(companyId: number, id: number, data: Partial<{
 }>) {
   const event = await prisma.calendarEvent.findFirst({ where: { id, companyId } });
   if (!event) throw new AppError(404, "Termin nicht gefunden");
-  if (event.type !== "MANUELL" && event.type !== "AUTO_EMAIL") {
+  const editable = ["MANUELL", "AUTO_EMAIL", "BESICHTIGUNG"] as const;
+  if (!(editable as readonly string[]).includes(event.type)) {
     throw new AppError(403, "Nur manuelle Termine können bearbeitet werden");
   }
   return prisma.calendarEvent.update({ where: { id }, data });
@@ -98,6 +101,62 @@ export async function updateEvent(companyId: number, id: number, data: Partial<{
 export async function deleteEvent(companyId: number, id: number) {
   const event = await prisma.calendarEvent.findFirst({ where: { id, companyId } });
   if (!event) throw new AppError(404, "Termin nicht gefunden");
-  if (event.type !== "MANUELL") throw new AppError(403, "Nur manuelle Termine können gelöscht werden");
+  const deletable = ["MANUELL", "BESICHTIGUNG"] as const;
+  if (!(deletable as readonly string[]).includes(event.type)) {
+    throw new AppError(403, "Nur manuelle Termine können gelöscht werden");
+  }
   await prisma.calendarEvent.delete({ where: { id } });
+}
+
+function toIcalDate(date: Date, allDay: boolean): string {
+  if (allDay) {
+    return date.toISOString().slice(0, 10).replace(/-/g, "");
+  }
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+function escapeIcal(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+}
+
+export async function exportIcal(companyId: number): Promise<string> {
+  const from = new Date();
+  const to = new Date();
+  to.setMonth(to.getMonth() + 6);
+
+  const events = await listEvents(companyId, from, to);
+
+  const lines: string[] = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//Immoverwaltung//DE",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "X-WR-CALNAME:Immoverwaltung",
+    "X-WR-TIMEZONE:Europe/Berlin",
+  ];
+
+  for (const e of events) {
+    const ev = e as { id: string | number; title: string; start: Date | string; end?: Date | string | null; allDay?: boolean; description?: string };
+    const start = new Date(ev.start);
+    const end = ev.end ? new Date(ev.end) : (ev.allDay ? new Date(start.getTime() + 86400000) : new Date(start.getTime() + 3600000));
+    const uid = `event-${ev.id}@immoverwaltung`;
+
+    lines.push("BEGIN:VEVENT");
+    lines.push(`UID:${uid}`);
+    lines.push(`DTSTAMP:${toIcalDate(new Date(), false)}`);
+    if (ev.allDay) {
+      lines.push(`DTSTART;VALUE=DATE:${toIcalDate(start, true)}`);
+      lines.push(`DTEND;VALUE=DATE:${toIcalDate(end, true)}`);
+    } else {
+      lines.push(`DTSTART:${toIcalDate(start, false)}`);
+      lines.push(`DTEND:${toIcalDate(end, false)}`);
+    }
+    lines.push(`SUMMARY:${escapeIcal(ev.title)}`);
+    if (ev.description) lines.push(`DESCRIPTION:${escapeIcal(ev.description)}`);
+    lines.push("END:VEVENT");
+  }
+
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n");
 }

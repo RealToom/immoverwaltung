@@ -7,6 +7,7 @@ import * as ctrl from "../controllers/calendar.controller.js";
 
 const router = Router();
 
+router.get("/ical", ctrl.exportIcal);
 router.get("/", validate({ query: calendarQuerySchema }), ctrl.list);
 router.post("/", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"), validate({ body: createCalendarEventSchema }), ctrl.create);
 router.patch("/:id", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"), validate({ params: idParamSchema, body: updateCalendarEventSchema }), ctrl.update);

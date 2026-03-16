@@ -8,12 +8,12 @@ import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
-import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent } from "@/hooks/api/useCalendarEvents";
+import { Loader2, Plus, ChevronLeft, ChevronRight, CalendarArrowDown, Eye } from "lucide-react";
+import { useCalendarEvents, useCreateCalendarEvent, useUpdateCalendarEvent, downloadIcal } from "@/hooks/api/useCalendarEvents";
 import { toast } from "sonner";
 
 const EVENING_DURATION_KEY = "eveningEventDurationMin";
@@ -41,6 +41,7 @@ const EVENT_COLORS: Record<string, string> = {
   AUTO_WARTUNG: "#ef4444",
   AUTO_MIETE: "#22c55e",
   AUTO_EMAIL: "#8b5cf6",
+  BESICHTIGUNG: "#0ea5e9",
 };
 
 const EVENT_LABELS: Record<string, string> = {
@@ -49,16 +50,22 @@ const EVENT_LABELS: Record<string, string> = {
   AUTO_WARTUNG: "Wartung",
   AUTO_MIETE: "Mietzahlung",
   AUTO_EMAIL: "Aus E-Mail",
+  BESICHTIGUNG: "Besichtigung",
 };
+
+type EventType = "MANUELL" | "BESICHTIGUNG";
+
+const EMPTY_FORM = { title: "", start: "", duration: 0, type: "MANUELL" as EventType };
+const EMPTY_BESICHTIGUNG = { visitorName: "", visitorPhone: "", propertyLabel: "" };
 
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<View>("month");
   const [newEventOpen, setNewEventOpen] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newStart, setNewStart] = useState("");
-  const [newDuration, setNewDuration] = useState<number>(0);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [besichtigung, setBesichtigung] = useState(EMPTY_BESICHTIGUNG);
   const [selectedEvent, setSelectedEvent] = useState<(typeof events)[0] | null>(null);
+  const [icalLoading, setIcalLoading] = useState(false);
 
   const from = subMonths(currentDate, 1);
   const to = addMonths(currentDate, 2);
@@ -66,14 +73,11 @@ export default function CalendarPage() {
   const createEvent = useCreateCalendarEvent();
   const updateEvent = useUpdateCalendarEvent();
 
-  // Auto-fill duration when time is set to ≥ 20:00
   useEffect(() => {
-    if (!newStart) return;
-    const hour = new Date(newStart).getHours();
-    if (hour >= EVENING_HOUR) {
-      setNewDuration(getEveningDefault());
-    }
-  }, [newStart]);
+    if (!form.start) return;
+    const hour = new Date(form.start).getHours();
+    if (hour >= EVENING_HOUR) setForm((f) => ({ ...f, duration: f.duration || getEveningDefault() }));
+  }, [form.start]);
 
   const events = useMemo(() =>
     (data?.data ?? []).map((e) => {
@@ -82,7 +86,6 @@ export default function CalendarPage() {
       if (e.end) {
         end = new Date(e.end);
       } else if (!e.allDay && start.getHours() >= EVENING_HOUR) {
-        // Fallback: visualize evening events without explicit end as 1h block
         end = new Date(start.getTime() + 60 * 60 * 1000);
       } else {
         end = start;
@@ -97,22 +100,34 @@ export default function CalendarPage() {
       .slice(0, 8), [data]);
 
   const handleCreate = async () => {
-    if (!newTitle || !newStart) return;
-    const start = new Date(newStart);
-    const hasTime = newDuration > 0;
-    const end = hasTime ? new Date(start.getTime() + newDuration * 60 * 1000) : undefined;
+    if (!form.title || !form.start) return;
+    const start = new Date(form.start);
+    const hasTime = form.duration > 0;
+    const end = hasTime ? new Date(start.getTime() + form.duration * 60 * 1000) : undefined;
+
+    let description: string | undefined;
+    if (form.type === "BESICHTIGUNG") {
+      const parts: string[] = [];
+      if (besichtigung.visitorName) parts.push(`Interessent: ${besichtigung.visitorName}`);
+      if (besichtigung.visitorPhone) parts.push(`Tel: ${besichtigung.visitorPhone}`);
+      if (besichtigung.propertyLabel) parts.push(`Objekt: ${besichtigung.propertyLabel}`);
+      description = parts.join(" | ");
+    }
+
     try {
       await createEvent.mutateAsync({
-        title: newTitle,
+        title: form.title,
         start: start.toISOString(),
         end: end?.toISOString(),
         allDay: !hasTime,
+        type: form.type,
+        color: form.type === "BESICHTIGUNG" ? EVENT_COLORS.BESICHTIGUNG : undefined,
+        description,
       });
       toast.success("Termin erstellt");
       setNewEventOpen(false);
-      setNewTitle("");
-      setNewStart("");
-      setNewDuration(0);
+      setForm(EMPTY_FORM);
+      setBesichtigung(EMPTY_BESICHTIGUNG);
     } catch {
       toast.error("Fehler beim Erstellen");
     }
@@ -127,7 +142,8 @@ export default function CalendarPage() {
     start: string | Date;
     end: string | Date;
   }) => {
-    if (event.resource?.type !== "MANUELL") return;
+    const type = event.resource?.type;
+    if (type !== "MANUELL" && type !== "BESICHTIGUNG") return;
     updateEvent.mutate({
       id: event.id as number,
       start: new Date(start).toISOString(),
@@ -151,6 +167,17 @@ export default function CalendarPage() {
     const h = Math.floor(min / 60);
     const m = min % 60;
     return m > 0 ? `${h}h ${m}min` : `${h}h`;
+  };
+
+  const parseBesichtigungDescription = (desc?: string) => {
+    if (!desc) return {};
+    const parts: Record<string, string> = {};
+    desc.split(" | ").forEach((p) => {
+      if (p.startsWith("Interessent: ")) parts.visitorName = p.slice(13);
+      if (p.startsWith("Tel: ")) parts.visitorPhone = p.slice(5);
+      if (p.startsWith("Objekt: ")) parts.propertyLabel = p.slice(8);
+    });
+    return parts;
   };
 
   return (
@@ -199,7 +226,16 @@ export default function CalendarPage() {
                   </button>
                 ))}
               </div>
-              <Button size="sm" onClick={() => setNewEventOpen(true)}>
+              <Button variant="outline" size="sm" disabled={icalLoading} onClick={async () => {
+                setIcalLoading(true);
+                try { await downloadIcal(); toast.success("iCal exportiert"); }
+                catch { toast.error("iCal-Export fehlgeschlagen"); }
+                finally { setIcalLoading(false); }
+              }} className="gap-1.5">
+                {icalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarArrowDown className="h-4 w-4" />}
+                iCal
+              </Button>
+              <Button size="sm" onClick={() => { setForm(EMPTY_FORM); setBesichtigung(EMPTY_BESICHTIGUNG); setNewEventOpen(true); }}>
                 <Plus className="h-4 w-4 mr-1" /> Neuer Termin
               </Button>
             </div>
@@ -224,7 +260,10 @@ export default function CalendarPage() {
                 toolbar={false}
                 onSelectEvent={(event) => setSelectedEvent(event as (typeof events)[0])}
                 onEventDrop={handleEventDrop as never}
-                draggableAccessor={(event) => (event as (typeof events)[0]).resource?.type === "MANUELL"}
+                draggableAccessor={(event) => {
+                  const type = (event as (typeof events)[0]).resource?.type;
+                  return type === "MANUELL" || type === "BESICHTIGUNG";
+                }}
                 resizable={false}
               />
             </div>
@@ -253,6 +292,9 @@ export default function CalendarPage() {
               {e.type === "AUTO_EMAIL" && (
                 <Badge variant="outline" className="text-purple-600 border-purple-300 w-fit text-[10px]">KI-Vorschlag</Badge>
               )}
+              {e.type === "BESICHTIGUNG" && (
+                <Badge variant="outline" className="text-sky-600 border-sky-300 w-fit text-[10px]">Besichtigung</Badge>
+              )}
             </div>
           ))}
         </div>
@@ -264,24 +306,32 @@ export default function CalendarPage() {
           <DialogHeader>
             <DialogTitle>{selectedEvent?.title}</DialogTitle>
           </DialogHeader>
-          {selectedEvent && (
-            <div className="space-y-3 py-1">
-              <div className="flex items-center gap-2">
-                <Badge style={{ backgroundColor: selectedEvent.resource?.color ?? EVENT_COLORS[selectedEvent.resource?.type] ?? "#6b7280" }} className="text-white border-0">
-                  {EVENT_LABELS[selectedEvent.resource?.type] ?? selectedEvent.resource?.type}
-                </Badge>
+          {selectedEvent && (() => {
+            const parsed = selectedEvent.resource?.type === "BESICHTIGUNG"
+              ? parseBesichtigungDescription(selectedEvent.resource?.description)
+              : null;
+            return (
+              <div className="space-y-3 py-1">
+                <div className="flex items-center gap-2">
+                  <Badge style={{ backgroundColor: selectedEvent.resource?.color ?? EVENT_COLORS[selectedEvent.resource?.type] ?? "#6b7280" }} className="text-white border-0">
+                    {EVENT_LABELS[selectedEvent.resource?.type] ?? selectedEvent.resource?.type}
+                  </Badge>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p><span className="font-medium text-foreground">Start:</span> {format(selectedEvent.start, "dd. MMMM yyyy HH:mm", { locale: de })}</p>
+                  {selectedEvent.end && selectedEvent.end.getTime() !== selectedEvent.start.getTime() && (
+                    <p><span className="font-medium text-foreground">Ende:</span> {format(selectedEvent.end, "dd. MMMM yyyy HH:mm", { locale: de })}</p>
+                  )}
+                  {parsed?.visitorName && <p><span className="font-medium text-foreground">Interessent:</span> {parsed.visitorName}</p>}
+                  {parsed?.visitorPhone && <p><span className="font-medium text-foreground">Telefon:</span> {parsed.visitorPhone}</p>}
+                  {parsed?.propertyLabel && <p><span className="font-medium text-foreground">Objekt:</span> {parsed.propertyLabel}</p>}
+                  {!parsed && selectedEvent.resource?.description && (
+                    <p><span className="font-medium text-foreground">Notizen:</span> {selectedEvent.resource.description}</p>
+                  )}
+                </div>
               </div>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p><span className="font-medium text-foreground">Start:</span> {format(selectedEvent.start, "dd. MMMM yyyy HH:mm", { locale: de })}</p>
-                {selectedEvent.end && selectedEvent.end.getTime() !== selectedEvent.start.getTime() && (
-                  <p><span className="font-medium text-foreground">Ende:</span> {format(selectedEvent.end, "dd. MMMM yyyy HH:mm", { locale: de })}</p>
-                )}
-                {selectedEvent.resource?.notes && (
-                  <p><span className="font-medium text-foreground">Notizen:</span> {selectedEvent.resource.notes}</p>
-                )}
-              </div>
-            </div>
-          )}
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedEvent(null)}>Schließen</Button>
           </DialogFooter>
@@ -291,48 +341,86 @@ export default function CalendarPage() {
       {/* Neuer Termin Dialog */}
       <Dialog open={newEventOpen} onOpenChange={(open) => {
         setNewEventOpen(open);
-        if (!open) { setNewTitle(""); setNewStart(""); setNewDuration(0); }
+        if (!open) { setForm(EMPTY_FORM); setBesichtigung(EMPTY_BESICHTIGUNG); }
       }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Neuer Termin</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Neuer Termin</DialogTitle>
+            <DialogDescription>Manuellen Termin oder Besichtigungsbuchung anlegen</DialogDescription>
+          </DialogHeader>
           <div className="flex flex-col gap-4 py-2">
+            {/* Typ-Auswahl */}
+            <div>
+              <Label>Termintyp</Label>
+              <div className="flex gap-2 mt-1.5">
+                {([["MANUELL", "Allgemein"], ["BESICHTIGUNG", "Besichtigung"]] as [EventType, string][]).map(([t, label]) => (
+                  <button key={t} type="button"
+                    onClick={() => setForm((f) => ({ ...f, type: t }))}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-sm transition-colors ${form.type === t ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"}`}>
+                    {t === "BESICHTIGUNG" && <Eye className="h-3.5 w-3.5" />}
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div>
               <Label>Titel</Label>
-              <Input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Terminbezeichnung" />
+              <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder={form.type === "BESICHTIGUNG" ? "z.B. Besichtigung Wohnung 3" : "Terminbezeichnung"} />
             </div>
             <div>
               <Label>Datum & Uhrzeit</Label>
-              <Input type="datetime-local" value={newStart} onChange={(e) => setNewStart(e.target.value)} />
+              <Input type="datetime-local" value={form.start} onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))} />
             </div>
             <div>
               <Label className="flex items-center justify-between">
                 <span>Dauer (Minuten)</span>
-                {newStart && new Date(newStart).getHours() >= EVENING_HOUR && newDuration > 0 && (
-                  <span className="text-xs text-primary font-normal">
-                    Abendtermin — {durationLabel(newDuration)} auto gesetzt
-                  </span>
+                {form.start && new Date(form.start).getHours() >= EVENING_HOUR && form.duration > 0 && (
+                  <span className="text-xs text-primary font-normal">Abendtermin — {durationLabel(form.duration)} auto gesetzt</span>
                 )}
               </Label>
               <div className="flex items-center gap-2">
                 <Input
-                  type="number"
-                  min={0}
-                  step={15}
-                  value={newDuration === 0 ? "" : newDuration}
-                  onChange={(e) => setNewDuration(e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)))}
-                  placeholder="Leer = ganztägig"
+                  type="number" min={0} step={15}
+                  value={form.duration === 0 ? "" : form.duration}
+                  onChange={(e) => setForm((f) => ({ ...f, duration: e.target.value === "" ? 0 : Math.max(0, Number(e.target.value)) }))}
+                  placeholder={form.type === "BESICHTIGUNG" ? "z.B. 30" : "Leer = ganztägig"}
                   className="flex-1"
                 />
-                {newDuration > 0 && (
-                  <span className="text-sm text-muted-foreground whitespace-nowrap">{durationLabel(newDuration)}</span>
-                )}
+                {form.duration > 0 && <span className="text-sm text-muted-foreground whitespace-nowrap">{durationLabel(form.duration)}</span>}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Leer lassen für ganztägigen Termin</p>
+              {form.type !== "BESICHTIGUNG" && <p className="text-xs text-muted-foreground mt-1">Leer lassen für ganztägigen Termin</p>}
             </div>
+
+            {/* Besichtigung-Felder */}
+            {form.type === "BESICHTIGUNG" && (
+              <div className="space-y-3 rounded-md border p-3 bg-sky-50/50">
+                <p className="text-xs font-medium text-sky-700">Besichtigungsdetails</p>
+                <div>
+                  <Label>Interessent (Name)</Label>
+                  <Input value={besichtigung.visitorName}
+                    onChange={(e) => setBesichtigung((b) => ({ ...b, visitorName: e.target.value }))}
+                    placeholder="Max Mustermann" />
+                </div>
+                <div>
+                  <Label>Telefon / E-Mail</Label>
+                  <Input value={besichtigung.visitorPhone}
+                    onChange={(e) => setBesichtigung((b) => ({ ...b, visitorPhone: e.target.value }))}
+                    placeholder="+49 170 1234567" />
+                </div>
+                <div>
+                  <Label>Objekt / Einheit</Label>
+                  <Input value={besichtigung.propertyLabel}
+                    onChange={(e) => setBesichtigung((b) => ({ ...b, propertyLabel: e.target.value }))}
+                    placeholder="Musterstraße 1, Wohnung 3" />
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setNewEventOpen(false)}>Abbrechen</Button>
-            <Button onClick={handleCreate} disabled={createEvent.isPending || !newTitle || !newStart}>
+            <Button onClick={handleCreate} disabled={createEvent.isPending || !form.title || !form.start}>
               {createEvent.isPending && <Loader2 className="h-4 w-4 animate-spin mr-1" />} Speichern
             </Button>
           </DialogFooter>

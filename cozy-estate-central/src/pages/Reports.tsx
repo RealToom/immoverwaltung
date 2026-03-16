@@ -7,6 +7,9 @@ import {
   Loader2,
   Download,
   CalendarDays,
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -22,6 +25,9 @@ import {
   PieChart,
   Pie,
   Cell,
+  LineChart,
+  Line,
+  Legend,
 } from "recharts";
 import {
   Table,
@@ -32,9 +38,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useProperties } from "@/hooks/api/useProperties";
 import { useMaintenanceTickets } from "@/hooks/api/useMaintenanceTickets";
-import { useRevenueByProperty } from "@/hooks/api/useFinance";
+import { useRevenueByProperty, useMonthlyByYear, useRoiData } from "@/hooks/api/useFinance";
 import { mapMaintenanceCategory, mapMaintenanceStatus, formatCurrency } from "@/lib/mappings";
 import { getToken } from "@/lib/api";
 
@@ -51,6 +58,10 @@ const Reports = () => {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [exporting, setExporting] = useState(false);
+  const currentYear = new Date().getFullYear();
+  const [annualYear, setAnnualYear] = useState(currentYear);
+  const { data: monthlyByYearRes } = useMonthlyByYear(annualYear);
+  const { data: roiRes } = useRoiData(annualYear);
   const { data: ticketsRes, isLoading: ticketsLoading } = useMaintenanceTickets(
     undefined, undefined, undefined, undefined, from || undefined, to || undefined,
   );
@@ -244,7 +255,22 @@ const Reports = () => {
         </div>
       </header>
 
-      <main className="flex-1 p-6 space-y-6 overflow-auto">
+      <main className="flex-1 overflow-auto">
+        <Tabs defaultValue="uebersicht" className="h-full flex flex-col">
+          <div className="px-6 pt-4 border-b pb-0">
+            <TabsList className="bg-transparent p-0 h-auto gap-0 rounded-none">
+              <TabsTrigger value="uebersicht" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 pb-3">
+                <Users className="h-4 w-4 mr-1.5" />
+                Übersicht
+              </TabsTrigger>
+              <TabsTrigger value="jahresabschluss" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 pb-3">
+                <BarChart3 className="h-4 w-4 mr-1.5" />
+                Jahresabschluss
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="uebersicht" className="flex-1 overflow-auto m-0 p-6 space-y-6">
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <KpiCard title="Belegungsquote" value={`${stats.occupancyRate}%`} change={`${stats.totalOccupied} von ${stats.totalUnits} Einheiten`} changeType={stats.occupancyRate >= 90 ? "positive" : "negative"} icon={Users} />
@@ -414,6 +440,125 @@ const Reports = () => {
             </Table>
           </CardContent>
         </Card>
+          </TabsContent>
+
+          {/* Jahresabschluss Tab */}
+          <TabsContent value="jahresabschluss" className="flex-1 overflow-auto m-0 p-6 space-y-6">
+            {/* Year selector */}
+            <div className="flex items-center gap-3">
+              <h2 className="font-heading font-semibold text-foreground">Jahresabschluss</h2>
+              <div className="flex items-center gap-1 ml-2">
+                <Button variant="outline" size="sm" onClick={() => setAnnualYear((y) => y - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="font-semibold text-base min-w-16 text-center">{annualYear}</span>
+                <Button variant="outline" size="sm" onClick={() => setAnnualYear((y) => Math.min(currentYear + 1, y + 1))}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Annual KPIs */}
+            {(() => {
+              const months = monthlyByYearRes?.data ?? [];
+              const roiData = roiRes?.data ?? [];
+              const totalEin = months.reduce((s, m) => s + m.einnahmen, 0);
+              const totalAus = months.reduce((s, m) => s + m.ausgaben, 0);
+              const totalNet = totalEin - totalAus;
+              const avgRendite = roiData.length > 0
+                ? roiData.reduce((s, p) => s + (p.nettorendite ?? 0), 0) / roiData.length
+                : 0;
+
+              const monthlyChartData = months.map((m) => ({
+                monat: m.month.slice(5), // "MM"
+                Einnahmen: m.einnahmen,
+                Ausgaben: m.ausgaben,
+                Nettoertrag: m.netto,
+              }));
+
+              const annualChartConfig = {
+                Einnahmen: { label: "Einnahmen", color: "hsl(152, 60%, 42%)" },
+                Ausgaben: { label: "Ausgaben", color: "hsl(0, 72%, 51%)" },
+                Nettoertrag: { label: "Nettoertrag", color: "hsl(215, 60%, 28%)" },
+              };
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <KpiCard title="Jahreseinnahmen" value={formatCurrency(totalEin)} change={`${annualYear}`} changeType="positive" icon={CreditCard} iconBg="bg-success/15" iconColor="text-success" />
+                    <KpiCard title="Jahresausgaben" value={formatCurrency(totalAus)} change="inkl. Wartung & Kosten" changeType="negative" icon={Wrench} iconBg="bg-destructive/10" iconColor="text-destructive" />
+                    <KpiCard title="Nettoertrag" value={formatCurrency(totalNet)} change="Einnahmen – Ausgaben" changeType={totalNet >= 0 ? "positive" : "negative"} icon={TrendingUp} iconBg="bg-accent/15" iconColor="text-accent-foreground" />
+                    <KpiCard title="Ø Nettorendite" value={`${avgRendite.toFixed(1)}%`} change="über alle Objekte" changeType={avgRendite >= 3 ? "positive" : "negative"} icon={BarChart3} />
+                  </div>
+
+                  {/* Monthly Trend Chart */}
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Monatlicher Verlauf {annualYear}</CardTitle>
+                      <CardDescription>Einnahmen, Ausgaben und Nettoertrag je Monat</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <ChartContainer config={annualChartConfig} className="h-[300px] w-full">
+                        <LineChart data={monthlyChartData} margin={{ left: 8, right: 8, top: 4, bottom: 4 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="monat" fontSize={11} tickLine={false} axisLine={false} />
+                          <YAxis fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
+                          <ChartTooltip content={<ChartTooltipContent formatter={(value) => `€ ${Number(value).toLocaleString("de-DE")}`} />} />
+                          <Legend />
+                          <Line type="monotone" dataKey="Einnahmen" stroke="hsl(152, 60%, 42%)" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="Ausgaben" stroke="hsl(0, 72%, 51%)" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="Nettoertrag" stroke="hsl(215, 60%, 28%)" strokeWidth={2} dot={false} strokeDasharray="4 2" />
+                        </LineChart>
+                      </ChartContainer>
+                    </CardContent>
+                  </Card>
+
+                  {/* Per-Property ROI Table */}
+                  {roiData.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Rendite nach Immobilie {annualYear}</CardTitle>
+                        <CardDescription>Jahresergebnis und Renditekennzahlen pro Objekt</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Immobilie</TableHead>
+                              <TableHead className="text-right">Jahreseinnahmen</TableHead>
+                              <TableHead className="text-right">Jahresausgaben</TableHead>
+                              <TableHead className="text-right">Nettoertrag</TableHead>
+                              <TableHead className="text-right">Brutto-Rendite</TableHead>
+                              <TableHead className="text-right">Netto-Rendite</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {roiData.map((p) => (
+                              <TableRow key={p.propertyId}>
+                                <TableCell className="font-medium">{p.name}</TableCell>
+                                <TableCell className="text-right text-success font-medium">{formatCurrency(p.annualIncome)}</TableCell>
+                                <TableCell className="text-right text-destructive">{formatCurrency(p.annualExpenses)}</TableCell>
+                                <TableCell className="text-right font-semibold">{formatCurrency(p.netIncome)}</TableCell>
+                                <TableCell className="text-right">
+                                  <Badge variant="outline" className="bg-accent/10">{(p.bruttorendite ?? 0).toFixed(1)}%</Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Badge variant="outline" className={(p.nettorendite ?? 0) >= 3 ? "bg-success/10 text-success border-success/20" : "bg-muted"}>
+                                    {(p.nettorendite ?? 0).toFixed(1)}%
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
+              );
+            })()}
+          </TabsContent>
+        </Tabs>
       </main>
     </div>
   );

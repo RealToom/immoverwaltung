@@ -34,6 +34,16 @@ export function useMonthlyRevenue(months: number = 8) {
   });
 }
 
+export function useMonthlyByYear(year: number) {
+  return useQuery({
+    queryKey: ["finance", "monthly-by-year", year],
+    queryFn: () =>
+      api<{ data: MonthlyData[] }>("/finance/monthly-by-year", {
+        params: { year },
+      }),
+  });
+}
+
 // ─── Revenue by Property ────────────────────────────────────
 interface PropertyRevenue {
   propertyId: number;

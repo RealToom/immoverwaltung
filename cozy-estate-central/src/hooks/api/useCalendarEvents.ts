@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, getToken } from "@/lib/api";
 
 export interface CalendarEvent {
   id: string | number;
@@ -7,10 +7,26 @@ export interface CalendarEvent {
   start: string;
   end?: string | null;
   allDay: boolean;
-  type: "MANUELL" | "AUTO_VERTRAG" | "AUTO_WARTUNG" | "AUTO_MIETE" | "AUTO_EMAIL";
+  type: "MANUELL" | "AUTO_VERTRAG" | "AUTO_WARTUNG" | "AUTO_MIETE" | "AUTO_EMAIL" | "BESICHTIGUNG";
   color?: string;
   sourceId?: number;
   description?: string;
+}
+
+export async function downloadIcal() {
+  const token = getToken();
+  const res = await fetch("/api/calendar/ical", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error("iCal-Export fehlgeschlagen");
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "kalender.ics";
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function useCalendarEvents(from?: Date, to?: Date) {

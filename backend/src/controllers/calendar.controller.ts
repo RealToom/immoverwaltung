@@ -22,3 +22,10 @@ export async function remove(req: Request, res: Response): Promise<void> {
   await calendarService.deleteEvent(req.companyId!, Number(req.params.id));
   res.status(204).end();
 }
+
+export async function exportIcal(req: Request, res: Response): Promise<void> {
+  const ics = await calendarService.exportIcal(req.companyId!);
+  res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+  res.setHeader("Content-Disposition", 'attachment; filename="kalender.ics"');
+  res.send(ics);
+}

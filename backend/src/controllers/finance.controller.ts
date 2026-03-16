@@ -13,6 +13,12 @@ export async function getMonthly(req: Request, res: Response): Promise<void> {
   res.json({ data });
 }
 
+export async function getMonthlyByYear(req: Request, res: Response): Promise<void> {
+  const year = Number(req.query.year) || new Date().getFullYear();
+  const data = await financeService.getMonthlyByYear(req.companyId!, year);
+  res.json({ data });
+}
+
 export async function getByProperty(req: Request, res: Response): Promise<void> {
   const data = await financeService.getRevenueByProperty(req.companyId!);
   res.json({ data });

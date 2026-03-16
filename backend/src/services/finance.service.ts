@@ -65,6 +65,37 @@ export async function getMonthlyRevenue(companyId: number, months: number = 12) 
   }));
 }
 
+export async function getMonthlyByYear(companyId: number, year: number) {
+  const startDate = new Date(year, 0, 1);
+  const endDate = new Date(year, 11, 31, 23, 59, 59);
+
+  const transactions = await prisma.transaction.findMany({
+    where: { companyId, date: { gte: startDate, lte: endDate } },
+    orderBy: { date: "asc" },
+  });
+
+  const monthlyData: Record<string, { einnahmen: number; ausgaben: number }> = {};
+  for (let m = 1; m <= 12; m++) {
+    monthlyData[`${year}-${String(m).padStart(2, "0")}`] = { einnahmen: 0, ausgaben: 0 };
+  }
+
+  for (const tx of transactions) {
+    const key = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, "0")}`;
+    if (tx.type === "EINNAHME") {
+      monthlyData[key].einnahmen += tx.amount;
+    } else {
+      monthlyData[key].ausgaben += Math.abs(tx.amount);
+    }
+  }
+
+  return Object.entries(monthlyData).map(([month, data]) => ({
+    month,
+    einnahmen: data.einnahmen,
+    ausgaben: data.ausgaben,
+    netto: data.einnahmen - data.ausgaben,
+  }));
+}
+
 export async function getRevenueByProperty(companyId: number) {
   const properties = await prisma.property.findMany({
     where: { companyId },

@@ -8,6 +8,7 @@ const router = Router();
 
 router.get("/summary", ctrl.getSummary);
 router.get("/monthly", validate({ query: monthlyQuerySchema }), ctrl.getMonthly);
+router.get("/monthly-by-year", ctrl.getMonthlyByYear);
 router.get("/by-property", ctrl.getByProperty);
 router.get("/expense-breakdown", ctrl.getExpenseBreakdown);
 router.get("/transactions", validate({ query: financeQuerySchema }), ctrl.getTransactions);

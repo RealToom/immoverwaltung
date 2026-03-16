@@ -7,6 +7,7 @@ export const createCalendarEventSchema = z.object({
   end: z.coerce.date().optional(),
   allDay: z.boolean().default(false),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  type: z.enum(["MANUELL", "BESICHTIGUNG"]).optional(),
 });
 
 export const updateCalendarEventSchema = z.object({
