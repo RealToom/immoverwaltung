@@ -35,4 +35,11 @@ export const env = {
   // Superadmin: secret for issuing tokens + secret for verifying them (optional, dev defaults)
   get SUPERADMIN_SECRET() { return process.env.SUPERADMIN_SECRET || "dev-superadmin-secret"; },
   get SUPERADMIN_JWT_SECRET() { return process.env.SUPERADMIN_JWT_SECRET || "dev-superadmin-jwt-secret-min32chars"; },
+  // Stripe Billing (optional in dev — empty string disables Stripe calls)
+  get STRIPE_SECRET_KEY() { return process.env.STRIPE_SECRET_KEY || ""; },
+  get STRIPE_WEBHOOK_SECRET() { return process.env.STRIPE_WEBHOOK_SECRET || ""; },
+  get STRIPE_PRICE_PRO() { return process.env.STRIPE_PRICE_PRO || ""; },
+  get STRIPE_PRICE_BUSINESS() { return process.env.STRIPE_PRICE_BUSINESS || ""; },
+  // Frontend URL for Stripe redirect URLs (no trailing slash)
+  get CLIENT_URL() { return process.env.CLIENT_URL || "http://localhost:8080"; },
 };
