@@ -31,6 +31,7 @@ import Datenschutz from "./pages/Datenschutz";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdminDashboard from "./pages/SuperAdmin";
 import Insurances from "./pages/Insurances";
+import AuditLog from "./pages/AuditLog";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -66,6 +67,7 @@ const AppLayout = () => (
         <Route path="/vorlagen" element={<Templates />} />
         <Route path="/import" element={<Navigate to="/administration" replace />} />
         <Route path="/insurance" element={<Insurances />} />
+        <Route path="/audit-logs" element={<AuditLog />} />
         <Route path="/impressum" element={<Impressum />} />
         <Route path="/datenschutz" element={<Datenschutz />} />
         <Route path="*" element={<NotFound />} />

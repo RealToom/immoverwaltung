@@ -33,6 +33,7 @@ import { superadminRouter } from "./superadmin.routes.js";
 import { administrationRouter } from "./administration.routes.js";
 import { insuranceRouter } from "./insurance.routes.js";
 import { budgetRouter } from "./budget.routes.js";
+import { auditLogRouter } from "./auditlog.routes.js";
 
 const router = Router();
 
@@ -78,5 +79,6 @@ router.use("/import", requireAuth, tenantGuard, importRouter);
 router.use("/administration", requireAuth, tenantGuard, administrationRouter);
 router.use("/insurance", requireAuth, tenantGuard, insuranceRouter);
 router.use("/maintenance-budgets", requireAuth, tenantGuard, budgetRouter);
+router.use("/audit-logs", requireAuth, tenantGuard, auditLogRouter);
 
 export { router as apiRouter };

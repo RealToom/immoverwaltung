@@ -16,6 +16,7 @@ import {
   LayoutTemplate,
   Scale,
   ShieldCheck,
+  ClipboardList,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -134,6 +135,20 @@ export function AppSidebar() {
                     >
                       <Shield className="h-4 w-4" />
                       <span>Administration</span>
+                    </NavLink>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {isAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild tooltip="Audit-Log">
+                    <NavLink
+                      to="/audit-logs"
+                      className="text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      activeClassName="bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    >
+                      <ClipboardList className="h-4 w-4" />
+                      <span>Audit-Log</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
