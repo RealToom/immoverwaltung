@@ -109,7 +109,7 @@ export async function createCompany(req: Request, res: Response): Promise<void> 
 
   const company = await prisma.$transaction(async (tx) => {
     const c = await tx.company.create({
-      data: { name: companyName, slug, address: "", taxNumber: "" },
+      data: { name: companyName, slug, address: "", taxNumber: "", subscriptionStatus: "TRIAL", planType: "TRIAL" },
     });
     await tx.user.create({
       data: {

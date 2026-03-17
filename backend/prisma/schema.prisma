@@ -22,6 +22,14 @@ model Company {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  stripeCustomerId      String?            @map("stripe_customer_id")
+  stripeSubscriptionId  String?            @map("stripe_subscription_id")
+  subscriptionStatus    SubscriptionStatus @map("subscription_status")
+  planType              PlanType           @map("plan_type")
+  trialEndsAt           DateTime?          @map("trial_ends_at")
+  currentPeriodEnd      DateTime?          @map("current_period_end")
+  manualOverride        Boolean            @default(false) @map("manual_override")
+
   users              User[]
   properties         Property[]
   tenants            Tenant[]
@@ -131,6 +139,20 @@ enum UserRole {
   VERWALTER
   BUCHHALTER
   READONLY
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  MANUAL
+}
+
+enum PlanType {
+  TRIAL
+  PRO
+  BUSINESS
 }
 
 // ─── Property (Immobilie) ───────────────────────────────────

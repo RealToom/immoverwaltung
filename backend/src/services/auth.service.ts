@@ -54,6 +54,8 @@ export async function register(
         create: {
           name: companyName,
           slug,
+          subscriptionStatus: "TRIAL",
+          planType: "TRIAL",
         },
       },
     },
