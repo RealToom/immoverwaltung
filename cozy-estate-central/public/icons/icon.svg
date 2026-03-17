@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Hintergrund -->
+  <rect width="512" height="512" rx="80" fill="#0f172a"/>
+  <!-- Haus-Symbol (weiss) -->
+  <polygon points="256,100 420,240 380,240 380,400 300,400 300,300 212,300 212,400 132,400 132,240 92,240" fill="white"/>
+</svg>
