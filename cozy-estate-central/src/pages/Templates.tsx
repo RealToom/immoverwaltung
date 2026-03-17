@@ -27,6 +27,8 @@ import {
   useRenderDocumentTemplate,
   type DocumentTemplate,
 } from "@/hooks/api/useDocumentTemplates";
+import { useTenants } from "@/hooks/api/useTenants";
+import { useCompanySettings } from "@/hooks/api/useSettings";
 
 const TEMPLATE_CATEGORIES = [
   "Mietvertrag", "Abmahnung", "Nebenkostenabrechnung", "Kündigung",
@@ -61,6 +63,12 @@ const Templates = () => {
     tenantName: "", propertyName: "", unitNumber: "",
     date: new Date().toLocaleDateString("de-DE"), amount: "", landlord: "",
   });
+
+  const [selectedTenantId, setSelectedTenantId] = useState<number | null>(null);
+  const [selectedUnitId, setSelectedUnitId] = useState<number | null>(null);
+  const tenantsQuery = useTenants();
+  const tenants = tenantsQuery.data?.data ?? [];
+  const companyQuery = useCompanySettings();
 
   // Delete confirm state
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -107,11 +115,46 @@ const Templates = () => {
 
   const openRenderDialog = (template: DocumentTemplate) => {
     setRenderTarget(template);
+    setSelectedTenantId(null);
+    setSelectedUnitId(null);
     setVariables({
-      tenantName: "", propertyName: "", unitNumber: "",
-      date: new Date().toLocaleDateString("de-DE"), amount: "", landlord: "",
+      tenantName: "",
+      propertyName: "",
+      unitNumber: "",
+      date: new Date().toLocaleDateString("de-DE"),
+      amount: "",
+      landlord: companyQuery.data?.data.name ?? "",
     });
     setRenderOpen(true);
+  };
+
+  const handleTenantSelect = (tenantIdStr: string) => {
+    const tenantId = Number(tenantIdStr);
+    const tenant = tenants.find((t) => t.id === tenantId) ?? null;
+    setSelectedTenantId(tenantId);
+    setSelectedUnitId(null);
+    if (!tenant) return;
+    const unit = tenant.units.length === 1 ? tenant.units[0] : null;
+    setVariables((v) => ({
+      ...v,
+      tenantName: tenant.name,
+      propertyName: unit ? unit.property.name : "",
+      unitNumber: unit ? unit.number : "",
+    }));
+  };
+
+  const handleUnitSelect = (unitIdStr: string) => {
+    const unitId = Number(unitIdStr);
+    const tenant = tenants.find((t) => t.id === selectedTenantId) ?? null;
+    const unit = tenant?.units.find((u) => u.id === unitId) ?? null;
+    setSelectedUnitId(unitId);
+    if (unit) {
+      setVariables((v) => ({
+        ...v,
+        unitNumber: unit.number,
+        propertyName: unit.property.name,
+      }));
+    }
   };
 
   const openEditDialog = (t: DocumentTemplate) => {
@@ -290,6 +333,54 @@ const Templates = () => {
           {renderTarget && (
             <div className="space-y-3 py-2">
               <p className="text-sm text-muted-foreground font-medium">{renderTarget.name}</p>
+
+              {/* Mieter-Auswahl */}
+              <div className="grid gap-1.5">
+                <Label className="text-xs">Mieter auswählen</Label>
+                <Select
+                  value={selectedTenantId?.toString() ?? ""}
+                  onValueChange={handleTenantSelect}
+                  disabled={tenantsQuery.isLoading}
+                >
+                  <SelectTrigger>
+                    {tenantsQuery.isLoading
+                      ? <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" />Lade Mieter…</span>
+                      : <SelectValue placeholder="Mieter wählen…" />}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tenants.map((t) => (
+                      <SelectItem key={t.id} value={t.id.toString()}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Unit-Auswahl (nur bei mehreren Units) */}
+              {selectedTenantId !== null &&
+                (tenants.find((t) => t.id === selectedTenantId)?.units.length ?? 0) > 1 && (
+                <div className="grid gap-1.5">
+                  <Label className="text-xs">Einheit auswählen</Label>
+                  <Select
+                    value={selectedUnitId?.toString() ?? ""}
+                    onValueChange={handleUnitSelect}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Einheit wählen…" /></SelectTrigger>
+                    <SelectContent>
+                      {tenants
+                        .find((t) => t.id === selectedTenantId)
+                        ?.units.map((u) => (
+                          <SelectItem key={u.id} value={u.id.toString()}>
+                            {u.number} — {u.property.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Variablen (alle editierbar) */}
               <div className="grid grid-cols-2 gap-3">
                 {Object.entries(variables).map(([key, val]) => (
                   <div key={key} className="grid gap-1.5">
