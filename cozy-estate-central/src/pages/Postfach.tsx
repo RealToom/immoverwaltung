@@ -62,6 +62,8 @@ export default function Postfach() {
 
   const handleSelect = (id: number) => {
     setSelectedId(id);
+    setManualTenantId("");
+    setManualPropertyId("");
     updateMsg.mutate({ id, isRead: true });
   };
 
@@ -249,13 +251,17 @@ export default function Postfach() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() =>
-                            updateMsg.mutate({
-                              id: detail.id,
-                              suggestedTenantId: null,
-                              suggestedPropertyId: null,
-                            })
-                          }
+                          onClick={async () => {
+                            try {
+                              await updateMsg.mutateAsync({
+                                id: detail.id,
+                                suggestedTenantId: null,
+                                suggestedPropertyId: null,
+                              });
+                            } catch {
+                              toast.error("Fehler beim Ablehnen");
+                            }
+                          }}
                         >
                           <X className="h-3.5 w-3.5" />
                         </Button>
