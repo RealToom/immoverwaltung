@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -8,8 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { useEmailMessages, useEmailMessage, useUpdateEmailMessage, useReplyEmail, useCreateEventFromEmail, useSendNewEmail } from "@/hooks/api/useEmailMessages";
+import { useEmailMessages, useEmailMessage, useUpdateEmailMessage, useReplyEmail, useCreateEventFromEmail, useSendNewEmail, useAssignEmail } from "@/hooks/api/useEmailMessages";
 import { useEmailAccounts } from "@/hooks/api/useEmailAccounts";
+import { useTenants } from "@/hooks/api/useTenants";
+import { useProperties } from "@/hooks/api/useProperties";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDate } from "@/lib/mappings";
 import { toast } from "sonner";
@@ -30,6 +33,8 @@ export default function Postfach() {
   const [composeSubject, setComposeSubject] = useState("");
   const [composeBody, setComposeBody] = useState("");
   const [composeAccountId, setComposeAccountId] = useState<string>("");
+  const [manualTenantId, setManualTenantId] = useState<string>("");
+  const [manualPropertyId, setManualPropertyId] = useState<string>("");
 
   const isReadFilter = filter === "ungelesen" ? false : undefined;
   const isInquiryFilter = filter === "anfragen" ? true : undefined;
@@ -44,6 +49,11 @@ export default function Postfach() {
   const replyEmail = useReplyEmail();
   const createEvent = useCreateEventFromEmail();
   const sendNew = useSendNewEmail();
+  const assignEmail = useAssignEmail();
+  const { data: tenantsRes } = useTenants();
+  const { data: propertiesRes } = useProperties();
+  const tenants = tenantsRes?.data ?? [];
+  const properties = propertiesRes?.data ?? [];
   const { data: accountsRes } = useEmailAccounts();
   const accounts = accountsRes?.data ?? [];
 
@@ -178,6 +188,132 @@ export default function Postfach() {
                   </div>
                 </div>
               )}
+
+              {/* KI-Zuordnung Banner */}
+              {(() => {
+                // Fall C: bereits zugeordnet
+                if (detail.tenantId || detail.propertyId) {
+                  return (
+                    <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50 text-sm">
+                      <Sparkles className="h-4 w-4 text-purple-600 shrink-0" />
+                      <span className="text-muted-foreground">Zugeordnet:</span>
+                      {detail.tenant && (
+                        <Link to={`/tenants/${detail.tenantId}`} className="font-medium hover:underline">
+                          {detail.tenant.name}
+                        </Link>
+                      )}
+                      {detail.tenant && detail.property && <span className="text-muted-foreground">·</span>}
+                      {detail.property && (
+                        <Link to={`/properties/${detail.propertyId}`} className="font-medium hover:underline">
+                          {detail.property.name}
+                        </Link>
+                      )}
+                    </div>
+                  );
+                }
+
+                // Fall A: KI-Vorschlag vorhanden
+                if (detail.suggestedTenantId || detail.suggestedPropertyId) {
+                  return (
+                    <div className="flex items-center justify-between p-3 rounded-md bg-purple-50 border border-purple-200 dark:bg-purple-950/30">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-purple-600 shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-purple-800 dark:text-purple-300">KI-Vorschlag: Zuordnung</p>
+                          <p className="text-xs text-purple-600">
+                            {detail.suggestedTenant?.name ?? "–"}
+                            {detail.suggestedTenant && detail.suggestedProperty && " · "}
+                            {detail.suggestedProperty?.name ?? ""}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={assignEmail.isPending}
+                          onClick={async () => {
+                            try {
+                              await assignEmail.mutateAsync({
+                                id: detail.id,
+                                tenantId: detail.suggestedTenantId ?? undefined,
+                                propertyId: detail.suggestedPropertyId ?? undefined,
+                              });
+                              toast.success("Zugeordnet und archiviert");
+                            } catch {
+                              toast.error("Fehler bei der Zuordnung");
+                            }
+                          }}
+                        >
+                          <Check className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            updateMsg.mutate({
+                              id: detail.id,
+                              suggestedTenantId: null,
+                              suggestedPropertyId: null,
+                            })
+                          }
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Fall B: kein Treffer — manuelle Zuordnung
+                return (
+                  <div className="flex flex-wrap items-end gap-2 p-3 rounded-md border bg-muted/30">
+                    <div className="flex flex-col gap-1 min-w-[140px]">
+                      <label className="text-xs text-muted-foreground">Mieter</label>
+                      <Select value={manualTenantId} onValueChange={setManualTenantId}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Kein" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Kein</SelectItem>
+                          {tenants.map((t) => (
+                            <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex flex-col gap-1 min-w-[140px]">
+                      <label className="text-xs text-muted-foreground">Immobilie</label>
+                      <Select value={manualPropertyId} onValueChange={setManualPropertyId}>
+                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Keine" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Keine</SelectItem>
+                          {properties.map((p) => (
+                            <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      size="sm"
+                      disabled={assignEmail.isPending || (!manualTenantId && !manualPropertyId)}
+                      onClick={async () => {
+                        try {
+                          await assignEmail.mutateAsync({
+                            id: detail.id,
+                            tenantId: manualTenantId ? Number(manualTenantId) : undefined,
+                            propertyId: manualPropertyId ? Number(manualPropertyId) : undefined,
+                          });
+                          toast.success("Zugeordnet und archiviert");
+                          setManualTenantId("");
+                          setManualPropertyId("");
+                        } catch {
+                          toast.error("Fehler bei der Zuordnung");
+                        }
+                      }}
+                    >
+                      {assignEmail.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Speichern"}
+                    </Button>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4">
