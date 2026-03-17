@@ -53,6 +53,54 @@
 
 ## Changelog
 
+### 2026-03-17: Stripe Billing Integration
+
+Vollständige Abonnement-Verwaltung mit Stripe-Integration. Drei Plan-Tiers (Trial 14d, Pro 49€, Business 99€) mit Hard-Lock für auslaufende Abos. Superadmin-Kontrolle über manuelle Overrides für Tests.
+
+**Backend:**
+- `SubscriptionStatus` Enum (TRIAL, ACTIVE, PAST_DUE, CANCELED) + `PlanType` Enum (TRIAL, PRO, BUSINESS)
+- `Company`: neue Felder `subscriptionStatus`, `planType`, `currentPeriodStart`, `currentPeriodEnd`, `stripeCustomerId`, `stripeSubscriptionId`, `manualOverride` (Superadmin-Flag)
+- Migration: `20260317_add_stripe_billing`
+- `subscriptionGuard` Middleware — blockiert API bei auslaufenem Abo mit 402 Status, leitet zu `/billing-locked` (Ausnahmen: Billing-Endpunkte, Superadmin, Logout)
+- `billing.service.ts` — `createCheckoutSession()`, `createPortalSession()`, `getSubscriptionStatus()`
+- `Stripe Webhook Handler` (`POST /api/webhooks/stripe`) — registered BEFORE `express.json()` (Raw-Body-Zugriff), Validierung per `stripe.webhooks.constructEvent()`, Events: `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.payment_failed`. `manualOverride` Guard: Webhook ignoriert Trial-Conversions wenn `manualOverride=true` (Testdaten behalten Trial-Status)
+- `POST /api/billing/status` — Abo-Status + Preise abrufen (für ClientUrl)
+- `POST /api/billing/checkout` — Stripe Checkout-Session erstellen (req.companyId + planType)
+- `POST /api/billing/portal` — Stripe Customer Portal öffnen (VERWALTER+, existing subscription erforderlich)
+- `PATCH /api/superadmin/companies/:id/subscription` — Superadmin: manualOverride setzen, Status + PlanType ändern (Testing)
+- Billing-Routes ausgeschlossen von subscriptionGuard (sonst lockout)
+
+**Frontend:**
+- `useBilling.ts` Hook — `getStatus()`, `redirectToCheckout()`, `redirectToPortal()`, `getCheckoutUrl()` (für External-Redirect)
+- `BillingLocked.tsx` Seite — 402-Error Handling, Upgrade-Buttons zu Checkout, Trial-Countdown
+- `Settings.tsx`: neuer "Abonnement" Tab — Plan-Info, Renew-Datum, Portal-Button, Upgrade-Buttons
+- `SuperAdmin.tsx`: "Abo-Dialog" — Status/Plan ändern, manualOverride-Toggle pro Firma
+
+**Architektur:**
+- Webhook MUSS VOR express.json() registriert sein (Stripe braucht Raw-Body zur Signature-Verifizierung)
+- Billing-Endpunkte + Webhooks ausgeschlossen von subscriptionGuard (sonst Chicken-Egg-Problem)
+- Client-URL wird von Backend an Stripe weitergeleitet: `CLIENT_URL` aus `.env` → Checkout/Portal Redirect-Ziele
+
+**Required Env-Vars:**
+- `STRIPE_SECRET_KEY` — Stripe Secret API Key
+- `STRIPE_WEBHOOK_SECRET` — Webhook Endpoint Secret
+- `STRIPE_PRICE_PRO` — Stripe Product Price ID für Pro-Plan (49€/month)
+- `STRIPE_PRICE_BUSINESS` — Stripe Product Price ID für Business-Plan (99€/month)
+- `CLIENT_URL` — Frontend-URL (für Stripe Redirect nach Checkout/Portal)
+
+**Pläne:**
+| Plan | Dauer | Preis |
+|------|-------|-------|
+| Trial | 14 Tage | Kostenlos |
+| Pro | Monatlich | 49€ |
+| Business | Monatlich | 99€ |
+
+**Hard-Lock Verhalten:**
+- Bei Abo-Ablauf → `subscriptionStatus = PAST_DUE`, 402-Fehler auf alle API-Calls (außer Billing)
+- Redirect zu `/billing-locked` im Frontend
+- Upgrade erforderlich zum Freischalten
+- `manualOverride=true` → Webhook-Events ignoriert (für Test-Accounts, keine automatische Downgrade zu TRIAL)
+
 ### 2026-03-17: Postfach KI-Zuordnung zu Mieter/Immobilie
 
 Automatische Klassifizierung eingehender E-Mails zu Mietern und Objekten per Claude Haiku während des IMAP-Syncs. Bestätigungs-Workflow mit drei Zuständen im Frontend + Dokument-Archivierung.
