@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterAiSuggestions } from "../services/imap-sync.js";
+import { filterAiSuggestions } from "../services/imap-sync.service.js";
 
 describe("filterAiSuggestions", () => {
   const tenantIds = new Set([1, 2, 3]);
@@ -43,12 +43,14 @@ describe("filterAiSuggestions", () => {
     expect(result).toEqual({ suggestedTenantId: null, suggestedPropertyId: null });
   });
 
-  it("sentinel -1 never matches a real ID", () => {
+  it("null input stays null even when set contains valid IDs", () => {
+    // Ensures AI returning null is treated as null (not coerced to a match)
     const result = filterAiSuggestions(
       { suggestedTenantId: null, suggestedPropertyId: null },
-      new Set([-1]),  // even if -1 is somehow in set, null input stays null
-      propertyIds
+      new Set([1, 2, 3]),
+      new Set([10, 20])
     );
     expect(result.suggestedTenantId).toBeNull();
+    expect(result.suggestedPropertyId).toBeNull();
   });
 });
