@@ -160,6 +160,29 @@ export async function assignEmail(
   const msg = await prisma.emailMessage.findFirst({ where: { id, companyId } });
   if (!msg) throw new AppError(404, "Nachricht nicht gefunden");
 
+  // Validate that provided tenantId/propertyId belong to the same company
+  if (data.tenantId != null) {
+    const tenant = await prisma.tenant.findFirst({ where: { id: data.tenantId, companyId } });
+    if (!tenant) throw new AppError(400, "Mieter nicht gefunden");
+  }
+  if (data.propertyId != null) {
+    const property = await prisma.property.findFirst({ where: { id: data.propertyId, companyId } });
+    if (!property) throw new AppError(400, "Objekt nicht gefunden");
+  }
+
+  // Idempotency: skip file/document creation if already assigned
+  if (msg.tenantId !== null || msg.propertyId !== null) {
+    return prisma.emailMessage.update({
+      where: { id },
+      data: {
+        tenantId: data.tenantId ?? null,
+        propertyId: data.propertyId ?? null,
+        suggestedTenantId: null,
+        suggestedPropertyId: null,
+      },
+    });
+  }
+
   const content = msg.bodyText ?? "";
   const dir = path.join(env.UPLOAD_DIR, "email-documents", String(companyId));
   await fsPromises.mkdir(dir, { recursive: true });

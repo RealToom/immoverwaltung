@@ -7,6 +7,12 @@ vi.mock("../lib/prisma.js", () => ({
       findFirst: vi.fn(),
       update: vi.fn(),
     },
+    tenant: {
+      findFirst: vi.fn(),
+    },
+    property: {
+      findFirst: vi.fn(),
+    },
   },
 }));
 
@@ -41,12 +47,16 @@ describe("assignEmail", () => {
     bodyText: "Sehr geehrte Damen und Herren...",
     companyId: 42,
     emailAccountId: 5,
+    tenantId: null,
+    propertyId: null,
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
     (prisma.emailMessage.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(mockMsg);
     (prisma.emailMessage.update as ReturnType<typeof vi.fn>).mockResolvedValue({ ...mockMsg, tenantId: 7 });
+    (prisma.tenant.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 7, name: "Müller" });
+    (prisma.property.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 10, name: "Hauptstraße 12" });
   });
 
   it("updates emailMessage and calls createDocument on success", async () => {
@@ -75,5 +85,27 @@ describe("assignEmail", () => {
     (createDocument as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("DB error"));
     await expect(assignEmail(42, 1, { tenantId: 7 })).rejects.toThrow("DB error");
     expect(fs.unlink).toHaveBeenCalledOnce();
+  });
+
+  it("throws 400 when tenantId belongs to different company", async () => {
+    (prisma.tenant.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    await expect(assignEmail(42, 1, { tenantId: 999 })).rejects.toThrow("Mieter nicht gefunden");
+    expect(createDocument).not.toHaveBeenCalled();
+  });
+
+  it("throws 400 when propertyId belongs to different company", async () => {
+    (prisma.property.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    await expect(assignEmail(42, 1, { tenantId: 7, propertyId: 999 })).rejects.toThrow("Objekt nicht gefunden");
+    expect(createDocument).not.toHaveBeenCalled();
+  });
+
+  it("skips document creation when email already assigned (idempotency)", async () => {
+    (prisma.emailMessage.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...mockMsg, tenantId: 7, propertyId: 10,
+    });
+    await assignEmail(42, 1, { tenantId: 7, propertyId: 10 });
+    expect(createDocument).not.toHaveBeenCalled();
+    expect(fs.writeFile).not.toHaveBeenCalled();
+    expect(prisma.emailMessage.update).toHaveBeenCalledOnce();
   });
 });

@@ -1,6 +1,6 @@
 # Immoverwaltung - Projektdokumentation
 
-> **Letzte Aktualisierung:** 2026-03-02
+> **Letzte Aktualisierung:** 2026-03-17
 > **Status:** Production-Ready + Administrations-Bereich vollständig (Firma, Bank, DATEV, E-Mail/IMAP, Datenimport, Mitarbeiter anlegen)
 
 ## Roadmap / Zukünftige Features
@@ -52,6 +52,23 @@
 ---
 
 ## Changelog
+
+### 2026-03-17: Postfach KI-Zuordnung zu Mieter/Immobilie
+
+Automatische Klassifizierung eingehender E-Mails zu Mietern und Objekten per Claude Haiku während des IMAP-Syncs. Bestätigungs-Workflow mit drei Zuständen im Frontend + Dokument-Archivierung.
+
+**Backend:**
+- `EmailMessage`: 4 neue Felder (`suggestedTenantId`, `suggestedPropertyId`, `tenantId`, `propertyId`) mit benannten Prisma-Relations. Migration: `20260317083919_add_email_tenant_property_links`
+- `imap-sync.service.ts`: `analyzeEmailWithAi()` erweitert (6 Felder, max_tokens 600). Whitelist-Validierung der KI-IDs (Prompt-Injection-Schutz) via `filterAiSuggestions()`
+- `email-message.service.ts`: `assignEmail()` — schreibt E-Mail als `.txt`-Datei ins Upload-Verzeichnis, legt verschlüsseltes Dokument per `createDocument()` an, validiert Eigentümerschaft von `tenantId`/`propertyId`, idempotent (kein Duplicate bei Mehrfachaufruf)
+- `POST /api/email-messages/:id/assign` — Zuordnung bestätigen (Rollen: ADMIN, VERWALTER, BUCHHALTER)
+- `PATCH /api/email-messages/:id` — Vorschlag ablehnen (bestehender Endpunkt, neue Felder `suggestedTenantId: null`)
+
+**Frontend:**
+- `useEmailMessages.ts`: Interface um 8 Felder erweitert, neuer `useAssignEmail()`-Hook
+- `Postfach.tsx`: Banner mit 3 Zuständen — (C) bereits zugeordnet mit Links, (A) KI-Vorschlag bestätigen/ablehnen, (B) manuelle Dropdowns
+
+**Tests:** 6 Unit-Tests für `filterAiSuggestions()`, 6 Unit-Tests für `assignEmail()` (inkl. Ownership-Validation + Idempotenz)
 
 ### 2026-03-13: Production-Readiness Abschlusstest & Security Audits
 
