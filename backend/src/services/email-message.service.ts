@@ -4,6 +4,10 @@ import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
 import { decryptString, decryptFile } from "../lib/crypto.js";
 import { logger } from "../lib/logger.js";
+import fsPromises from "node:fs/promises";
+import path from "node:path";
+import { createDocument } from "./document.service.js";
+import { env } from "../config/env.js";
 
 export async function listMessages(companyId: number, opts: {
   page: number; limit: number; accountId?: number;
@@ -23,6 +27,14 @@ export async function listMessages(companyId: number, opts: {
       skip: (opts.page - 1) * opts.limit, take: opts.limit,
       select: { id: true, fromAddress: true, fromName: true, subject: true, receivedAt: true,
                 isRead: true, isInquiry: true, inquiryStatus: true, suggestedEventId: true,
+                suggestedTenantId: true,
+                suggestedPropertyId: true,
+                tenantId: true,
+                propertyId: true,
+                suggestedTenant: { select: { id: true, name: true } },
+                suggestedProperty: { select: { id: true, name: true } },
+                tenant: { select: { id: true, name: true } },
+                property: { select: { id: true, name: true } },
                 attachments: { select: { id: true, filename: true, mimeType: true, size: true } } },
     }),
     prisma.emailMessage.count({ where }),
@@ -34,7 +46,14 @@ export async function listMessages(companyId: number, opts: {
 export async function getMessage(companyId: number, id: number) {
   const msg = await prisma.emailMessage.findFirst({
     where: { id, companyId },
-    include: { attachments: true, emailAccount: { select: { email: true, label: true } } },
+    include: {
+      attachments: true,
+      emailAccount: { select: { email: true, label: true } },
+      suggestedTenant: { select: { id: true, name: true } },
+      suggestedProperty: { select: { id: true, name: true } },
+      tenant: { select: { id: true, name: true } },
+      property: { select: { id: true, name: true } },
+    },
   });
   if (!msg) throw new AppError(404, "Nachricht nicht gefunden");
   return msg;
@@ -42,6 +61,8 @@ export async function getMessage(companyId: number, id: number) {
 
 export async function updateMessage(companyId: number, id: number, data: {
   isRead?: boolean; isInquiry?: boolean; inquiryStatus?: string;
+  suggestedTenantId?: null;
+  suggestedPropertyId?: null;
 }) {
   const msg = await prisma.emailMessage.findFirst({ where: { id, companyId } });
   if (!msg) throw new AppError(404, "Nachricht nicht gefunden");
@@ -129,4 +150,49 @@ export async function createEventFromEmail(companyId: number, userId: number, me
   });
   await prisma.emailMessage.update({ where: { id: messageId }, data: { suggestedEventId: event.id } });
   return event;
+}
+
+export async function assignEmail(
+  companyId: number,
+  id: number,
+  data: { tenantId?: number; propertyId?: number }
+) {
+  const msg = await prisma.emailMessage.findFirst({ where: { id, companyId } });
+  if (!msg) throw new AppError(404, "Nachricht nicht gefunden");
+
+  const content = msg.bodyText ?? "";
+  const dir = path.join(env.UPLOAD_DIR, "email-documents", String(companyId));
+  await fsPromises.mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, `email-${id}-${Date.now()}.txt`);
+  await fsPromises.writeFile(filePath, content, "utf8");
+
+  const bytes = Buffer.byteLength(content, "utf8");
+  const fileSize = bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+
+  try {
+    await createDocument(companyId, {
+      name: `E-Mail: ${msg.subject}`,
+      fileType: "email",
+      fileSize,
+      filePath,
+      tenantId: data.tenantId ?? undefined,
+      propertyId: data.propertyId ?? undefined,
+    });
+  } catch (err) {
+    await fsPromises.unlink(filePath).catch(() => undefined);
+    throw err;
+  }
+
+  // Note: createDocument + prisma.update are not atomic. If update fails after
+  // createDocument succeeds, the document remains. Accepted trade-off since
+  // file operations cannot be rolled back.
+  return prisma.emailMessage.update({
+    where: { id },
+    data: {
+      tenantId: data.tenantId ?? null,
+      propertyId: data.propertyId ?? null,
+      suggestedTenantId: null,
+      suggestedPropertyId: null,
+    },
+  });
 }
