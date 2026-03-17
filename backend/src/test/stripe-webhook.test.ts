@@ -72,7 +72,7 @@ describe("stripeWebhookHandler", () => {
 
     const req = makeReq(Buffer.from("{}"), "sig_test");
     const res = makeRes();
-    await stripeWebhookHandler(req as Request, res as Response);
+    await stripeWebhookHandler(req as Request, res as unknown as Response);
 
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(res.sendStatus).toHaveBeenCalledWith(200);
@@ -97,7 +97,7 @@ describe("stripeWebhookHandler", () => {
 
     const req = makeReq(Buffer.from("{}"), "sig_test");
     const res = makeRes();
-    await stripeWebhookHandler(req as Request, res as Response);
+    await stripeWebhookHandler(req as Request, res as unknown as Response);
 
     expect(mockUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -119,7 +119,7 @@ describe("stripeWebhookHandler", () => {
 
     const req = makeReq(Buffer.from("{}"), "bad_sig");
     const res = makeRes();
-    await stripeWebhookHandler(req as Request, res as Response);
+    await stripeWebhookHandler(req as Request, res as unknown as Response);
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.json).toHaveBeenCalledWith({ error: "Invalid signature" });

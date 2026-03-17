@@ -9,7 +9,7 @@ import type { PlanType } from "@prisma/client";
 const StripeConstructor = Stripe as any;
 let _stripe: Stripe | null = null;
 
-function getStripe(): Stripe {
+export function getStripe(): Stripe {
   if (!_stripe) {
     _stripe = StripeConstructor(env.STRIPE_SECRET_KEY, { apiVersion: "2026-02-25.clover" });
   }

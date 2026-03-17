@@ -3,17 +3,8 @@ import Stripe from "stripe";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { logger } from "../lib/logger.js";
-import { mapPriceIdToPlanType } from "../services/billing.service.js";
+import { mapPriceIdToPlanType, getStripe } from "../services/billing.service.js";
 import type { SubscriptionStatus, PlanType } from "@prisma/client";
-
-let _stripe: Stripe | null = null;
-function getStripe(): Stripe {
-  if (!_stripe) {
-    const StripeConstructor = Stripe as any;
-    _stripe = StripeConstructor(env.STRIPE_SECRET_KEY, { apiVersion: "2026-02-25.clover" });
-  }
-  return _stripe!;
-}
 
 function mapStripeStatus(status: string): SubscriptionStatus {
   switch (status) {
@@ -83,7 +74,7 @@ export async function stripeWebhookHandler(req: Request, res: Response): Promise
         subscriptionStatus: newStatus,
         planType: (mappedPlan ?? company.planType) as PlanType,
         stripeSubscriptionId: sub.id,
-        currentPeriodEnd: new Date(sub.current_period_end * 1000),
+        currentPeriodEnd: new Date((sub as any).current_period_end * 1000),
       },
     });
   } else if (event.type === "customer.subscription.deleted") {
