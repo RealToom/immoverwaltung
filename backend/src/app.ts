@@ -6,6 +6,7 @@ import { logger } from "./lib/logger.js";
 import { corsOptions } from "./config/cors.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { apiRouter } from "./routes/index.js";
+import { stripeWebhookHandler } from "./routes/stripe-webhook.routes.js";
 
 const app = express();
 
@@ -33,6 +34,9 @@ app.use(pinoHttp({
     return "info";
   },
 }));
+
+// Stripe webhook — raw body MUST be registered BEFORE express.json()
+app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookHandler);
 
 // Middleware
 app.use(cors(corsOptions));

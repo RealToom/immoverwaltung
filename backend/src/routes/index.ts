@@ -34,6 +34,8 @@ import { administrationRouter } from "./administration.routes.js";
 import { insuranceRouter } from "./insurance.routes.js";
 import { budgetRouter } from "./budget.routes.js";
 import { auditLogRouter } from "./auditlog.routes.js";
+import { billingRouter } from "./billing.routes.js";
+import { subscriptionGuard } from "../middleware/subscriptionGuard.js";
 
 const router = Router();
 
@@ -44,41 +46,44 @@ router.use(apiLimiter);
 router.use("/auth", authRouter);
 router.use("/superadmin", superadminRouter);
 
+// Billing routes — no subscriptionGuard (accessible even when subscription is locked)
+router.use("/billing", requireAuth, tenantGuard, billingRouter);
+
 // Protected routes (require auth + company isolation)
-router.use("/properties", requireAuth, tenantGuard, propertyRouter);
-router.use("/units", requireAuth, tenantGuard, unitRouter);
-router.use("/tenants", requireAuth, tenantGuard, tenantRouter);
-router.use("/tenants/:tenantId/documents", requireAuth, tenantGuard, tenantDocumentRouter);
-router.use("/contracts", requireAuth, tenantGuard, contractRouter);
-router.use("/maintenance", requireAuth, tenantGuard, maintenanceRouter);
-router.use("/documents", requireAuth, tenantGuard, documentRouter);
-router.use("/finance", requireAuth, tenantGuard, financeRouter);
-router.use("/finance", requireAuth, tenantGuard, receiptRouter);
-router.use("/dashboard", requireAuth, tenantGuard, dashboardRouter);
-router.use("/company", requireAuth, tenantGuard, companyRouter);
-router.use("/bank-accounts", requireAuth, tenantGuard, bankRouter);
-router.use("/users", requireAuth, tenantGuard, userRouter);
-router.use("/calendar", requireAuth, tenantGuard, calendarRouter);
-router.use("/email-accounts", requireAuth, tenantGuard, emailAccountRouter);
-router.use("/email-messages", requireAuth, tenantGuard, emailMessageRouter);
-router.use("/meters", requireAuth, tenantGuard, meterRouter);
-router.use("/recurring-transactions", requireAuth, tenantGuard, recurringTransactionRouter);
-router.use("/dunning", requireAuth, tenantGuard, dunningRouter);
-router.use("/handover-protocols", requireAuth, tenantGuard, handoverRouter);
-router.use("/maintenance-schedules", requireAuth, tenantGuard, maintenanceScheduleRouter);
-router.use("/document-templates", requireAuth, tenantGuard, documentTemplateRouter);
+router.use("/properties", requireAuth, tenantGuard, subscriptionGuard, propertyRouter);
+router.use("/units", requireAuth, tenantGuard, subscriptionGuard, unitRouter);
+router.use("/tenants", requireAuth, tenantGuard, subscriptionGuard, tenantRouter);
+router.use("/tenants/:tenantId/documents", requireAuth, tenantGuard, subscriptionGuard, tenantDocumentRouter);
+router.use("/contracts", requireAuth, tenantGuard, subscriptionGuard, contractRouter);
+router.use("/maintenance", requireAuth, tenantGuard, subscriptionGuard, maintenanceRouter);
+router.use("/documents", requireAuth, tenantGuard, subscriptionGuard, documentRouter);
+router.use("/finance", requireAuth, tenantGuard, subscriptionGuard, financeRouter);
+router.use("/finance", requireAuth, tenantGuard, subscriptionGuard, receiptRouter);
+router.use("/dashboard", requireAuth, tenantGuard, subscriptionGuard, dashboardRouter);
+router.use("/company", requireAuth, tenantGuard, subscriptionGuard, companyRouter);
+router.use("/bank-accounts", requireAuth, tenantGuard, subscriptionGuard, bankRouter);
+router.use("/users", requireAuth, tenantGuard, subscriptionGuard, userRouter);
+router.use("/calendar", requireAuth, tenantGuard, subscriptionGuard, calendarRouter);
+router.use("/email-accounts", requireAuth, tenantGuard, subscriptionGuard, emailAccountRouter);
+router.use("/email-messages", requireAuth, tenantGuard, subscriptionGuard, emailMessageRouter);
+router.use("/meters", requireAuth, tenantGuard, subscriptionGuard, meterRouter);
+router.use("/recurring-transactions", requireAuth, tenantGuard, subscriptionGuard, recurringTransactionRouter);
+router.use("/dunning", requireAuth, tenantGuard, subscriptionGuard, dunningRouter);
+router.use("/handover-protocols", requireAuth, tenantGuard, subscriptionGuard, handoverRouter);
+router.use("/maintenance-schedules", requireAuth, tenantGuard, subscriptionGuard, maintenanceScheduleRouter);
+router.use("/document-templates", requireAuth, tenantGuard, subscriptionGuard, documentTemplateRouter);
 
 // Public: Nordigen OAuth callback (no auth — browser is redirected here by Nordigen)
 router.get("/banking/callback", bankingCallbackHandler);
 
 // Protected banking and DATEV routes
-router.use("/banking", requireAuth, tenantGuard, bankingRouter);
-router.use("/finance/datev", requireAuth, tenantGuard, datevRouter);
-router.use("/reports", requireAuth, tenantGuard, reportRouter);
-router.use("/import", requireAuth, tenantGuard, importRouter);
-router.use("/administration", requireAuth, tenantGuard, administrationRouter);
-router.use("/insurance", requireAuth, tenantGuard, insuranceRouter);
-router.use("/maintenance-budgets", requireAuth, tenantGuard, budgetRouter);
-router.use("/audit-logs", requireAuth, tenantGuard, auditLogRouter);
+router.use("/banking", requireAuth, tenantGuard, subscriptionGuard, bankingRouter);
+router.use("/finance/datev", requireAuth, tenantGuard, subscriptionGuard, datevRouter);
+router.use("/reports", requireAuth, tenantGuard, subscriptionGuard, reportRouter);
+router.use("/import", requireAuth, tenantGuard, subscriptionGuard, importRouter);
+router.use("/administration", requireAuth, tenantGuard, subscriptionGuard, administrationRouter);
+router.use("/insurance", requireAuth, tenantGuard, subscriptionGuard, insuranceRouter);
+router.use("/maintenance-budgets", requireAuth, tenantGuard, subscriptionGuard, budgetRouter);
+router.use("/audit-logs", requireAuth, tenantGuard, subscriptionGuard, auditLogRouter);
 
 export { router as apiRouter };
