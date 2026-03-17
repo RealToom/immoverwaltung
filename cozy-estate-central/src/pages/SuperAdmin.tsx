@@ -42,8 +42,25 @@ import {
   useCreateCompany,
   useResetCompanyPassword,
   useDeleteCompany,
+  useUpdateSubscription,
   type SuperAdminCompany,
 } from "@/hooks/api/useSuperAdmin";
+
+function AboBadge({ status }: { status?: string }) {
+  const map: Record<string, { label: string; className: string }> = {
+    TRIAL:    { label: "Trial",      className: "bg-gray-100 text-gray-700" },
+    ACTIVE:   { label: "Aktiv",      className: "bg-green-100 text-green-700" },
+    PAST_DUE: { label: "Überfällig", className: "bg-yellow-100 text-yellow-700" },
+    CANCELED: { label: "Gekündigt",  className: "bg-red-100 text-red-700" },
+    MANUAL:   { label: "Manuell",    className: "bg-blue-100 text-blue-700" },
+  };
+  const s = map[status ?? ""] ?? { label: status ?? "—", className: "bg-gray-100 text-gray-600" };
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${s.className}`}>
+      {s.label}
+    </span>
+  );
+}
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
@@ -103,6 +120,12 @@ export default function SuperAdmin() {
   const [showCreate, setShowCreate] = useState(false);
   const [showReset, setShowReset] = useState<SuperAdminCompany | null>(null);
   const [showDelete, setShowDelete] = useState<SuperAdminCompany | null>(null);
+  const [aboDialog, setAboDialog] = useState<SuperAdminCompany | null>(null);
+  const [aboPlanType, setAboPlanType] = useState("TRIAL");
+  const [aboStatus, setAboStatus] = useState("TRIAL");
+  const [aboManualOverride, setAboManualOverride] = useState(false);
+  const [aboUntil, setAboUntil] = useState("");
+  const updateSubscription = useUpdateSubscription(token);
 
   const [createForm, setCreateForm] = useState({
     companyName: "",
@@ -164,6 +187,14 @@ export default function SuperAdmin() {
       });
     }
   };
+
+  function openAboDialog(company: SuperAdminCompany) {
+    setAboDialog(company);
+    setAboPlanType(company.planType ?? "TRIAL");
+    setAboStatus(company.subscriptionStatus ?? "TRIAL");
+    setAboManualOverride(company.manualOverride ?? false);
+    setAboUntil(company.currentPeriodEnd ? company.currentPeriodEnd.slice(0, 10) : "");
+  }
 
   const db = statsQuery.data?.data?.db;
   const server = statsQuery.data?.data?.server;
@@ -281,6 +312,7 @@ export default function SuperAdmin() {
                   <TableHead>Immobilien</TableHead>
                   <TableHead>Mieter</TableHead>
                   <TableHead>Verträge</TableHead>
+                  <TableHead>Abo</TableHead>
                   <TableHead>Angelegt</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
@@ -288,7 +320,7 @@ export default function SuperAdmin() {
               <TableBody>
                 {companiesQuery.isLoading && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={9} className="text-center py-8">
                       <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
                     </TableCell>
                   </TableRow>
@@ -308,11 +340,13 @@ export default function SuperAdmin() {
                     <TableCell>{c._count.properties}</TableCell>
                     <TableCell>{c._count.tenants}</TableCell>
                     <TableCell>{c._count.contracts}</TableCell>
+                    <TableCell><AboBadge status={c.subscriptionStatus} /></TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(c.createdAt).toLocaleDateString("de-DE")}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        <Button size="sm" variant="outline" onClick={() => openAboDialog(c)}>Abo</Button>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -449,6 +483,62 @@ export default function SuperAdmin() {
             <Button variant="destructive" onClick={handleDelete} disabled={deleteCompany.isPending}>
               {deleteCompany.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
               Endgültig löschen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Abo setzen Dialog */}
+      <Dialog open={!!aboDialog} onOpenChange={(o) => !o && setAboDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Abo setzen — {aboDialog?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Plan</label>
+              <select className="w-full border rounded px-3 py-2 text-sm" value={aboPlanType} onChange={e => setAboPlanType(e.target.value)}>
+                <option value="TRIAL">Trial</option>
+                <option value="PRO">Pro</option>
+                <option value="BUSINESS">Business</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Status</label>
+              <select className="w-full border rounded px-3 py-2 text-sm" value={aboStatus} onChange={e => setAboStatus(e.target.value)}>
+                <option value="TRIAL">Trial</option>
+                <option value="ACTIVE">Active</option>
+                <option value="PAST_DUE">Past Due</option>
+                <option value="CANCELED">Canceled</option>
+                <option value="MANUAL">Manual</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="manualOverride" checked={aboManualOverride} onChange={e => setAboManualOverride(e.target.checked)} />
+              <label htmlFor="manualOverride" className="text-sm">Manueller Override (Stripe-Webhooks ignorieren)</label>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Abo bis (optional)</label>
+              <input type="date" className="w-full border rounded px-3 py-2 text-sm" value={aboUntil} onChange={e => setAboUntil(e.target.value)} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAboDialog(null)}>Abbrechen</Button>
+            <Button
+              disabled={updateSubscription.isPending}
+              onClick={async () => {
+                if (!aboDialog) return;
+                await updateSubscription.mutateAsync({
+                  companyId: aboDialog.id,
+                  planType: aboPlanType,
+                  subscriptionStatus: aboStatus,
+                  manualOverride: aboManualOverride,
+                  currentPeriodEnd: aboUntil ? new Date(aboUntil).toISOString() : null,
+                });
+                setAboDialog(null);
+              }}
+            >
+              Speichern
             </Button>
           </DialogFooter>
         </DialogContent>

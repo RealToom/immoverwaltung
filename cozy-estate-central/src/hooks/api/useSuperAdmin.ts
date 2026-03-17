@@ -44,6 +44,11 @@ export interface SuperAdminCompany {
   id: number;
   name: string;
   createdAt: string;
+  subscriptionStatus: string;
+  planType: string;
+  trialEndsAt: string | null;
+  currentPeriodEnd: string | null;
+  manualOverride: boolean;
   _count: { users: number; properties: number; tenants: number; contracts: number };
 }
 
@@ -116,5 +121,29 @@ export function useDeleteCompany(token: string | null) {
     mutationFn: (companyId: number) =>
       superadminFetch(`/companies/${companyId}`, token, { method: "DELETE" }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["superadmin"] }),
+  });
+}
+
+export function useUpdateSubscription(token: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      companyId,
+      planType,
+      subscriptionStatus,
+      manualOverride,
+      currentPeriodEnd,
+    }: {
+      companyId: number;
+      planType: string;
+      subscriptionStatus: string;
+      manualOverride: boolean;
+      currentPeriodEnd?: string | null;
+    }) =>
+      superadminFetch(`/companies/${companyId}/subscription`, token, {
+        method: "PATCH",
+        body: JSON.stringify({ planType, subscriptionStatus, manualOverride, currentPeriodEnd }),
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["superadmin", "companies"] }),
   });
 }
