@@ -147,10 +147,10 @@ model Property {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
-  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  units              Unit[]
-  documents          Document[]
-  contracts          Contract[]
+  company               Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  units                 Unit[]
+  documents             Document[]
+  contracts             Contract[]
   maintenanceTickets    MaintenanceTicket[]
   transactions          Transaction[]
   meters                Meter[]
@@ -158,6 +158,8 @@ model Property {
   maintenanceSchedules  MaintenanceSchedule[]
   insurancePolicies     InsurancePolicy[]
   maintenanceBudgets    MaintenanceBudget[]
+  emailMessages          EmailMessage[] @relation("EmailMessageProperty")
+  suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedProperty")
 
   @@map("properties")
 }
@@ -215,10 +217,12 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  units     Unit[]
-  contracts Contract[]
-  documents Document[]
+  company                Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  units                  Unit[]
+  contracts              Contract[]
+  documents              Document[]
+  emailMessages          EmailMessage[] @relation("EmailMessageTenant")
+  suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedTenant")
 
   @@map("tenants")
 }
@@ -768,17 +772,27 @@ model EmailMessage {
   isRead           Boolean        @default(false) @map("is_read")
   isInquiry        Boolean        @default(false) @map("is_inquiry")
   inquiryStatus    InquiryStatus? @map("inquiry_status")
-  suggestedEventId Int?           @map("suggested_event_id")
+  suggestedEventId    Int?           @map("suggested_event_id")
+  suggestedTenantId   Int?           @map("suggested_tenant_id")
+  suggestedPropertyId Int?           @map("suggested_property_id")
+  tenantId            Int?           @map("tenant_id")
+  propertyId          Int?           @map("property_id")
   emailAccountId   Int            @map("email_account_id")
   companyId        Int            @map("company_id")
   createdAt        DateTime       @default(now()) @map("created_at")
 
-  emailAccount EmailAccount      @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
-  company      Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  attachments  EmailAttachment[]
+  emailAccount      EmailAccount      @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  attachments       EmailAttachment[]
+  suggestedTenant   Tenant?           @relation("EmailMessageSuggestedTenant",   fields: [suggestedTenantId],   references: [id], onDelete: SetNull)
+  tenant            Tenant?           @relation("EmailMessageTenant",            fields: [tenantId],            references: [id], onDelete: SetNull)
+  suggestedProperty Property?         @relation("EmailMessageSuggestedProperty", fields: [suggestedPropertyId], references: [id], onDelete: SetNull)
+  property          Property?         @relation("EmailMessageProperty",          fields: [propertyId],          references: [id], onDelete: SetNull)
 
   @@index([companyId, isRead])
   @@index([companyId, isInquiry])
+  @@index([companyId, suggestedTenantId])
+  @@index([companyId, tenantId])
   @@map("email_messages")
 }
 
