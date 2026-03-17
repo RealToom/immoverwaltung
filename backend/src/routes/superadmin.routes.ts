@@ -11,5 +11,6 @@ router.get("/companies", requireSuperAdmin, ctrl.getCompanies);
 router.post("/companies", requireSuperAdmin, ctrl.createCompany);
 router.post("/companies/:id/reset-password", requireSuperAdmin, ctrl.resetPassword);
 router.delete("/companies/:id", requireSuperAdmin, ctrl.deleteCompany);
+router.patch("/companies/:id/subscription", requireSuperAdmin, ctrl.updateSubscription);
 
 export { router as superadminRouter };

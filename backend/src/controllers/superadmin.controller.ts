@@ -8,6 +8,7 @@ import fs from "fs";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
+import { logger } from "../lib/logger.js";
 
 export async function login(req: Request, res: Response): Promise<void> {
   const { password } = req.body as { password?: string };
@@ -142,8 +143,38 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
 
 export async function deleteCompany(req: Request, res: Response): Promise<void> {
   const companyId = Number(req.params.id);
-  const company = await prisma.company.findUnique({ where: { id: companyId } });
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: {
+      name: true,
+      stripeSubscriptionId: true,
+      stripeCustomerId: true,
+    },
+  });
   if (!company) throw new AppError(404, "Firma nicht gefunden");
+
+  // Cancel Stripe subscription and customer before deleting DB record
+  // Errors are non-fatal: orphaned Stripe resources are recoverable manually
+  if (env.STRIPE_SECRET_KEY) {
+    const StripeModule = await import("stripe");
+    const StripeConstructor = StripeModule.default as any;
+    const stripe = StripeConstructor(env.STRIPE_SECRET_KEY, { apiVersion: "2026-02-25.clover" });
+
+    if ((company as any).stripeSubscriptionId) {
+      try {
+        await stripe.subscriptions.cancel((company as any).stripeSubscriptionId as string);
+      } catch (err: any) {
+        if (err?.statusCode !== 404) logger.warn({ err }, "Stripe subscription cancel warning");
+      }
+    }
+    if ((company as any).stripeCustomerId) {
+      try {
+        await stripe.customers.del((company as any).stripeCustomerId as string);
+      } catch (err: any) {
+        if (err?.statusCode !== 404) logger.warn({ err }, "Stripe customer delete warning");
+      }
+    }
+  }
 
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`DELETE FROM audit_logs WHERE company_id = ${companyId}`;
@@ -175,4 +206,29 @@ export async function deleteCompany(req: Request, res: Response): Promise<void> 
   });
 
   res.json({ data: { deleted: company.name } });
+}
+
+export async function updateSubscription(req: Request, res: Response): Promise<void> {
+  const companyId = Number(req.params.id);
+  const { planType, subscriptionStatus, manualOverride, currentPeriodEnd } = req.body as {
+    planType: string;
+    subscriptionStatus: string;
+    manualOverride: boolean;
+    currentPeriodEnd?: string | null;
+  };
+
+  const company = await prisma.company.findUnique({ where: { id: companyId } });
+  if (!company) throw new AppError(404, "Firma nicht gefunden");
+
+  await prisma.company.update({
+    where: { id: companyId },
+    data: {
+      planType: planType as any,
+      subscriptionStatus: subscriptionStatus as any,
+      manualOverride,
+      currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd) : null,
+    },
+  });
+
+  res.json({ data: { updated: true } });
 }
