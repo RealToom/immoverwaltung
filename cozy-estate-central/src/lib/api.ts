@@ -101,6 +101,16 @@ export async function api<T = unknown>(path: string, options: RequestOptions = {
     }
   }
 
+  // 402 — subscription required: redirect to lock screen (skip for billing/auth paths)
+  if (res.status === 402) {
+    const isBillingPath = path.startsWith("/billing") || path.startsWith("/auth");
+    if (!isBillingPath) {
+      window.location.replace("/billing-locked");
+    }
+    const json402 = await res.json();
+    throw new ApiError(402, json402.error?.message || "Abonnement erforderlich");
+  }
+
   if (res.status === 204) {
     return undefined as T;
   }
