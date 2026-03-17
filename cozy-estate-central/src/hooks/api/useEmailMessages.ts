@@ -6,6 +6,14 @@ export interface EmailMessage {
   receivedAt: string; isRead: boolean; isInquiry: boolean;
   inquiryStatus: "NEU" | "IN_BEARBEITUNG" | "AKZEPTIERT" | "ABGELEHNT" | null;
   suggestedEventId: number | null;
+  suggestedTenantId: number | null;
+  suggestedPropertyId: number | null;
+  tenantId: number | null;
+  propertyId: number | null;
+  suggestedTenant?: { id: number; name: string };
+  suggestedProperty?: { id: number; name: string };
+  tenant?: { id: number; name: string };
+  property?: { id: number; name: string };
   attachments: { id: number; filename: string; mimeType: string; size: number }[];
   bodyText?: string; bodyHtml?: string;
 }
@@ -70,5 +78,17 @@ export function useSendNewEmail() {
   return useMutation({
     mutationFn: (data: { accountId: number; to: string; subject: string; body: string }) =>
       api("/email-messages/send", { method: "POST", body: data }),
+  });
+}
+
+export function useAssignEmail() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: number; tenantId?: number; propertyId?: number }) =>
+      api(`/email-messages/${id}/assign`, { method: "POST", body: data }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["email-messages"] });
+      qc.invalidateQueries({ queryKey: ["email-message"] });
+    },
   });
 }
