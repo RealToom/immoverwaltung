@@ -8,6 +8,7 @@ import fs from "fs";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
+import { updateSubscriptionSchema } from "../schemas/billing.schema.js";
 import { logger } from "../lib/logger.js";
 
 export async function login(req: Request, res: Response): Promise<void> {
@@ -110,7 +111,7 @@ export async function createCompany(req: Request, res: Response): Promise<void> 
 
   const company = await prisma.$transaction(async (tx) => {
     const c = await tx.company.create({
-      data: { name: companyName, slug, address: "", taxNumber: "", subscriptionStatus: "TRIAL", planType: "TRIAL" },
+      data: { name: companyName, slug, address: "", taxNumber: "", subscriptionStatus: "TRIAL", planType: "TRIAL", trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) }, // 14-day trial
     });
     await tx.user.create({
       data: {
@@ -210,12 +211,7 @@ export async function deleteCompany(req: Request, res: Response): Promise<void> 
 
 export async function updateSubscription(req: Request, res: Response): Promise<void> {
   const companyId = Number(req.params.id);
-  const { planType, subscriptionStatus, manualOverride, currentPeriodEnd } = req.body as {
-    planType: string;
-    subscriptionStatus: string;
-    manualOverride: boolean;
-    currentPeriodEnd?: string | null;
-  };
+  const body = updateSubscriptionSchema.parse(req.body);
 
   const company = await prisma.company.findUnique({ where: { id: companyId } });
   if (!company) throw new AppError(404, "Firma nicht gefunden");
@@ -223,10 +219,10 @@ export async function updateSubscription(req: Request, res: Response): Promise<v
   await prisma.company.update({
     where: { id: companyId },
     data: {
-      planType: planType as any,
-      subscriptionStatus: subscriptionStatus as any,
-      manualOverride,
-      currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd) : null,
+      planType: body.planType as any,
+      subscriptionStatus: body.subscriptionStatus as any,
+      manualOverride: body.manualOverride,
+      currentPeriodEnd: body.currentPeriodEnd ? new Date(body.currentPeriodEnd) : null,
     },
   });
 
