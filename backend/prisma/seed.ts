@@ -38,6 +38,9 @@ async function main() {
       address: "Hauptstr. 1, 10115 Berlin",
       taxNumber: "DE123456789",
       website: "https://mustermann-hv.de",
+      subscriptionStatus: "MANUAL",
+      planType: "PRO",
+      manualOverride: true,
     },
   });
   console.log(`Company: ${company.name} (ID: ${company.id})`);
