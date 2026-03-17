@@ -32,6 +32,7 @@ import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdminDashboard from "./pages/SuperAdmin";
 import Insurances from "./pages/Insurances";
 import AuditLog from "./pages/AuditLog";
+import BillingLocked from "./pages/BillingLocked";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -101,6 +102,7 @@ const App = () => (
                   </SuperAdminGuard>
                 }
               />
+              <Route path="/billing-locked" element={<BillingLocked />} />
               <Route
                 path="/*"
                 element={
