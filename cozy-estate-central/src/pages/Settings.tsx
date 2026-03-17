@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { useTheme } from "next-themes";
 import {
   Settings,
@@ -14,13 +15,17 @@ import {
   Eye,
   EyeOff,
   Save,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -40,8 +45,135 @@ import {
 } from "@/hooks/api/useSettings";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useBillingStatus, useCreateCheckout, useCreatePortalSession } from "@/hooks/api/useBilling";
+import { differenceInDays, parseISO, format } from "date-fns";
+import { de } from "date-fns/locale";
 
 type Theme = "light" | "dark" | "system";
+
+function AbonnementTab() {
+  const location = useLocation();
+  const hasSuccessParam = new URLSearchParams(location.search).get("success") === "1";
+  const [isPolling, setIsPolling] = useState(hasSuccessParam);
+
+  // Stop polling after 10 seconds max
+  useEffect(() => {
+    if (!isPolling) return;
+    const timer = setTimeout(() => setIsPolling(false), 10_000);
+    return () => clearTimeout(timer);
+  }, [isPolling]);
+
+  const { data, isLoading: billingLoading } = useBillingStatus({ refetchInterval: isPolling ? 2000 : false });
+  const checkout = useCreateCheckout();
+  const portal = useCreatePortalSession();
+
+  // Stop polling once ACTIVE
+  useEffect(() => {
+    if (data?.data.subscriptionStatus === "ACTIVE") setIsPolling(false);
+  }, [data]);
+
+  if (billingLoading) return <div className="py-8 text-center text-muted-foreground">Wird geladen…</div>;
+
+  const billing = data?.data;
+  if (!billing) return null;
+
+  const { subscriptionStatus, planType, trialEndsAt, currentPeriodEnd } = billing;
+
+  function statusBadge() {
+    const map: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+      TRIAL:    { label: "Trial",      variant: "secondary" },
+      ACTIVE:   { label: "Aktiv",      variant: "default" },
+      PAST_DUE: { label: "Überfällig", variant: "destructive" },
+      CANCELED: { label: "Gekündigt",  variant: "destructive" },
+      MANUAL:   { label: "Testzugang", variant: "outline" },
+    };
+    const s = map[subscriptionStatus] ?? { label: subscriptionStatus, variant: "outline" as const };
+    return <Badge variant={s.variant}>{s.label}</Badge>;
+  }
+
+  async function handleCheckout(plan: "PRO" | "BUSINESS") {
+    const res = await checkout.mutateAsync(plan);
+    window.location.href = res.data.url;
+  }
+
+  async function handlePortal() {
+    const res = await portal.mutateAsync();
+    window.location.href = res.data.url;
+  }
+
+  const planLabel = planType === "PRO" ? "Pro (49 €/Monat)" : planType === "BUSINESS" ? "Business (99 €/Monat)" : "Trial";
+
+  return (
+    <div className="space-y-6 max-w-xl">
+      {hasSuccessParam && isPolling && (
+        <Alert>
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertDescription>Zahlung bestätigt — Abo wird aktiviert…</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="space-y-2">
+        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Aktueller Plan</h3>
+        <div className="flex items-center gap-3">
+          <span className="text-lg font-medium">{planLabel}</span>
+          {statusBadge()}
+        </div>
+      </div>
+
+      {subscriptionStatus === "TRIAL" && trialEndsAt && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {differenceInDays(parseISO(trialEndsAt), new Date())} Tage verbleibend
+            (bis {format(parseISO(trialEndsAt), "dd.MM.yyyy", { locale: de })})
+          </p>
+          <div className="flex gap-3 flex-wrap">
+            <Button onClick={() => handleCheckout("PRO")} disabled={checkout.isPending}>Pro abonnieren — 49 €/Monat</Button>
+            <Button variant="outline" onClick={() => handleCheckout("BUSINESS")} disabled={checkout.isPending}>Business — 99 €/Monat</Button>
+          </div>
+        </div>
+      )}
+
+      {subscriptionStatus === "ACTIVE" && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Nächste Zahlung: {currentPeriodEnd ? format(parseISO(currentPeriodEnd), "dd.MM.yyyy", { locale: de }) : "—"}
+          </p>
+          <div className="flex gap-3 flex-wrap">
+            <Button variant="outline" onClick={handlePortal} disabled={portal.isPending}>Abo verwalten</Button>
+            <Button variant="ghost" onClick={() => handleCheckout("BUSINESS")} disabled={checkout.isPending}>Plan wechseln</Button>
+          </div>
+        </div>
+      )}
+
+      {subscriptionStatus === "PAST_DUE" && (
+        <div className="space-y-4">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>Ihre letzte Zahlung ist fehlgeschlagen. Bitte aktualisieren Sie Ihre Zahlungsdaten.</AlertDescription>
+          </Alert>
+          <Button onClick={handlePortal} disabled={portal.isPending}>Jetzt bezahlen</Button>
+        </div>
+      )}
+
+      {subscriptionStatus === "CANCELED" && (
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">Ihr Abonnement wurde gekündigt.</p>
+          <div className="flex gap-3 flex-wrap">
+            <Button onClick={() => handleCheckout("PRO")} disabled={checkout.isPending}>Pro abonnieren — 49 €/Monat</Button>
+            <Button variant="outline" onClick={() => handleCheckout("BUSINESS")} disabled={checkout.isPending}>Business — 99 €/Monat</Button>
+          </div>
+        </div>
+      )}
+
+      {subscriptionStatus === "MANUAL" && (
+        <p className="text-sm text-muted-foreground">
+          Testzugang (durch Administrator vergeben).
+          {currentPeriodEnd ? ` Gültig bis: ${format(parseISO(currentPeriodEnd), "dd.MM.yyyy", { locale: de })}` : ""}
+        </p>
+      )}
+    </div>
+  );
+}
 
 const roleLabels: Record<string, string> = {
   ADMIN: "Administrator",
@@ -174,6 +306,7 @@ const SettingsPage = () => {
             <TabsTrigger value="darstellung" className="gap-1.5"><Moon className="h-4 w-4" /> Darstellung</TabsTrigger>
             <TabsTrigger value="app" className="gap-1.5"><Settings className="h-4 w-4" /> App</TabsTrigger>
             <TabsTrigger value="sicherheit" className="gap-1.5"><Shield className="h-4 w-4" /> Sicherheit</TabsTrigger>
+            <TabsTrigger value="abo">Abonnement</TabsTrigger>
           </TabsList>
 
           {/* Profile Tab */}
@@ -486,6 +619,11 @@ const SettingsPage = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Abonnement Tab */}
+          <TabsContent value="abo">
+            <AbonnementTab />
           </TabsContent>
 
         </Tabs>
