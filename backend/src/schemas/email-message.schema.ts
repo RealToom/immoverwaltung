@@ -12,6 +12,8 @@ export const updateEmailMessageSchema = z.object({
   isRead: z.boolean().optional(),
   isInquiry: z.boolean().optional(),
   inquiryStatus: z.enum(["NEU", "IN_BEARBEITUNG", "AKZEPTIERT", "ABGELEHNT"]).optional(),
+  suggestedTenantId: z.null().optional(),
+  suggestedPropertyId: z.null().optional(),
 });
 
 export const replyEmailSchema = z.object({
@@ -36,3 +38,11 @@ export const sendNewEmailSchema = z.object({
   subject: z.string().min(1).max(500),
   body: z.string().min(1).max(50000),
 });
+
+export const assignEmailSchema = z.object({
+  tenantId: z.number().int().positive().optional(),
+  propertyId: z.number().int().positive().optional(),
+}).refine(
+  (d) => d.tenantId != null || d.propertyId != null,
+  { message: "tenantId oder propertyId muss angegeben werden" }
+);

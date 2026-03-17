@@ -40,3 +40,8 @@ export async function sendNew(req: Request, res: Response): Promise<void> {
   await svc.sendNewEmail(req.companyId!, req.body);
   res.json({ message: "Nachricht gesendet" });
 }
+
+export async function assign(req: Request, res: Response): Promise<void> {
+  const result = await svc.assignEmail(req.companyId!, Number(req.params.id), req.body);
+  res.json({ data: result });
+}
