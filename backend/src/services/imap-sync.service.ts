@@ -38,14 +38,14 @@ export function filterAiSuggestions(
 async function analyzeEmailWithAi(
   subject: string,
   bodyText: string,
-  tenants: { id: number; name: string; email: string }[],
+  tenants: { id: number; name: string }[],
   properties: { id: number; name: string }[]
 ): Promise<AiAnalysisResult> {
   if (!env.ANTHROPIC_API_KEY) {
     return { hasAppointment: false, isInquiry: false, suggestedTenantId: null, suggestedPropertyId: null };
   }
 
-  const tenantList = tenants.map(t => `ID:${t.id} Name:"${t.name}" E-Mail:"${t.email}"`).join("\n");
+  const tenantList = tenants.map(t => `ID:${t.id} Name:"${t.name}"`).join("\n");
   const propertyList = properties.map(p => `ID:${p.id} Name:"${p.name}"`).join("\n");
 
   try {
@@ -119,7 +119,7 @@ export async function syncAccount(accountId: number, companyId: number): Promise
 
     // Load tenants + properties for AI matching
     const [tenants, properties] = await Promise.all([
-      prisma.tenant.findMany({ where: { companyId }, select: { id: true, name: true, email: true } }),
+      prisma.tenant.findMany({ where: { companyId }, select: { id: true, name: true } }),
       prisma.property.findMany({ where: { companyId }, select: { id: true, name: true } }),
     ]);
     const validTenantIds = new Set(tenants.map(t => t.id));

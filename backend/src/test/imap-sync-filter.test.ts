@@ -53,4 +53,14 @@ describe("filterAiSuggestions", () => {
     expect(result.suggestedTenantId).toBeNull();
     expect(result.suggestedPropertyId).toBeNull();
   });
+
+  it("nullifies both when both IDs are invalid (prompt injection attempt)", () => {
+    const result = filterAiSuggestions(
+      { suggestedTenantId: 999, suggestedPropertyId: 888 },
+      tenantIds,
+      propertyIds
+    );
+    expect(result.suggestedTenantId).toBeNull();
+    expect(result.suggestedPropertyId).toBeNull();
+  });
 });
