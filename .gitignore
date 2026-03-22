@@ -26,3 +26,4 @@ nul
 
 # Uploads (user data, not source code)
 backend/uploads/
+.worktrees/
