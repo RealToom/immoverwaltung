@@ -67,7 +67,7 @@ describe("yousignWebhookHandler", () => {
     const res = makeRes();
     await yousignWebhookHandler(req as Request, res as unknown as Response);
     expect(mockUpdateMany).toHaveBeenCalledWith({
-      where: { id: 42 },
+      where: { id: 42, signatureRequestId: { not: null } },
       data: expect.objectContaining({
         signatureStatus: "ABGESCHLOSSEN",
         status: "AKTIV",
@@ -88,7 +88,7 @@ describe("yousignWebhookHandler", () => {
     const res = makeRes();
     await yousignWebhookHandler(req as Request, res as unknown as Response);
     expect(mockUpdateMany).toHaveBeenCalledWith({
-      where: { id: 10 },
+      where: { id: 10, signatureRequestId: { not: null } },
       data: { signatureStatus: "ABGELEHNT" },
     });
     expect(res.sendStatus).toHaveBeenCalledWith(200);
@@ -104,7 +104,7 @@ describe("yousignWebhookHandler", () => {
     const res = makeRes();
     await yousignWebhookHandler(req as Request, res as unknown as Response);
     expect(mockUpdateMany).toHaveBeenCalledWith({
-      where: { id: 7 },
+      where: { id: 7, signatureRequestId: { not: null } },
       data: { signatureStatus: "ABGELAUFEN" },
     });
     expect(res.sendStatus).toHaveBeenCalledWith(200);

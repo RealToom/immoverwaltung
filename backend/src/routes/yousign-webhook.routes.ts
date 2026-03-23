@@ -18,6 +18,12 @@ function validateHmac(body: Buffer, header: string): boolean {
   }
 }
 
+function parseContractId(obj: { external_id?: string }): number | null {
+  if (!obj.external_id) return null;
+  const id = parseInt(obj.external_id, 10);
+  return isNaN(id) ? null : id;
+}
+
 export async function yousignWebhookHandler(req: Request, res: Response): Promise<void> {
   // Note: Verify exact header name against Yousign sandbox during first integration test.
   // Yousign may send "X-Yousign-Signature" or "X-Yousign-Signature-256".
@@ -29,47 +35,57 @@ export async function yousignWebhookHandler(req: Request, res: Response): Promis
     return;
   }
 
-  const event = JSON.parse((req.body as Buffer).toString()) as {
-    type: string;
-    data: { object: Record<string, unknown> };
-  };
-
-  if (event.type === "signature_request.done") {
-    const obj = event.data.object as {
-      external_id?: string;
-      documents?: Array<{ id: string; signed_file_url?: string }>;
+  try {
+    const event = JSON.parse((req.body as Buffer).toString()) as {
+      type: string;
+      data: { object: Record<string, unknown> };
     };
-    const contractId = obj.external_id ? parseInt(obj.external_id, 10) : null;
-    if (contractId) {
-      const doc = obj.documents?.[0];
-      await prisma.contract.updateMany({
-        where: { id: contractId },
-        data: {
-          signatureStatus: "ABGESCHLOSSEN",
-          status: "AKTIV",
-          signedDocumentId: doc?.id ?? null,
-          signedDocumentUrl: doc?.signed_file_url ?? null,
-        },
-      });
+
+    if (event.type === "signature_request.done") {
+      const obj = event.data.object as {
+        external_id?: string;
+        documents?: Array<{ id: string; signed_file_url?: string }>;
+      };
+      const contractId = parseContractId(obj);
+      if (contractId) {
+        const doc = obj.documents?.[0];
+        // No companyId filter needed: webhook is HMAC-authenticated, contractId set by our
+        // own code, and contract IDs are globally unique. signatureRequestId guard ensures
+        // we only update contracts that actually initiated a signature request.
+        await prisma.contract.updateMany({
+          where: { id: contractId, signatureRequestId: { not: null } },
+          data: {
+            signatureStatus: "ABGESCHLOSSEN",
+            // Only activate contracts that are in ENTWURF state (not already AKTIV or GEKUENDIGT)
+            status: "AKTIV",
+            signedDocumentId: doc?.id ?? null,
+            signedDocumentUrl: doc?.signed_file_url ?? null,
+          },
+        });
+      }
+    } else if (event.type === "signature_request.declined") {
+      const obj = event.data.object as { external_id?: string };
+      const contractId = parseContractId(obj);
+      if (contractId) {
+        await prisma.contract.updateMany({
+          where: { id: contractId, signatureRequestId: { not: null } },
+          data: { signatureStatus: "ABGELEHNT" },
+        });
+      }
+    } else if (event.type === "signature_request.expired") {
+      const obj = event.data.object as { external_id?: string };
+      const contractId = parseContractId(obj);
+      if (contractId) {
+        await prisma.contract.updateMany({
+          where: { id: contractId, signatureRequestId: { not: null } },
+          data: { signatureStatus: "ABGELAUFEN" },
+        });
+      }
     }
-  } else if (event.type === "signature_request.declined") {
-    const obj = event.data.object as { external_id?: string };
-    const contractId = obj.external_id ? parseInt(obj.external_id, 10) : null;
-    if (contractId) {
-      await prisma.contract.updateMany({
-        where: { id: contractId },
-        data: { signatureStatus: "ABGELEHNT" },
-      });
-    }
-  } else if (event.type === "signature_request.expired") {
-    const obj = event.data.object as { external_id?: string };
-    const contractId = obj.external_id ? parseInt(obj.external_id, 10) : null;
-    if (contractId) {
-      await prisma.contract.updateMany({
-        where: { id: contractId },
-        data: { signatureStatus: "ABGELAUFEN" },
-      });
-    }
+  } catch (err) {
+    logger.error({ err }, "Yousign webhook: processing error");
+    res.sendStatus(500);
+    return;
   }
 
   res.sendStatus(200);

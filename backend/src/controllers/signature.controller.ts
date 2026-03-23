@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import PDFDocument from "pdfkit";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
+import { env } from "../config/env.js";
 import { renderTemplate } from "../services/document-template.service.js";
 import {
   uploadDocument,
@@ -24,6 +25,10 @@ async function renderToPdfBuffer(text: string): Promise<Buffer> {
 }
 
 export async function sendForSignature(req: Request, res: Response): Promise<void> {
+  if (!env.YOUSIGN_API_KEY) {
+    throw new AppError(503, "Signaturservice nicht konfiguriert");
+  }
+
   const contractId = parseInt(req.params.id as string, 10);
   const { templateId, signerEmail, signerName } = sendForSignatureSchema.parse(req.body);
 

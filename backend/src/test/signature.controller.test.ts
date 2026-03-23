@@ -23,8 +23,13 @@ vi.mock("../services/document-template.service.js", () => ({
   renderTemplate: vi.fn(),
 }));
 
+vi.mock("../config/env.js", () => ({
+  env: { YOUSIGN_API_KEY: "test-key", YOUSIGN_BASE_URL: "", YOUSIGN_WEBHOOK_SECRET: "" },
+}));
+
 import { sendForSignature } from "../controllers/signature.controller.js";
-import { uploadDocument } from "../services/yousign.service.js";
+import { uploadDocument, createSignatureRequest, activateRequest } from "../services/yousign.service.js";
+import { renderTemplate } from "../services/document-template.service.js";
 
 function makeReq(body: object, params = { id: "1" }): Partial<Request> {
   return { body, params, companyId: 1 } as unknown as Partial<Request>;
@@ -45,7 +50,7 @@ describe("sendForSignature controller", () => {
       id: 1,
       companyId: 1,
       signatureStatus: "AUSSTEHEND",
-      tenant: { email: "mieter@test.de", firstName: "Max", lastName: "Müller" },
+      tenant: { email: "mieter@test.de", name: "Max Müller" },
     });
 
     const req = makeReq({ templateId: 1 });
@@ -56,5 +61,38 @@ describe("sendForSignature controller", () => {
     ).rejects.toMatchObject({ statusCode: 409 });
 
     expect(uploadDocument).not.toHaveBeenCalled();
+  });
+
+  it("completes full flow and returns signatureRequestId", async () => {
+    mockFindFirst.mockResolvedValueOnce({
+      id: 1,
+      companyId: 1,
+      signatureStatus: null,
+      tenant: { email: "mieter@test.de", name: "Max Müller" },
+    });
+    vi.mocked(renderTemplate).mockResolvedValueOnce("Vertragstext");
+    vi.mocked(uploadDocument).mockResolvedValueOnce("doc-123");
+    vi.mocked(createSignatureRequest).mockResolvedValueOnce("req-456");
+    vi.mocked(activateRequest).mockResolvedValueOnce(undefined);
+    mockUpdate.mockResolvedValueOnce({});
+
+    const req = makeReq({ templateId: 1 });
+    const res = makeRes();
+
+    await sendForSignature(req as Request, res as unknown as Response);
+
+    expect(uploadDocument).toHaveBeenCalledWith(expect.any(Buffer), "Mietvertrag-1.pdf");
+    expect(createSignatureRequest).toHaveBeenCalledWith(
+      "doc-123",
+      { email: "mieter@test.de", firstName: "Max", lastName: "Müller" },
+      1,
+    );
+    expect(activateRequest).toHaveBeenCalledWith("req-456");
+    expect(mockUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ signatureStatus: "AUSSTEHEND", signatureRequestId: "req-456" }),
+      }),
+    );
+    expect(res.json).toHaveBeenCalledWith({ data: { signatureRequestId: "req-456", status: "AUSSTEHEND" } });
   });
 });
