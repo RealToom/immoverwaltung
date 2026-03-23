@@ -58,6 +58,7 @@ model Company {
   smtpSettings            CompanySmtpSettings?
   insurancePolicies       InsurancePolicy[]
   maintenanceBudgets      MaintenanceBudget[]
+  energyPassports         EnergyPassport[]
 
   @@map("companies")
 }
@@ -180,6 +181,7 @@ model Property {
   maintenanceSchedules  MaintenanceSchedule[]
   insurancePolicies     InsurancePolicy[]
   maintenanceBudgets    MaintenanceBudget[]
+  energyPassport        EnergyPassport?
   emailMessages          EmailMessage[] @relation("EmailMessageProperty")
   suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedProperty")
 
@@ -897,4 +899,31 @@ model MaintenanceBudget {
   @@unique([companyId, propertyId, year])
   @@index([companyId])
   @@map("maintenance_budgets")
+}
+
+// ─── EnergyPassport (Energieausweis) ─────────────────────────
+enum EnergyPassportType {
+  VERBRAUCH
+  BEDARF
+}
+
+model EnergyPassport {
+  id                  Int                @id @default(autoincrement())
+  certificateType     EnergyPassportType @map("certificate_type")
+  energyClass         String             @map("energy_class")
+  primaryEnergyDemand Float?             @map("primary_energy_demand")
+  finalEnergyDemand   Float?             @map("final_energy_demand")
+  energyCarrier       String?            @map("energy_carrier")
+  issuedAt            DateTime           @map("issued_at")
+  validUntil          DateTime           @map("valid_until")
+  certificateNumber   String?            @map("certificate_number")
+  propertyId          Int                @unique @map("property_id")
+  companyId           Int                @map("company_id")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("energy_passports")
 }

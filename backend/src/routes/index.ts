@@ -35,6 +35,7 @@ import { insuranceRouter } from "./insurance.routes.js";
 import { budgetRouter } from "./budget.routes.js";
 import { auditLogRouter } from "./auditlog.routes.js";
 import { billingRouter } from "./billing.routes.js";
+import { energyRouter } from "./energy.routes.js";
 import { subscriptionGuard } from "../middleware/subscriptionGuard.js";
 
 const router = Router();
@@ -85,5 +86,6 @@ router.use("/administration", requireAuth, tenantGuard, subscriptionGuard, admin
 router.use("/insurance", requireAuth, tenantGuard, subscriptionGuard, insuranceRouter);
 router.use("/maintenance-budgets", requireAuth, tenantGuard, subscriptionGuard, budgetRouter);
 router.use("/audit-logs", requireAuth, tenantGuard, subscriptionGuard, auditLogRouter);
+router.use("/energy", requireAuth, tenantGuard, subscriptionGuard, energyRouter);
 
 export { router as apiRouter };

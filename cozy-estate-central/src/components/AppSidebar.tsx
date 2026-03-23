@@ -17,6 +17,7 @@ import {
   Scale,
   ShieldCheck,
   ClipboardList,
+  Zap,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import {
@@ -39,6 +40,7 @@ const mainNav = [
   { title: "Mieter", url: "/tenants", icon: Users },
   { title: "Verträge", url: "/contracts", icon: FileText },
   { title: "Finanzen", url: "/finances", icon: CreditCard },
+  { title: "Energie", url: "/energie", icon: Zap },
 ];
 
 const secondaryNav = [
