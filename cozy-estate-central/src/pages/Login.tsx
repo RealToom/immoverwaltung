@@ -58,8 +58,8 @@ const Login = () => {
             <Building2 className="h-7 w-7 text-primary-foreground" />
           </div>
           <div className="text-center">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">ImmoVerwalt</h1>
-            <p className="text-sm text-muted-foreground">Immobilienverwaltung leicht gemacht</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">ImmoHub</h1>
+            <p className="text-sm text-muted-foreground">Ihr Hausverwaltungs-Hub</p>
           </div>
         </div>
 
@@ -113,7 +113,14 @@ const Login = () => {
         </Card>
 
         <p className="text-center text-xs text-muted-foreground">
-          © 2026 ImmoVerwalt. Alle Rechte vorbehalten.
+          Noch kein Konto?{" "}
+          <a href="/register" className="underline hover:text-foreground">
+            Jetzt registrieren
+          </a>
+        </p>
+
+        <p className="text-center text-xs text-muted-foreground">
+          © 2026 ImmoHub. Alle Rechte vorbehalten.
         </p>
       </div>
     </div>
