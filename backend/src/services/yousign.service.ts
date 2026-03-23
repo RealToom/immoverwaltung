@@ -9,7 +9,7 @@ function yousignHeaders(): Record<string, string> {
 
 export async function uploadDocument(pdfBuffer: Buffer, filename: string): Promise<string> {
   const form = new FormData();
-  form.append("file", new Blob([pdfBuffer], { type: "application/pdf" }), filename);
+  form.append("file", new Blob([new Uint8Array(pdfBuffer)], { type: "application/pdf" }), filename);
   form.append("nature", "signable_document");
 
   let res: Response;
