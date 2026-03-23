@@ -126,6 +126,16 @@ const maintenanceStatusReverse: Record<string, string> = {
 export const mapMaintenanceStatus = (s: string) => maintenanceStatusMap[s] ?? s;
 export const toBackendMaintenanceStatus = (s: string) => maintenanceStatusReverse[s] ?? s;
 
+// ─── Signature Status ────────────────────────────────────────
+const signatureStatusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  AUSSTEHEND: { label: "Unterschrift ausstehend", variant: "secondary" },
+  ABGESCHLOSSEN: { label: "Unterschrieben", variant: "default" },
+  ABGELEHNT: { label: "Unterschrift abgelehnt", variant: "destructive" },
+  ABGELAUFEN: { label: "Unterschrift abgelaufen", variant: "outline" },
+};
+export const mapSignatureStatus = (s: string | null | undefined) =>
+  s ? (signatureStatusConfig[s] ?? null) : null;
+
 // ─── Date Formatting ─────────────────────────────────────────
 export function formatDate(isoDate: string | null | undefined): string {
   if (!isoDate) return "–";

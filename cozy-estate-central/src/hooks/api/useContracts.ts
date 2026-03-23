@@ -10,6 +10,7 @@ interface ContractListItem {
   monthlyRent: number;
   deposit: number;
   status: string;
+  signatureStatus: string | null;
   nextReminder: string | null;
   reminderType: string | null;
   notes: string | null;
