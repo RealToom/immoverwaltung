@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import * as authService from "../services/auth.service.js";
 import { createAuditLog } from "../services/audit.service.js";
+import { sendWelcomeEmail } from "../services/email.service.js";
 import type { RegisterInput, LoginInput, UpdateProfileInput, UpdateNotificationPrefsInput, ChangePasswordInput } from "../schemas/auth.schema.js";
 
 const REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days in ms
@@ -48,6 +49,11 @@ export async function registerHandler(req: Request, res: Response) {
       user: result.user,
       accessToken: result.accessToken,
     },
+  });
+
+  const appUrl = process.env.CLIENT_URL ?? "https://hasverl.xyz";
+  sendWelcomeEmail(result.user.email as string, result.user.name as string, appUrl).catch(() => {
+    // ignore SMTP failures — registration succeeded regardless
   });
 }
 

@@ -34,6 +34,8 @@ vi.mock("../config/email.js", () => ({
 // Imports NACH den vi.mock()-Aufrufen
 import { prisma } from "../lib/prisma.js";
 import { register } from "../services/auth.service.js";
+import { sendWelcomeEmail } from "../services/email.service.js";
+import { sendMail } from "../config/email.js";
 
 const mockUser = {
   id: 1,
@@ -83,5 +85,26 @@ describe("authService.register", () => {
     expect(result.user).not.toHaveProperty("passwordHash");
     expect(result.user).not.toHaveProperty("failedLoginAttempts");
     expect(result.user).not.toHaveProperty("lockedUntil");
+  });
+});
+
+describe("sendWelcomeEmail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends mail with correct recipient and subject", async () => {
+    await sendWelcomeEmail("max@example.de", "Max", "https://hasverl.xyz");
+
+    expect(sendMail).toHaveBeenCalledOnce();
+    const [to, subject] = vi.mocked(sendMail).mock.calls[0];
+    expect(to).toBe("max@example.de");
+    expect(subject).toContain("Willkommen");
+  });
+
+  it("returns false when sendMail returns false", async () => {
+    vi.mocked(sendMail).mockResolvedValueOnce(false);
+    const result = await sendWelcomeEmail("max@example.de", "Max", "https://hasverl.xyz");
+    expect(result).toBe(false);
   });
 });

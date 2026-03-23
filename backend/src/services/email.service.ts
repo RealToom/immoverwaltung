@@ -136,6 +136,32 @@ export async function notifyRentPayment(
   await Promise.allSettled(recipients.map((to) => sendMailForCompany(companyId, to, subject, html)));
 }
 
+export async function sendWelcomeEmail(
+  to: string,
+  name: string,
+  appUrl: string
+): Promise<boolean> {
+  if (!isEmailEnabled) return false;
+  const subject = "Willkommen bei ImmoHub!";
+  const html = htmlWrapper("Willkommen bei ImmoHub", `
+    <p>Hallo ${escHtml(name)},</p>
+    <p>Ihr ImmoHub-Konto ist bereit. Sie können sich jetzt anmelden und Ihre Immobilienverwaltung einrichten.</p>
+    <p style="margin: 24px 0;">
+      <a href="${escHtml(appUrl)}/login"
+         style="background: #3b82f6; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;">
+        Jetzt anmelden
+      </a>
+    </p>
+    <p style="font-size: 13px; color: #6b7280;">
+      Bei Fragen erreichen Sie uns unter <a href="mailto:support@immohub.de">support@immohub.de</a>.
+    </p>
+    <p style="font-size: 13px; color: #6b7280;">
+      Ihr 14-tägiger kostenloser Testzeitraum hat begonnen. Keine Kreditkarte erforderlich.
+    </p>
+  `);
+  return sendMail(to, subject, html);
+}
+
 export async function sendDigestEmails(companyId: number, frequency: string): Promise<void> {
   if (!isEmailEnabled) return;
 
