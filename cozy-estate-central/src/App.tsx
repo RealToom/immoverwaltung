@@ -34,6 +34,8 @@ import Insurances from "./pages/Insurances";
 import AuditLog from "./pages/AuditLog";
 import BillingLocked from "./pages/BillingLocked";
 import Energie from "./pages/Energie";
+import Register from "./pages/Register";
+import LandingPage from "./pages/LandingPage";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -71,8 +73,6 @@ const AppLayout = () => (
         <Route path="/insurance" element={<Insurances />} />
         <Route path="/audit-logs" element={<AuditLog />} />
         <Route path="/energie" element={<Energie />} />
-        <Route path="/impressum" element={<Impressum />} />
-        <Route path="/datenschutz" element={<Datenschutz />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
@@ -105,6 +105,10 @@ const App = () => (
                 }
               />
               <Route path="/billing-locked" element={<BillingLocked />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/landing" element={<LandingPage />} />
+              <Route path="/impressum" element={<Impressum />} />
+              <Route path="/datenschutz" element={<Datenschutz />} />
               <Route
                 path="/*"
                 element={
