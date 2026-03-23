@@ -7,6 +7,7 @@ import { corsOptions } from "./config/cors.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { apiRouter } from "./routes/index.js";
 import { stripeWebhookHandler } from "./routes/stripe-webhook.routes.js";
+import { yousignWebhookHandler } from "./routes/yousign-webhook.routes.js";
 
 const app = express();
 
@@ -35,8 +36,9 @@ app.use(pinoHttp({
   },
 }));
 
-// Stripe webhook — raw body MUST be registered BEFORE express.json()
+// Webhook handlers — raw body MUST be registered BEFORE express.json()
 app.post("/api/webhooks/stripe", express.raw({ type: "application/json" }), stripeWebhookHandler);
+app.post("/api/webhooks/yousign", express.raw({ type: "application/json" }), yousignWebhookHandler);
 
 // Middleware
 app.use(cors(corsOptions));

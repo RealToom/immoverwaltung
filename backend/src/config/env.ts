@@ -42,4 +42,8 @@ export const env = {
   get STRIPE_PRICE_BUSINESS() { return process.env.STRIPE_PRICE_BUSINESS || ""; },
   // Frontend URL for Stripe redirect URLs (no trailing slash)
   get CLIENT_URL() { return process.env.CLIENT_URL || "http://localhost:8080"; },
+  // Yousign (digital signatures — optional in dev, empty string disables)
+  get YOUSIGN_API_KEY() { return process.env.YOUSIGN_API_KEY || ""; },
+  get YOUSIGN_BASE_URL() { return process.env.YOUSIGN_BASE_URL || "https://api.yousign.app/v3"; },
+  get YOUSIGN_WEBHOOK_SECRET() { return process.env.YOUSIGN_WEBHOOK_SECRET || ""; },
 };

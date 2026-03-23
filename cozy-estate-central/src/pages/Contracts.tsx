@@ -13,6 +13,8 @@ import {
   Filter,
   Eye,
   Loader2,
+  PenLine,
+  Download,
 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -31,10 +33,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useContracts, useCreateContract } from "@/hooks/api/useContracts";
 import { useDunning, useSendDunning, useResolveDunning } from "@/hooks/api/useDunning";
 import { useProperties } from "@/hooks/api/useProperties";
+import { useDocumentTemplates } from "@/hooks/api/useDocumentTemplates";
+import { useSendForSignature, downloadSignedDocument } from "@/hooks/api/useSignature";
 import {
   mapContractType,
   mapContractStatus,
   mapReminderType,
+  mapSignatureStatus,
   formatDate,
   toBackendContractType,
   toBackendContractStatus,
@@ -67,6 +72,9 @@ const Contracts = () => {
   const [propertyFilter, setPropertyFilter] = useState<string>("alle");
   const [selectedContract, setSelectedContract] = useState<Record<string, unknown> | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showSendSignature, setShowSendSignature] = useState(false);
+  const [signatureTemplateId, setSignatureTemplateId] = useState<string>("");
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("action") === "add" && user?.role !== "READONLY") {
@@ -86,7 +94,11 @@ const Contracts = () => {
     propertyId,
   );
   const { data: propertiesResponse } = useProperties();
+  const { data: templates } = useDocumentTemplates();
   const createContract = useCreateContract();
+  const sendForSignature = useSendForSignature(
+    (selectedContract as unknown as { id: number } | null)?.id ?? 0,
+  );
 
   const contracts = contractsResponse?.data ?? [];
   const properties = propertiesResponse?.data ?? [];
@@ -367,10 +379,21 @@ const Contracts = () => {
                         <TableCell className="text-sm text-muted-foreground">{c.noticePeriod} Monate</TableCell>
                         <TableCell className="font-medium text-foreground">€ {c.monthlyRent.toLocaleString("de-DE")}</TableCell>
                         <TableCell>
-                          <Badge variant={sc.variant} className="gap-1 text-xs">
-                            <StatusIcon className="h-3 w-3" />
-                            {sc.label}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={sc.variant} className="gap-1 text-xs w-fit">
+                              <StatusIcon className="h-3 w-3" />
+                              {sc.label}
+                            </Badge>
+                            {c.signatureStatus && (() => {
+                              const sig = mapSignatureStatus(c.signatureStatus);
+                              return sig ? (
+                                <Badge variant={sig.variant} className="gap-1 text-xs w-fit">
+                                  <PenLine className="h-3 w-3" />
+                                  {sig.label}
+                                </Badge>
+                              ) : null;
+                            })()}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right pr-6">
                           <Button variant="ghost" size="sm" className="h-7 gap-1" onClick={(e) => { e.stopPropagation(); setSelectedContract(c as unknown as Record<string, unknown>); }}>
@@ -395,7 +418,7 @@ const Contracts = () => {
         )}
 
         {/* Contract Detail Dialog */}
-        <Dialog open={!!selectedContract} onOpenChange={(open) => !open && setSelectedContract(null)}>
+        <Dialog open={!!selectedContract} onOpenChange={(open) => { if (!open) { setSelectedContract(null); setShowSendSignature(false); setSignatureTemplateId(""); } }}>
           <DialogContent className="max-w-lg">
             {selectedContract && (() => {
               const c = selectedContract as unknown as typeof contracts[0];
@@ -474,6 +497,114 @@ const Contracts = () => {
                       <div className="rounded-lg bg-muted/50 p-3">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Notizen</p>
                         <p className="text-sm text-foreground">{c.notes}</p>
+                      </div>
+                    )}
+
+                    {/* Digital Signature Section */}
+                    {user?.role !== "READONLY" && (
+                      <div className="rounded-lg border border-border/60 p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <PenLine className="h-4 w-4 text-muted-foreground" />
+                            <p className="text-sm font-medium text-foreground">Digitale Unterschrift</p>
+                          </div>
+                          {c.signatureStatus && (() => {
+                            const sig = mapSignatureStatus(c.signatureStatus);
+                            return sig ? (
+                              <Badge variant={sig.variant} className="text-xs">{sig.label}</Badge>
+                            ) : null;
+                          })()}
+                        </div>
+
+                        {c.signatureStatus === "ABGESCHLOSSEN" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full gap-1.5"
+                            disabled={isDownloading}
+                            onClick={async () => {
+                              setIsDownloading(true);
+                              try {
+                                await downloadSignedDocument(c.id, c.tenant.name);
+                              } catch {
+                                toast({ title: "Fehler", description: "Dokument konnte nicht heruntergeladen werden.", variant: "destructive" });
+                              } finally {
+                                setIsDownloading(false);
+                              }
+                            }}
+                          >
+                            {isDownloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                            Signiertes PDF herunterladen
+                          </Button>
+                        )}
+
+                        {(user?.role === "ADMIN" || user?.role === "VERWALTER") &&
+                          c.signatureStatus !== "AUSSTEHEND" && c.signatureStatus !== "ABGESCHLOSSEN" && (
+                          <>
+                            {!showSendSignature ? (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="w-full gap-1.5"
+                                onClick={() => setShowSendSignature(true)}
+                              >
+                                <PenLine className="h-3.5 w-3.5" />
+                                Zur Unterschrift senden
+                              </Button>
+                            ) : (
+                              <div className="space-y-2">
+                                <Select value={signatureTemplateId} onValueChange={setSignatureTemplateId}>
+                                  <SelectTrigger className="h-8 text-sm">
+                                    <SelectValue placeholder="Vorlage auswählen..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {(templates ?? []).map((t) => (
+                                      <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    className="flex-1"
+                                    disabled={!signatureTemplateId || sendForSignature.isPending}
+                                    onClick={async () => {
+                                      try {
+                                        await sendForSignature.mutateAsync({ templateId: Number(signatureTemplateId) });
+                                        setShowSendSignature(false);
+                                        setSignatureTemplateId("");
+                                        toast({ title: "Unterschriftsanforderung gesendet", description: `${c.tenant.name} erhält eine E-Mail mit dem Dokument.` });
+                                      } catch (err: unknown) {
+                                        const status = (err as { status?: number })?.status;
+                                        if (status === 409) {
+                                          toast({ title: "Bereits angefordert", description: "Für diesen Vertrag ist bereits eine Unterschrift ausstehend.", variant: "destructive" });
+                                        } else if (status === 400) {
+                                          toast({ title: "Keine E-Mail-Adresse", description: "Der Mieter hat keine E-Mail-Adresse hinterlegt.", variant: "destructive" });
+                                        } else {
+                                          toast({ title: "Fehler", description: "Unterschrift konnte nicht angefordert werden.", variant: "destructive" });
+                                        }
+                                      }
+                                    }}
+                                  >
+                                    {sendForSignature.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                    Senden
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => { setShowSendSignature(false); setSignatureTemplateId(""); }}
+                                  >
+                                    Abbrechen
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {c.signatureStatus === "AUSSTEHEND" && (
+                          <p className="text-xs text-muted-foreground">Wartet auf Unterschrift des Mieters.</p>
+                        )}
                       </div>
                     )}
                   </div>

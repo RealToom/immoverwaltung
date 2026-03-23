@@ -275,6 +275,11 @@ model Contract {
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
+  signatureRequestId  String?          @map("signature_request_id")
+  signatureStatus     SignatureStatus?  @map("signature_status")
+  signedDocumentId    String?          @map("signed_document_id")
+  signedDocumentUrl   String?          @map("signed_document_url")
+
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   property     Property      @relation(fields: [propertyId], references: [id])
   unit         Unit          @relation(fields: [unitId], references: [id])
@@ -297,6 +302,13 @@ enum ContractStatus {
   GEKUENDIGT
   AUSLAUFEND
   ENTWURF
+}
+
+enum SignatureStatus {
+  AUSSTEHEND
+  ABGESCHLOSSEN
+  ABGELEHNT
+  ABGELAUFEN
 }
 
 enum ReminderType {
