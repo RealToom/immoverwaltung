@@ -4,12 +4,14 @@ import { requireAuth } from "../middleware/auth.js";
 import { authLimiter } from "../middleware/rateLimiter.js";
 import {
   loginSchema,
+  registerSchema,
   updateProfileSchema,
   updateNotificationPrefsSchema,
   changePasswordSchema,
 } from "../schemas/auth.schema.js";
 import {
   loginHandler,
+  registerHandler,
   refreshHandler,
   logoutHandler,
   getMeHandler,
@@ -22,7 +24,8 @@ import {
 const router = Router();
 
 // Public routes (rate-limited)
-// Self-registration is disabled — accounts are created by admins via /api/users
+// Self-service registration
+router.post("/register", authLimiter, validate({ body: registerSchema }), registerHandler);
 router.post("/login", authLimiter, validate({ body: loginSchema }), loginHandler);
 router.post("/refresh", authLimiter, refreshHandler);
 
