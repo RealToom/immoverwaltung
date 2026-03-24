@@ -26,7 +26,15 @@ const Login = () => {
     }
     setIsSubmitting(true);
     try {
-      await login(email, password);
+      const result = await login(email, password);
+      if (result.requiresMfa) {
+        navigate("/2fa/verify");
+        return;
+      }
+      if (result.requiresMfaSetup) {
+        navigate("/2fa/setup");
+        return;
+      }
       toast.success("Erfolgreich angemeldet!");
       navigate("/");
     } catch (err: unknown) {

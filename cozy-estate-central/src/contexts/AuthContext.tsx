@@ -17,10 +17,14 @@ interface AuthContextType {
   billing: BillingStatus | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ requiresMfa?: boolean; requiresMfaSetup?: boolean }>;
   register: (name: string, email: string, password: string, companyName: string) => Promise<void>;
   logout: () => Promise<void>;
   refetchBilling: () => Promise<void>;
+  mfaToken: string | null;
+  setupToken: string | null;
+  clearMfaTokens: () => void;
+  finalizeLogin: (accessToken: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -29,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [setupToken, setSetupToken] = useState<string | null>(null);
 
   const fetchBilling = useCallback(async (): Promise<BillingStatus | null> => {
     try {
@@ -56,15 +62,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).finally(() => setIsLoading(false));
   }, [fetchBilling]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await api<{ data: { user: User; accessToken: string } }>("/auth/login", {
+  const login = useCallback(async (email: string, password: string): Promise<{ requiresMfa?: boolean; requiresMfaSetup?: boolean }> => {
+    const res = await api<{ data: Record<string, unknown> }>("/auth/login", {
       method: "POST",
       body: { email, password },
     });
-    setToken(res.data.accessToken);
-    setUser(res.data.user);
+    const d = res.data;
+
+    if (d.requiresMfa) {
+      setMfaToken(d.mfaToken as string);
+      return { requiresMfa: true };
+    }
+    if (d.requiresMfaSetup) {
+      setSetupToken(d.setupToken as string);
+      return { requiresMfaSetup: true };
+    }
+
+    // Normal login (bypass active)
+    setToken(d.accessToken as string);
+    setUser(d.user as User);
     const billingRes = await fetchBilling();
     setBilling(billingRes);
+    return {};
   }, [fetchBilling]);
 
   const register = useCallback(async (name: string, email: string, password: string, companyName: string) => {
@@ -89,6 +108,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBilling(null);
   }, []);
 
+  const clearMfaTokens = useCallback(() => {
+    setMfaToken(null);
+    setSetupToken(null);
+  }, []);
+
+  const finalizeLogin = useCallback(async (accessToken: string) => {
+    setToken(accessToken);
+    const [userRes, billingRes] = await Promise.all([
+      api<{ data: User }>("/auth/me"),
+      fetchBilling(),
+    ]);
+    setUser(userRes.data);
+    setBilling(billingRes);
+  }, [fetchBilling]);
+
   const refetchBilling = useCallback(async () => {
     const billingRes = await fetchBilling();
     setBilling(billingRes);
@@ -104,6 +138,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       refetchBilling,
+      mfaToken,
+      setupToken,
+      clearMfaTokens,
+      finalizeLogin,
     }}>
       {children}
     </AuthContext.Provider>
