@@ -33,3 +33,19 @@ export function verifyAccessToken(token: string): TokenPayload {
 export function verifyRefreshToken(token: string): TokenPayload {
   return jwt.verify(token, getRefreshSecret()) as TokenPayload;
 }
+
+export interface MfaTokenPayload {
+  userId: number;
+  type: "mfa_pending" | "mfa_setup";
+}
+
+export function signMfaToken(
+  userId: number,
+  type: "mfa_pending" | "mfa_setup"
+): string {
+  return jwt.sign({ userId, type }, getAccessSecret(), { expiresIn: "5m" });
+}
+
+export function verifyMfaToken(token: string): MfaTokenPayload {
+  return jwt.verify(token, getAccessSecret()) as MfaTokenPayload;
+}
