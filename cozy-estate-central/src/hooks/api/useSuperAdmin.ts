@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useSuperAdminAuth } from "@/contexts/SuperAdminContext";
 
 const BASE = "/api/superadmin";
 
@@ -145,5 +146,44 @@ export function useUpdateSubscription(token: string | null) {
         body: JSON.stringify({ planType, subscriptionStatus, manualOverride, currentPeriodEnd }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["superadmin", "companies"] }),
+  });
+}
+
+export interface SuperAdminUser {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  totpEnabled: boolean;
+  totpBypassedByAdmin: boolean;
+  createdAt: string;
+}
+
+export function useCompanyUsers(companyId: number | null) {
+  const { token } = useSuperAdminAuth();
+  return useQuery({
+    queryKey: ["superadmin", "companies", companyId, "users"],
+    queryFn: () =>
+      superadminFetch<{ data: SuperAdminUser[] }>(
+        `/companies/${companyId}/users`,
+        token,
+      ).then((r) => r.data),
+    enabled: !!companyId,
+  });
+}
+
+export function useSet2FABypass() {
+  const { token } = useSuperAdminAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ companyId, userId, bypass }: { companyId: number; userId: number; bypass: boolean }) =>
+      superadminFetch<{ data: unknown }>(
+        `/companies/${companyId}/users/${userId}/2fa-bypass`,
+        token,
+        { method: "PATCH", body: JSON.stringify({ bypass }) },
+      ),
+    onSuccess: (_, { companyId }) => {
+      queryClient.invalidateQueries({ queryKey: ["superadmin", "companies", companyId, "users"] });
+    },
   });
 }

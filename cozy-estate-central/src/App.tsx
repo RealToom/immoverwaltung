@@ -36,6 +36,8 @@ import BillingLocked from "./pages/BillingLocked";
 import Energie from "./pages/Energie";
 import Register from "./pages/Register";
 import LandingPage from "./pages/LandingPage";
+import TwoFactorSetup from "./pages/TwoFactorSetup";
+import TwoFactorVerify from "./pages/TwoFactorVerify";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -95,6 +97,8 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/2fa/setup" element={<TwoFactorSetup />} />
+              <Route path="/2fa/verify" element={<TwoFactorVerify />} />
               <Route path="/superadmin/login" element={<SuperAdminLogin />} />
               <Route
                 path="/superadmin"

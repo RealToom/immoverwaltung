@@ -46,10 +46,56 @@ import {
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBillingStatus, useCreateCheckout, useCreatePortalSession } from "@/hooks/api/useBilling";
+import { useRegenerateBackupCodes } from "@/hooks/api/useTwoFactor";
 import { differenceInDays, parseISO, format } from "date-fns";
 import { de } from "date-fns/locale";
 
 type Theme = "light" | "dark" | "system";
+
+function RegenerateBackupCodesSection() {
+  const regenerate = useRegenerateBackupCodes();
+  const [code, setCode] = useState("");
+  const [newCodes, setNewCodes] = useState<string[]>([]);
+
+  async function handleRegenerate() {
+    if (code.length !== 6) { toast({ title: "Bitte aktuellen OTP-Code eingeben", variant: "destructive" }); return; }
+    try {
+      const result = await regenerate.mutateAsync(code);
+      setNewCodes(result.backupCodes);
+      setCode("");
+      toast({ title: "Backup-Codes neu generiert" });
+    } catch {
+      toast({ title: "Ungültiger Code", variant: "destructive" });
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <Input
+          placeholder="Aktueller OTP-Code (6-stellig)"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          maxLength={6}
+          className="w-48 font-mono"
+        />
+        <Button onClick={handleRegenerate} disabled={regenerate.isPending} variant="outline">
+          {regenerate.isPending ? "Generiere..." : "Backup-Codes neu generieren"}
+        </Button>
+      </div>
+      {newCodes.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300">⚠️ Neue Backup-Codes — jetzt sichern!</p>
+          <div className="grid grid-cols-2 gap-2">
+            {newCodes.map((c) => (
+              <code key={c} className="rounded bg-muted px-2 py-1 text-sm font-mono text-center">{c}</code>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AbonnementTab() {
   const location = useLocation();
@@ -617,6 +663,20 @@ const SettingsPage = () => {
                     Passwort ändern
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Zwei-Faktor-Authentifizierung
+                </CardTitle>
+                <CardDescription>
+                  2FA ist für Ihren Account aktiv. Sie können Backup-Codes neu generieren, falls Sie keinen Zugriff mehr auf Ihre Authenticator-App haben.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RegenerateBackupCodesSection />
               </CardContent>
             </Card>
           </TabsContent>

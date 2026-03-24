@@ -43,8 +43,12 @@ import {
   useResetCompanyPassword,
   useDeleteCompany,
   useUpdateSubscription,
+  useCompanyUsers,
+  useSet2FABypass,
   type SuperAdminCompany,
+  type SuperAdminUser,
 } from "@/hooks/api/useSuperAdmin";
+import { Switch } from "@/components/ui/switch";
 
 function AboBadge({ status }: { status?: string }) {
   const map: Record<string, { label: string; className: string }> = {
@@ -126,6 +130,10 @@ export default function SuperAdmin() {
   const [aboManualOverride, setAboManualOverride] = useState(false);
   const [aboUntil, setAboUntil] = useState("");
   const updateSubscription = useUpdateSubscription(token);
+
+  const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(null);
+  const { data: companyUsers } = useCompanyUsers(selectedCompanyId);
+  const set2FABypass = useSet2FABypass();
 
   const [createForm, setCreateForm] = useState({
     companyName: "",
@@ -333,43 +341,84 @@ export default function SuperAdmin() {
                   </TableRow>
                 )}
                 {companies.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="text-muted-foreground text-xs">{c.id}</TableCell>
-                    <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell>{c._count.users}</TableCell>
-                    <TableCell>{c._count.properties}</TableCell>
-                    <TableCell>{c._count.tenants}</TableCell>
-                    <TableCell>{c._count.contracts}</TableCell>
-                    <TableCell><AboBadge status={c.subscriptionStatus} /></TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(c.createdAt).toLocaleDateString("de-DE")}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="outline" onClick={() => openAboDialog(c)}>Abo</Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Passwort zurücksetzen"
-                          onClick={() => {
-                            setShowReset(c);
-                            setResetForm({ email: "", newPassword: "" });
-                          }}
-                        >
-                          <KeyRound className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Firma löschen"
-                          onClick={() => setShowDelete(c)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  <>
+                    <TableRow key={c.id}>
+                      <TableCell className="text-muted-foreground text-xs">{c.id}</TableCell>
+                      <TableCell className="font-medium">{c.name}</TableCell>
+                      <TableCell>{c._count.users}</TableCell>
+                      <TableCell>{c._count.properties}</TableCell>
+                      <TableCell>{c._count.tenants}</TableCell>
+                      <TableCell>{c._count.contracts}</TableCell>
+                      <TableCell><AboBadge status={c.subscriptionStatus} /></TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(c.createdAt).toLocaleDateString("de-DE")}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" onClick={() => openAboDialog(c)}>Abo</Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setSelectedCompanyId(selectedCompanyId === c.id ? null : c.id)}
+                          >
+                            {selectedCompanyId === c.id ? "▲ Nutzer" : "▼ Nutzer"}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Passwort zurücksetzen"
+                            onClick={() => {
+                              setShowReset(c);
+                              setResetForm({ email: "", newPassword: "" });
+                            }}
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            title="Firma löschen"
+                            onClick={() => setShowDelete(c)}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {selectedCompanyId === c.id && companyUsers && (
+                      <TableRow key={`${c.id}-users`}>
+                        <TableCell colSpan={9} className="p-0">
+                          <div className="p-3 bg-muted/30 rounded-md space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">Nutzer & 2FA-Status</p>
+                            {companyUsers.map((user: SuperAdminUser) => (
+                              <div key={user.id} className="flex items-center justify-between text-sm">
+                                <div>
+                                  <span className="font-medium">{user.name}</span>
+                                  <span className="text-muted-foreground ml-2">{user.email}</span>
+                                  <span className="text-muted-foreground ml-2">({user.role})</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">
+                                    {user.totpEnabled ? "2FA aktiv" : "2FA inaktiv"}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs">Bypass:</span>
+                                    <Switch
+                                      checked={user.totpBypassedByAdmin}
+                                      onCheckedChange={(bypass) =>
+                                        set2FABypass.mutate({ companyId: c.id, userId: user.id, bypass })
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 ))}
               </TableBody>
             </Table>
