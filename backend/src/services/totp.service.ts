@@ -6,7 +6,8 @@ import { encryptString, decryptString } from "../lib/crypto.js";
 
 export function generateSecret(): string {
   const bytes = crypto.randomBytes(20);
-  return new OTPAuth.Secret({ buffer: bytes }).base32;
+  const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  return new OTPAuth.Secret({ buffer: ab }).base32;
 }
 
 export async function generateQrCodeUri(
