@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import os from "os";
 import { execSync } from "child_process";
 import fs from "fs";
+import { z } from "zod";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
@@ -227,4 +228,42 @@ export async function updateSubscription(req: Request, res: Response): Promise<v
   });
 
   res.json({ data: { updated: true } });
+}
+
+export async function listCompanyUsers(req: Request, res: Response): Promise<void> {
+  const companyId = Number(req.params.id);
+  const company = await prisma.company.findUnique({ where: { id: companyId } });
+  if (!company) throw new AppError(404, "Firma nicht gefunden");
+
+  const users = await prisma.user.findMany({
+    where: { companyId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      totpEnabled: true,
+      totpBypassedByAdmin: true,
+      createdAt: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  res.json({ data: users });
+}
+
+export async function setTwoFactorBypass(req: Request, res: Response): Promise<void> {
+  const companyId = Number(req.params.id);
+  const userId = Number(req.params.userId);
+  const { bypass } = z.object({ bypass: z.boolean() }).parse(req.body);
+
+  const user = await prisma.user.findFirst({ where: { id: userId, companyId } });
+  if (!user) throw new AppError(404, "Nutzer nicht gefunden");
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { totpBypassedByAdmin: bypass },
+  });
+
+  res.json({ data: { userId, totpBypassedByAdmin: bypass } });
 }
