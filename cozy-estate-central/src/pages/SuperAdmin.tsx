@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Building2,
@@ -341,8 +341,8 @@ export default function SuperAdmin() {
                   </TableRow>
                 )}
                 {companies.map((c) => (
-                  <>
-                    <TableRow key={c.id}>
+                  <Fragment key={c.id}>
+                    <TableRow>
                       <TableCell className="text-muted-foreground text-xs">{c.id}</TableCell>
                       <TableCell className="font-medium">{c.name}</TableCell>
                       <TableCell>{c._count.users}</TableCell>
@@ -418,7 +418,7 @@ export default function SuperAdmin() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>

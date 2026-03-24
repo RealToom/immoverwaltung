@@ -26,7 +26,7 @@ function issueTokens(user: { id: number; companyId: number; role: string }) {
 }
 
 function sanitizeUser<T extends Record<string, unknown>>(user: T) {
-  const { passwordHash, failedLoginAttempts, lockedUntil, ...safe } = user;
+  const { passwordHash, failedLoginAttempts, lockedUntil, totpSecret, totpBackupCodes, ...safe } = user;
   return safe;
 }
 

@@ -11,6 +11,7 @@ import {
   generateBackupCodes,
   verifyBackupCode,
 } from "../services/totp.service.js";
+import { createAuditLog } from "../services/audit.service.js";
 
 const REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 const isProduction = process.env.NODE_ENV === "production";
@@ -47,6 +48,7 @@ const otpBodySchema = z.object({
 // POST /api/auth/2fa/setup — guarded by requireMfaToken("mfa_setup")
 export async function setup2faHandler(req: Request, res: Response): Promise<void> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: req.userId } });
+  if (user.totpEnabled) throw new AppError(400, "2FA bereits aktiviert");
   const plainSecret = generateSecret();
   const encryptedSecret = encryptString(plainSecret);
   await prisma.user.update({
@@ -75,6 +77,7 @@ export async function verifySetupHandler(req: Request, res: Response): Promise<v
 
   const { accessToken, refreshToken } = await issueAndStoreTokens(user);
   setRefreshCookie(res, refreshToken);
+  await createAuditLog("LOGIN", { companyId: user.companyId, userId: user.id }, { method: "totp_setup" });
 
   res.json({ data: { backupCodes: plain, accessToken } });
 }
@@ -96,6 +99,7 @@ export async function verify2faHandler(req: Request, res: Response): Promise<voi
 
   const { accessToken, refreshToken } = await issueAndStoreTokens(user);
   setRefreshCookie(res, refreshToken);
+  await createAuditLog("LOGIN", { companyId: user.companyId, userId: user.id }, { method: "totp" });
 
   res.json({ data: { accessToken } });
 }
