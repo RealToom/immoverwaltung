@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { twoFactorRouter } from "./twoFactor.routes.js";
 import { validate } from "../middleware/validate.js";
 import { requireAuth } from "../middleware/auth.js";
 import { authLimiter } from "../middleware/rateLimiter.js";
@@ -55,5 +56,7 @@ router.patch(
   validate({ body: changePasswordSchema }),
   changePasswordHandler
 );
+
+router.use("/", twoFactorRouter);
 
 export { router as authRouter };
