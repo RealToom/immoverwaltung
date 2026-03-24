@@ -6,6 +6,7 @@ import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
+  signMfaToken,
 } from "../lib/jwt.js";
 import { AppError, UnauthorizedError } from "../lib/errors.js";
 
@@ -121,9 +122,18 @@ export async function login(email: string, password: string) {
     user.lockedUntil = null;
   }
 
+  // 2FA branching
+  if (!user.totpBypassedByAdmin) {
+    if (!user.totpEnabled) {
+      const setupToken = signMfaToken(user.id, "mfa_setup");
+      return { requiresMfaSetup: true as const, setupToken };
+    }
+    const mfaToken = signMfaToken(user.id, "mfa_pending");
+    return { requiresMfa: true as const, mfaToken };
+  }
+
   const tokens = issueTokens(user);
 
-  // Store refresh token in DB
   await prisma.refreshToken.create({
     data: {
       token: tokens.refreshToken,

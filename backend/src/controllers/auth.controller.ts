@@ -62,7 +62,25 @@ export async function loginHandler(req: Request, res: Response) {
 
   const result = await authService.login(email, password);
 
+  // Case: MFA setup required
+  if ("requiresMfaSetup" in result) {
+    res.json({ data: { requiresMfaSetup: true, setupToken: result.setupToken } });
+    return;
+  }
+
+  // Case: MFA verification required
+  if ("requiresMfa" in result) {
+    res.json({ data: { requiresMfa: true, mfaToken: result.mfaToken } });
+    return;
+  }
+
+  // Case: normal login (bypass active)
   setRefreshCookie(res, result.refreshToken);
+
+  await createAuditLog("LOGIN", {
+    companyId: result.user.companyId as number,
+    userId: result.user.id as number,
+  }, { email });
 
   res.json({
     data: {
