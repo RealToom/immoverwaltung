@@ -1,5 +1,7 @@
 import type { Request, Response } from "express";
+import { randomUUID } from "crypto";
 import * as calendarService from "../services/calendar.service.js";
+import { prisma } from "../lib/prisma.js";
 
 export async function list(req: Request, res: Response): Promise<void> {
   const from = req.query.from ? new Date(req.query.from as string) : undefined;
@@ -28,4 +30,44 @@ export async function exportIcal(req: Request, res: Response): Promise<void> {
   res.setHeader("Content-Type", "text/calendar; charset=utf-8");
   res.setHeader("Content-Disposition", 'attachment; filename="kalender.ics"');
   res.send(ics);
+}
+
+// Public: resolve user by calendarToken and return iCal feed (no auth required)
+export async function exportIcalByToken(req: Request, res: Response): Promise<void> {
+  const token = String(req.params.token);
+  const user = await prisma.user.findUnique({ where: { calendarToken: token }, select: { companyId: true } });
+  if (!user) {
+    res.status(404).send("Ungültiger Kalender-Token.");
+    return;
+  }
+  const ics = await calendarService.exportIcal(user.companyId);
+  res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+  res.setHeader("Content-Disposition", 'attachment; filename="kalender.ics"');
+  res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+  res.send(ics);
+}
+
+// GET /api/calendar/token — return current user's calendarToken (generate if missing)
+export async function getCalendarToken(req: Request, res: Response): Promise<void> {
+  const userId = req.userId!;
+  let user = await prisma.user.findUnique({ where: { id: userId }, select: { calendarToken: true } });
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  if (!user.calendarToken) {
+    user = await prisma.user.update({ where: { id: userId }, data: { calendarToken: randomUUID() }, select: { calendarToken: true } });
+  }
+  res.json({ data: { calendarToken: user.calendarToken } });
+}
+
+// POST /api/calendar/token/regenerate — generate a new calendarToken for current user
+export async function regenerateCalendarToken(req: Request, res: Response): Promise<void> {
+  const userId = req.userId!;
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { calendarToken: randomUUID() },
+    select: { calendarToken: true },
+  });
+  res.json({ data: { calendarToken: user.calendarToken } });
 }

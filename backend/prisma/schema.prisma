@@ -79,6 +79,7 @@ model User {
   totpEnabled         Boolean   @default(false) @map("totp_enabled")
   totpBackupCodes     String[]  @default([]) @map("totp_backup_codes")
   totpBypassedByAdmin Boolean   @default(false) @map("totp_bypassed_by_admin")
+  calendarToken       String?   @unique @map("calendar_token")
   companyId           Int       @map("company_id")
   customRoleId        Int?      @map("custom_role_id")
   createdAt           DateTime  @default(now()) @map("created_at")

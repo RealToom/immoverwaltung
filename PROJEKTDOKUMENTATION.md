@@ -1,7 +1,7 @@
 # Immoverwaltung - Projektdokumentation
 
-> **Letzte Aktualisierung:** 2026-03-17
-> **Status:** Production-Ready + Administrations-Bereich vollständig (Firma, Bank, DATEV, E-Mail/IMAP, Datenimport, Mitarbeiter anlegen)
+> **Letzte Aktualisierung:** 2026-03-25
+> **Status:** Production-Ready + Bugfixes aus ImmoHub-Bugreport v2 (2026-03-25)
 
 ## Roadmap / Zukünftige Features
 

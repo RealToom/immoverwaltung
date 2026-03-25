@@ -25,14 +25,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useContracts, useCreateContract } from "@/hooks/api/useContracts";
 import { useDunning, useSendDunning, useResolveDunning } from "@/hooks/api/useDunning";
-import { useProperties } from "@/hooks/api/useProperties";
+import { useProperties, useProperty } from "@/hooks/api/useProperties";
+import { useTenants } from "@/hooks/api/useTenants";
 import { useDocumentTemplates } from "@/hooks/api/useDocumentTemplates";
 import { useSendForSignature, downloadSignedDocument } from "@/hooks/api/useSignature";
 import {
@@ -73,6 +74,7 @@ const Contracts = () => {
   const [selectedContract, setSelectedContract] = useState<Record<string, unknown> | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showSendSignature, setShowSendSignature] = useState(false);
+  const [showDunningConfirm, setShowDunningConfirm] = useState(false);
   const [signatureTemplateId, setSignatureTemplateId] = useState<string>("");
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -94,6 +96,8 @@ const Contracts = () => {
     propertyId,
   );
   const { data: propertiesResponse } = useProperties();
+  const { data: tenantsResponse } = useTenants();
+  const { data: propertyDetailData } = useProperty(newContract.propertyId ? Number(newContract.propertyId) : undefined);
   const { data: templates } = useDocumentTemplates();
   const createContract = useCreateContract();
   const sendForSignature = useSendForSignature(
@@ -102,6 +106,8 @@ const Contracts = () => {
 
   const contracts = contractsResponse?.data ?? [];
   const properties = propertiesResponse?.data ?? [];
+  const tenants = tenantsResponse?.data ?? [];
+  const availableUnits = propertyDetailData?.data?.units ?? [];
 
   const [newContract, setNewContract] = useState({
     tenantId: "",
@@ -185,12 +191,19 @@ const Contracts = () => {
             <div className="grid gap-4 py-2">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Mieter-ID *</Label>
-                  <Input value={newContract.tenantId} onChange={(e) => setNewContract((p) => ({ ...p, tenantId: e.target.value }))} placeholder="z.B. 1" type="number" />
+                  <Label>Mieter *</Label>
+                  <Select value={newContract.tenantId} onValueChange={(v) => setNewContract((p) => ({ ...p, tenantId: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Mieter wählen..." /></SelectTrigger>
+                    <SelectContent>
+                      {tenants.map((t) => (
+                        <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Immobilie *</Label>
-                  <Select value={newContract.propertyId} onValueChange={(v) => setNewContract((p) => ({ ...p, propertyId: v }))}>
+                  <Select value={newContract.propertyId} onValueChange={(v) => setNewContract((p) => ({ ...p, propertyId: v, unitId: "" }))}>
                     <SelectTrigger><SelectValue placeholder="Wählen..." /></SelectTrigger>
                     <SelectContent>
                       {properties.map((p) => (
@@ -202,8 +215,21 @@ const Contracts = () => {
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Unit-ID</Label>
-                  <Input value={newContract.unitId} onChange={(e) => setNewContract((p) => ({ ...p, unitId: e.target.value }))} placeholder="z.B. 1" type="number" />
+                  <Label>Einheit *</Label>
+                  <Select
+                    value={newContract.unitId}
+                    onValueChange={(v) => setNewContract((p) => ({ ...p, unitId: v }))}
+                    disabled={!newContract.propertyId}
+                  >
+                    <SelectTrigger><SelectValue placeholder={newContract.propertyId ? "Einheit wählen..." : "Erst Immobilie wählen"} /></SelectTrigger>
+                    <SelectContent>
+                      {availableUnits.map((u) => (
+                        <SelectItem key={u.id} value={String(u.id)}>
+                          {u.number} {u.type ? `(${u.type})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Vertragsart</Label>
@@ -443,14 +469,7 @@ const Contracts = () => {
                           variant="destructive"
                           className="h-7 text-xs gap-1"
                           disabled={sendDunning.isPending}
-                          onClick={async () => {
-                            try {
-                              await sendDunning.mutateAsync(c.id);
-                              toast({ title: "Mahnung versendet" });
-                            } catch {
-                              toast({ title: "Fehler", description: "Mahnung konnte nicht versendet werden.", variant: "destructive" });
-                            }
-                          }}
+                          onClick={() => setShowDunningConfirm(true)}
                         >
                           Mahnung senden
                         </Button>
@@ -611,6 +630,37 @@ const Contracts = () => {
                 </>
               );
             })()}
+          </DialogContent>
+        </Dialog>
+
+        {/* Mahnung senden bestätigen */}
+        <Dialog open={showDunningConfirm} onOpenChange={setShowDunningConfirm}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Mahnung senden?</DialogTitle>
+              <DialogDescription>
+                Eine Mahnung wird per E-Mail an den Mieter versendet. Diese Aktion kann nicht rückgängig gemacht werden.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDunningConfirm(false)}>Abbrechen</Button>
+              <Button
+                variant="destructive"
+                disabled={sendDunning.isPending}
+                onClick={async () => {
+                  const c = selectedContract as unknown as { id: number };
+                  setShowDunningConfirm(false);
+                  try {
+                    await sendDunning.mutateAsync(c.id);
+                    toast({ title: "Mahnung versendet" });
+                  } catch {
+                    toast({ title: "Fehler", description: "Mahnung konnte nicht versendet werden.", variant: "destructive" });
+                  }
+                }}
+              >
+                {sendDunning.isPending ? "Wird gesendet..." : "Mahnung senden"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </main>

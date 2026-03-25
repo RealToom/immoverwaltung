@@ -96,6 +96,7 @@ const Maintenance = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>("alle");
   const [createOpen, setCreateOpen] = useState(false);
   const [detailTicket, setDetailTicket] = useState<MaintenanceTicketItem | null>(null);
+  const [deleteTicketConfirmOpen, setDeleteTicketConfirmOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     title: "",
     description: "",
@@ -777,11 +778,10 @@ const Maintenance = () => {
                 <DialogFooter className="flex-col-reverse sm:flex-row gap-2">
                   <Button
                     variant="destructive"
-                    onClick={handleDeleteTicket}
-                    disabled={deleteTicket.isPending}
+                    onClick={() => setDeleteTicketConfirmOpen(true)}
                     className="sm:mr-auto"
                   >
-                    {deleteTicket.isPending ? "Löschen..." : "Löschen"}
+                    Löschen
                   </Button>
                   <Button variant="outline" onClick={() => setDetailTicket(null)}>Abbrechen</Button>
                   <Button onClick={handleSaveTicket} disabled={updateTicket.isPending}>
@@ -790,6 +790,26 @@ const Maintenance = () => {
                 </DialogFooter>
               </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Ticket löschen bestätigen */}
+      <Dialog open={deleteTicketConfirmOpen} onOpenChange={setDeleteTicketConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ticket löschen?</DialogTitle>
+            <DialogDescription>Diese Aktion kann nicht rückgängig gemacht werden.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTicketConfirmOpen(false)}>Abbrechen</Button>
+            <Button
+              variant="destructive"
+              onClick={async () => { setDeleteTicketConfirmOpen(false); await handleDeleteTicket(); }}
+              disabled={deleteTicket.isPending}
+            >
+              {deleteTicket.isPending ? "Löschen..." : "Löschen"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

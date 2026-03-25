@@ -64,6 +64,7 @@ export default function Tenants() {
   const [form, setForm] = useState({
     name: "", email: "", phone: "", unitId: "", rent: "", propertyId: "",
   });
+  const [emailError, setEmailError] = useState("");
 
   const propertyIdFilter = propertyFilter !== "all" ? Number(propertyFilter) : undefined;
   const { data: tenantsResponse, isLoading } = useTenants(search || undefined, propertyIdFilter);
@@ -83,8 +84,13 @@ export default function Tenants() {
   const previewMutation = usePreviewDocument();
 
   const handleAdd = async () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!form.name || !form.email) {
       toast({ title: "Fehler", description: "Bitte fülle alle Pflichtfelder aus.", variant: "destructive" });
+      return;
+    }
+    if (!emailRegex.test(form.email)) {
+      setEmailError("Bitte eine gültige E-Mail-Adresse eingeben.");
       return;
     }
     try {
@@ -96,6 +102,7 @@ export default function Tenants() {
         unitId: form.unitId ? Number(form.unitId) : undefined,
       });
       setForm({ name: "", email: "", phone: "", unitId: "", rent: "", propertyId: "" });
+      setEmailError("");
       setDialogOpen(false);
       toast({ title: "Mieter hinzugefügt", description: `${form.name} wurde erfolgreich angelegt.` });
     } catch {
@@ -537,7 +544,20 @@ export default function Tenants() {
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
                 <Label htmlFor="email">E-Mail *</Label>
-                <Input id="email" type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} placeholder="email@beispiel.de" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm((f) => ({ ...f, email: val }));
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    setEmailError(val && !emailRegex.test(val) ? "Ungültige E-Mail-Adresse" : "");
+                  }}
+                  placeholder="email@beispiel.de"
+                  className={emailError ? "border-destructive" : ""}
+                />
+                {emailError && <p className="text-xs text-destructive">{emailError}</p>}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="phone">Telefon</Label>

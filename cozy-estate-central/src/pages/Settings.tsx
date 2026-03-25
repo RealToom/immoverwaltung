@@ -17,6 +17,10 @@ import {
   Save,
   AlertCircle,
   CheckCircle2,
+  Calendar,
+  Copy,
+  RefreshCw,
+  Check,
 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -47,6 +51,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBillingStatus, useCreateCheckout, useCreatePortalSession } from "@/hooks/api/useBilling";
 import { useRegenerateBackupCodes } from "@/hooks/api/useTwoFactor";
+import { useCalendarToken, useRegenerateCalendarToken } from "@/hooks/api/useCalendarEvents";
 import { differenceInDays, parseISO, format } from "date-fns";
 import { de } from "date-fns/locale";
 
@@ -94,6 +99,95 @@ function RegenerateBackupCodesSection() {
         </div>
       )}
     </div>
+  );
+}
+
+function CalendarSyncSection() {
+  const { data: tokenData, isLoading } = useCalendarToken();
+  const regenerate = useRegenerateCalendarToken();
+  const [copied, setCopied] = useState(false);
+
+  const token = tokenData?.data?.calendarToken ?? "";
+  const feedUrl = token ? `${window.location.origin}/api/calendar/ical-feed/${token}` : "";
+
+  const handleCopy = () => {
+    if (!feedUrl) return;
+    navigator.clipboard.writeText(feedUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  const handleRegenerate = async () => {
+    await regenerate.mutateAsync();
+    toast({ title: "Kalender-Link erneuert", description: "Der alte Link ist ab sofort ungültig." });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calendar className="h-5 w-5" />
+          Kalender-Synchronisation
+        </CardTitle>
+        <CardDescription>
+          Abonnieren Sie Ihren persönlichen Kalender-Feed in Google Calendar, Apple Calendar oder Outlook.
+          Der Link enthält alle Termine, Mieterinnerungen und Wartungsaufgaben Ihrer Firma.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Loader2 className="h-4 w-4 animate-spin" /> Wird geladen…
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label>Ihr persönlicher iCal-Feed-Link</Label>
+              <div className="flex gap-2">
+                <Input value={feedUrl} readOnly className="font-mono text-xs bg-muted/50" />
+                <Button variant="outline" size="icon" onClick={handleCopy} title="Link kopieren">
+                  {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Fügen Sie diesen Link in Ihre Kalender-App ein (z. B. „Kalender abonnieren"). Der Feed wird automatisch aktualisiert.
+              </p>
+            </div>
+            <div className="pt-2 border-t">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium">Link erneuern</p>
+                  <p className="text-xs text-muted-foreground">
+                    Der alte Link wird sofort ungültig. Alle bestehenden Kalender-Abonnements müssen neu eingerichtet werden.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRegenerate}
+                  disabled={regenerate.isPending}
+                  className="shrink-0"
+                >
+                  {regenerate.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+                  Erneuern
+                </Button>
+              </div>
+            </div>
+            <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+              <p className="font-medium text-foreground">So abonnieren Sie den Kalender:</p>
+              <p><span className="font-medium">Google Calendar:</span> Andere Kalender → Per URL → Link einfügen</p>
+              <p><span className="font-medium">Apple Calendar:</span> Ablage → Neues Kalenderabonnement → Link einfügen</p>
+              <p><span className="font-medium">Outlook:</span> Kalender hinzufügen → Aus dem Internet → Link einfügen</p>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -352,6 +446,7 @@ const SettingsPage = () => {
             <TabsTrigger value="darstellung" className="gap-1.5"><Moon className="h-4 w-4" /> Darstellung</TabsTrigger>
             <TabsTrigger value="app" className="gap-1.5"><Settings className="h-4 w-4" /> App</TabsTrigger>
             <TabsTrigger value="sicherheit" className="gap-1.5"><Shield className="h-4 w-4" /> Sicherheit</TabsTrigger>
+            <TabsTrigger value="kalender" className="gap-1.5"><Calendar className="h-4 w-4" /> Kalender</TabsTrigger>
             <TabsTrigger value="abo">Abonnement</TabsTrigger>
           </TabsList>
 
@@ -679,6 +774,11 @@ const SettingsPage = () => {
                 <RegenerateBackupCodesSection />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Kalender Tab */}
+          <TabsContent value="kalender" className="space-y-6">
+            <CalendarSyncSection />
           </TabsContent>
 
           {/* Abonnement Tab */}

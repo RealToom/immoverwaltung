@@ -8,9 +8,17 @@ import * as ctrl from "../controllers/calendar.controller.js";
 const router = Router();
 
 router.get("/ical", ctrl.exportIcal);
+router.get("/token", ctrl.getCalendarToken);
+router.post("/token/regenerate", ctrl.regenerateCalendarToken);
 router.get("/", validate({ query: calendarQuerySchema }), ctrl.list);
 router.post("/", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"), validate({ body: createCalendarEventSchema }), ctrl.create);
 router.patch("/:id", requireRole("ADMIN", "VERWALTER", "BUCHHALTER"), validate({ params: idParamSchema, body: updateCalendarEventSchema }), ctrl.update);
 router.delete("/:id", requireRole("ADMIN", "VERWALTER"), validate({ params: idParamSchema }), ctrl.remove);
 
 export { router as calendarRouter };
+
+// Public router — no auth middleware
+import { Router as PublicRouter } from "express";
+const publicCalendarRouter = PublicRouter();
+publicCalendarRouter.get("/:token", ctrl.exportIcalByToken);
+export { publicCalendarRouter };

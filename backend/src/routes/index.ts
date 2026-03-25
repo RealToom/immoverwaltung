@@ -16,7 +16,7 @@ import { companyRouter } from "./company.routes.js";
 
 import { bankRouter } from "./bank.routes.js";
 import { userRouter } from "./user.routes.js";
-import { calendarRouter } from "./calendar.routes.js";
+import { calendarRouter, publicCalendarRouter } from "./calendar.routes.js";
 import { emailAccountRouter } from "./email-account.routes.js";
 import { emailMessageRouter } from "./email-message.routes.js";
 import { meterRouter } from "./meter.routes.js";
@@ -46,6 +46,8 @@ router.use(apiLimiter);
 // Public routes
 router.use("/auth", authRouter);
 router.use("/superadmin", superadminRouter);
+// Public iCal feed — no auth (token acts as auth)
+router.use("/calendar/ical-feed", publicCalendarRouter);
 
 // Billing routes — no subscriptionGuard (accessible even when subscription is locked)
 router.use("/billing", requireAuth, tenantGuard, billingRouter);

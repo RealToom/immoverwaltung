@@ -31,7 +31,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Progress } from "@/components/ui/progress";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Area, AreaChart } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell, Area, AreaChart, ReferenceLine } from "recharts";
 import { useFinanceSummary, useMonthlyRevenue, useRevenueByProperty, useTransactions, useExpenseBreakdown, useRentCollection, useCreateTransaction, useRoiData } from "@/hooks/api/useFinance";
 import type { ScannedReceipt } from "@/hooks/api/useFinance";
 import { useRecurringTransactions, useCreateRecurring, useUpdateRecurring, useDeleteRecurring } from "@/hooks/api/useRecurringTransactions";
@@ -129,6 +129,10 @@ const Finances = () => {
     }));
   }, [expenseRes]);
 
+  const currentMonthLabel = formatChartMonth(
+    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`
+  );
+
   const monthlyData = useMemo(() => {
     const raw = monthlyRes?.data ?? [];
     return raw.map((d) => ({
@@ -175,6 +179,40 @@ const Finances = () => {
     setNewTx(EMPTY_TX);
     setScanInfo(null);
     setCreateOpen(true);
+  };
+
+  const exportCSV = async () => {
+    try {
+      const { api: apiFn } = await import("@/lib/api");
+      const res = await apiFn<{ data: Array<{ date: string; description: string; type: string; amount: number; category: string; property: { name: string } | null }> }>(
+        "/finance/transactions",
+        { params: { page: 1, limit: 10000, type: txFilter !== "alle" ? txFilter : undefined } },
+      );
+      const rows = res.data;
+      const header = ["Datum", "Beschreibung", "Typ", "Betrag (EUR)", "Kategorie", "Immobilie"];
+      const csvRows = [
+        header.join(";"),
+        ...rows.map((r) =>
+          [
+            formatDate(r.date),
+            `"${r.description.replace(/"/g, '""')}"`,
+            r.type === "EINNAHME" ? "Einnahme" : "Ausgabe",
+            r.amount.toFixed(2).replace(".", ","),
+            r.category || "",
+            r.property?.name || "",
+          ].join(";")
+        ),
+      ];
+      const blob = new Blob(["\uFEFF" + csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `transaktionen_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Fehler", description: "Export fehlgeschlagen.", variant: "destructive" });
+    }
   };
 
   const handleScanFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -275,6 +313,10 @@ const Finances = () => {
             <SelectItem value="12m">Letzte 12 Monate</SelectItem>
           </SelectContent>
         </Select>
+        <Button onClick={openCreateDialog} className="gap-1.5">
+          <Plus className="h-4 w-4" />
+          Neue Buchung
+        </Button>
       </header>
 
       <main className="flex-1 p-6 space-y-6 overflow-auto">
@@ -352,7 +394,12 @@ const Finances = () => {
               <Card className="lg:col-span-2 border border-border/60 shadow-sm">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base font-heading font-semibold">Einnahmen & Ausgaben</CardTitle>
-                  <CardDescription>Monatliche Übersicht</CardDescription>
+                  <CardDescription>
+                    Monatliche Übersicht
+                    {monthlyData.some((d) => d.month === currentMonthLabel) && (
+                      <span className="ml-2 text-xs text-muted-foreground/70">· {currentMonthLabel} = laufender Monat (unvollständig)</span>
+                    )}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ChartContainer config={revenueChartConfig} className="h-[300px] w-full">
@@ -373,6 +420,14 @@ const Finances = () => {
                       <ChartTooltip content={<ChartTooltipContent formatter={(value) => `€ ${Number(value).toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />} />
                       <Area type="monotone" dataKey="einnahmen" stroke="hsl(152, 60%, 42%)" fill="url(#fillEinnahmen)" strokeWidth={2} />
                       <Area type="monotone" dataKey="ausgaben" stroke="hsl(0, 72%, 51%)" fill="url(#fillAusgaben)" strokeWidth={2} />
+                      {monthlyData.some((d) => d.month === currentMonthLabel) && (
+                        <ReferenceLine
+                          x={currentMonthLabel}
+                          stroke="hsl(215, 10%, 60%)"
+                          strokeDasharray="4 4"
+                          label={{ value: "heute", position: "insideTopRight", fontSize: 10, fill: "hsl(215, 10%, 60%)" }}
+                        />
+                      )}
                     </AreaChart>
                   </ChartContainer>
                 </CardContent>
@@ -491,9 +546,9 @@ const Finances = () => {
                         <TabsTrigger value="ausgabe" className="text-xs px-3 h-7">Ausgaben</TabsTrigger>
                       </TabsList>
                     </Tabs>
-                    <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                    <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={exportCSV}>
                       <Download className="h-3.5 w-3.5" />
-                      Export
+                      CSV Export
                     </Button>
                   </div>
                 </div>

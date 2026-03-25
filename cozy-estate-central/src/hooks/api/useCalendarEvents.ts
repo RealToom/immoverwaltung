@@ -62,3 +62,18 @@ export function useDeleteCalendarEvent() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["calendar-events"] }),
   });
 }
+
+export function useCalendarToken() {
+  return useQuery({
+    queryKey: ["calendar-token"],
+    queryFn: () => api<{ data: { calendarToken: string } }>("/calendar/token"),
+  });
+}
+
+export function useRegenerateCalendarToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ data: { calendarToken: string } }>("/calendar/token/regenerate", { method: "POST" }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["calendar-token"] }),
+  });
+}
