@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { useProperties } from "@/hooks/api/useProperties";
 import { useMaintenanceTickets } from "@/hooks/api/useMaintenanceTickets";
 import { useRevenueByProperty, useMonthlyByYear, useRoiData } from "@/hooks/api/useFinance";
