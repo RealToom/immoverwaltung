@@ -483,10 +483,10 @@ export default function Insurances() {
                         </TableCell>
                         <TableCell className="font-medium">{row.name || "—"}</TableCell>
                         <TableCell>{row.insurer || "—"}</TableCell>
-                        <TableCell>{TYPE_LABELS[row.type] ?? row.type || "—"}</TableCell>
+                        <TableCell>{(TYPE_LABELS[row.type] ?? row.type) || "—"}</TableCell>
                         <TableCell>{row.premium ? `€ ${row.premium}` : "—"}</TableCell>
                         <TableCell>{row.startDate || "—"}</TableCell>
-                        <TableCell>{STATUS_LABELS[row.status] ?? row.status || "—"}</TableCell>
+                        <TableCell>{(STATUS_LABELS[row.status] ?? row.status) || "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
