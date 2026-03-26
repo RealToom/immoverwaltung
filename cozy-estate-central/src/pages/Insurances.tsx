@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { ShieldCheck, Plus, Pencil, Trash2, AlertCircle } from "lucide-react";
+import { useState, useRef } from "react";
+import { ShieldCheck, Plus, Pencil, Trash2, AlertCircle, Upload, Download, CheckCircle2, XCircle } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -44,6 +44,65 @@ const EMPTY_FORM = {
   premium: "", startDate: "", endDate: "", notes: "", propertyId: "",
 };
 
+const CSV_HEADERS = ["name", "insurer", "policyNumber", "type", "status", "premium", "startDate", "endDate", "notes"];
+const VALID_TYPES = ["GEBAEUDE", "HAFTPFLICHT", "ELEMENTAR", "RECHTSSCHUTZ", "SONSTIGES"];
+const VALID_STATUSES = ["AKTIV", "ABGELAUFEN", "GEKUENDIGT"];
+
+interface CsvRow {
+  name: string;
+  insurer: string;
+  policyNumber: string;
+  type: string;
+  status: string;
+  premium: string;
+  startDate: string;
+  endDate: string;
+  notes: string;
+  errors: string[];
+}
+
+function parseCsv(text: string): CsvRow[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+  const rows: CsvRow[] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+    const [name = "", insurer = "", policyNumber = "", type = "", status = "", premium = "", startDate = "", endDate = "", notes = ""] = cols;
+    const errors: string[] = [];
+    if (!name) errors.push("Name fehlt");
+    if (!insurer) errors.push("Versicherer fehlt");
+    if (!VALID_TYPES.includes(type)) errors.push(`Typ ungültig (${VALID_TYPES.join("|")})`);
+    if (!premium || isNaN(Number(premium))) errors.push("Prämie muss eine Zahl sein");
+    if (!startDate || isNaN(Date.parse(startDate))) errors.push("Beginn muss JJJJ-MM-TT sein");
+    if (endDate && isNaN(Date.parse(endDate))) errors.push("Ablauf muss JJJJ-MM-TT sein");
+    if (status && !VALID_STATUSES.includes(status)) errors.push(`Status ungültig (${VALID_STATUSES.join("|")})`);
+    rows.push({ name, insurer, policyNumber, type, status: status || "AKTIV", premium, startDate, endDate, notes, errors });
+  }
+  return rows;
+}
+
+function downloadCsvTemplate() {
+  const header = CSV_HEADERS.join(",");
+  const example = [
+    "Gebäudeversicherung Hauptstr",
+    "Allianz AG",
+    "POL-12345",
+    "GEBAEUDE",
+    "AKTIV",
+    "1200",
+    "2024-01-01",
+    "2025-01-01",
+    "Jahrespolice",
+  ].join(",");
+  const blob = new Blob([header + "\n" + example], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "versicherungen_vorlage.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Insurances() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -63,6 +122,61 @@ export default function Insurances() {
   const [editPolicy, setEditPolicy] = useState<InsurancePolicy | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+
+  const [importOpen, setImportOpen] = useState(false);
+  const [csvRows, setCsvRows] = useState<CsvRow[]>([]);
+  const [importing, setImporting] = useState(false);
+  const [importDone, setImportDone] = useState<{ ok: number; fail: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      setCsvRows(parseCsv(text));
+      setImportDone(null);
+    };
+    reader.readAsText(file, "UTF-8");
+  }
+
+  async function handleImport() {
+    const validRows = csvRows.filter((r) => r.errors.length === 0);
+    if (validRows.length === 0) return;
+    setImporting(true);
+    let ok = 0;
+    let fail = 0;
+    for (const row of validRows) {
+      try {
+        await createMutation.mutateAsync({
+          name: row.name,
+          insurer: row.insurer,
+          policyNumber: row.policyNumber || null,
+          type: row.type,
+          status: row.status,
+          premium: Number(row.premium),
+          startDate: row.startDate,
+          endDate: row.endDate || null,
+          notes: row.notes || null,
+          propertyId: null,
+        } as never);
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    setImporting(false);
+    setImportDone({ ok, fail });
+    toast({ title: `Import abgeschlossen`, description: `${ok} importiert, ${fail} fehlgeschlagen.` });
+  }
+
+  function closeImport() {
+    setImportOpen(false);
+    setCsvRows([]);
+    setImportDone(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   function openCreate() {
     setEditPolicy(null);
@@ -143,11 +257,16 @@ export default function Insurances() {
         <Separator orientation="vertical" className="mr-2 h-4" />
         <ShieldCheck className="h-5 w-5 text-muted-foreground" />
         <h1 className="text-xl font-semibold">Versicherungen</h1>
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
           {canEdit && (
-            <Button size="sm" onClick={openCreate} className="gap-2">
-              <Plus className="h-4 w-4" /> Neue Versicherung
-            </Button>
+            <>
+              <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} className="gap-2">
+                <Upload className="h-4 w-4" /> Importieren
+              </Button>
+              <Button size="sm" onClick={openCreate} className="gap-2">
+                <Plus className="h-4 w-4" /> Neue Versicherung
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -310,6 +429,95 @@ export default function Insurances() {
             <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending}>
               Speichern
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog open={importOpen} onOpenChange={(o) => { if (!o) closeImport(); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Versicherungen importieren</DialogTitle>
+            <DialogDescription>
+              CSV-Datei hochladen. Spalten: name, insurer, policyNumber, type, status, premium, startDate, endDate, notes
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" className="gap-2" onClick={downloadCsvTemplate}>
+                <Download className="h-4 w-4" /> Vorlage herunterladen
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <Button size="sm" className="gap-2" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="h-4 w-4" /> CSV auswählen
+              </Button>
+            </div>
+
+            {csvRows.length > 0 && (
+              <div className="rounded-md border overflow-auto max-h-72">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-6" />
+                      <TableHead>Name</TableHead>
+                      <TableHead>Versicherer</TableHead>
+                      <TableHead>Typ</TableHead>
+                      <TableHead>Prämie</TableHead>
+                      <TableHead>Beginn</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {csvRows.map((row, i) => (
+                      <TableRow key={i} className={row.errors.length > 0 ? "bg-destructive/5" : ""}>
+                        <TableCell>
+                          {row.errors.length === 0
+                            ? <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            : <XCircle className="h-4 w-4 text-destructive" />}
+                        </TableCell>
+                        <TableCell className="font-medium">{row.name || "—"}</TableCell>
+                        <TableCell>{row.insurer || "—"}</TableCell>
+                        <TableCell>{TYPE_LABELS[row.type] ?? row.type || "—"}</TableCell>
+                        <TableCell>{row.premium ? `€ ${row.premium}` : "—"}</TableCell>
+                        <TableCell>{row.startDate || "—"}</TableCell>
+                        <TableCell>{STATUS_LABELS[row.status] ?? row.status || "—"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {csvRows.some((r) => r.errors.length > 0) && (
+              <div className="space-y-1 text-sm text-destructive">
+                {csvRows.map((row, i) =>
+                  row.errors.length > 0 ? (
+                    <p key={i}>Zeile {i + 2}: {row.errors.join(", ")}</p>
+                  ) : null
+                )}
+              </div>
+            )}
+
+            {importDone && (
+              <div className="flex items-center gap-2 text-sm font-medium text-green-700 bg-green-50 border border-green-200 rounded-md px-3 py-2">
+                <CheckCircle2 className="h-4 w-4" />
+                {importDone.ok} erfolgreich importiert{importDone.fail > 0 ? `, ${importDone.fail} fehlgeschlagen` : ""}.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeImport}>Schließen</Button>
+            {csvRows.filter((r) => r.errors.length === 0).length > 0 && !importDone && (
+              <Button onClick={handleImport} disabled={importing}>
+                {importing ? "Wird importiert…" : `${csvRows.filter((r) => r.errors.length === 0).length} Einträge importieren`}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
