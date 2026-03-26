@@ -89,6 +89,19 @@ const Contracts = () => {
   const backendType = typeFilter !== "alle" ? toBackendContractType(typeFilter) : undefined;
   const propertyId = propertyFilter !== "alle" ? Number(propertyFilter) : undefined;
 
+  const [newContract, setNewContract] = useState({
+    tenantId: "",
+    propertyId: "",
+    unitId: "",
+    type: "Wohnraum",
+    startDate: "",
+    endDate: "",
+    noticePeriod: "3",
+    monthlyRent: "",
+    deposit: "",
+    notes: "",
+  });
+
   const { data: contractsResponse, isLoading } = useContracts(
     search || undefined,
     backendStatus,
@@ -108,19 +121,6 @@ const Contracts = () => {
   const properties = propertiesResponse?.data ?? [];
   const tenants = tenantsResponse?.data ?? [];
   const availableUnits = propertyDetailData?.data?.units ?? [];
-
-  const [newContract, setNewContract] = useState({
-    tenantId: "",
-    propertyId: "",
-    unitId: "",
-    type: "Wohnraum",
-    startDate: "",
-    endDate: "",
-    noticePeriod: "3",
-    monthlyRent: "",
-    deposit: "",
-    notes: "",
-  });
 
   const upcomingReminders = useMemo(() => {
     return contracts
