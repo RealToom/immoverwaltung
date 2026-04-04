@@ -4,6 +4,7 @@ import { requireRole } from "../middleware/requireRole.js";
 import { tenantQuerySchema, createTenantSchema, updateTenantSchema } from "../schemas/tenant.schema.js";
 import { idParamSchema } from "../schemas/common.schema.js";
 import * as ctrl from "../controllers/tenant.controller.js";
+import { inviteTenantHandler } from "../controllers/tenantAuth.controller.js";
 
 const router = Router();
 
@@ -12,5 +13,6 @@ router.get("/:id", validate({ params: idParamSchema }), ctrl.getById);
 router.post("/", requireRole("ADMIN", "VERWALTER"), validate({ body: createTenantSchema }), ctrl.create);
 router.patch("/:id", requireRole("ADMIN", "VERWALTER"), validate({ params: idParamSchema, body: updateTenantSchema }), ctrl.update);
 router.delete("/:id", requireRole("ADMIN", "VERWALTER"), validate({ params: idParamSchema }), ctrl.remove);
+router.post("/:id/invite", requireRole("ADMIN", "VERWALTER"), validate({ params: idParamSchema }), inviteTenantHandler);
 
 export { router as tenantRouter };

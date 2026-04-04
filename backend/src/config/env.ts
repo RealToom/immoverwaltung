@@ -46,4 +46,9 @@ export const env = {
   get YOUSIGN_API_KEY() { return process.env.YOUSIGN_API_KEY || ""; },
   get YOUSIGN_BASE_URL() { return process.env.YOUSIGN_BASE_URL || "https://api.yousign.app/v3"; },
   get YOUSIGN_WEBHOOK_SECRET() { return process.env.YOUSIGN_WEBHOOK_SECRET || ""; },
+  // Tenant Portal JWT (completely separate from admin JWT)
+  get JWT_TENANT_ACCESS_SECRET() { return requireEnv("JWT_TENANT_ACCESS_SECRET"); },
+  get JWT_TENANT_REFRESH_SECRET() { return requireEnv("JWT_TENANT_REFRESH_SECRET"); },
+  // Tenant Portal frontend URL (for invite links)
+  get TENANT_PORTAL_URL() { return process.env.TENANT_PORTAL_URL || "http://localhost:5173"; },
 };
