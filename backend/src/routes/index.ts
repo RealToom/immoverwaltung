@@ -41,6 +41,7 @@ import { tenantAuthRouter } from "./tenantAuth.routes.js";
 import { tenantBrandingRouter } from "./tenantBranding.routes.js";
 import { tenantPortalRouter } from "./tenantPortal.routes.js";
 import { resolveCompanySlug } from "../middleware/resolveCompanySlug.js";
+import { tenantAdminRouter } from "./tenantAdmin.routes.js";
 
 const router = Router();
 
@@ -99,5 +100,8 @@ router.use("/insurance", requireAuth, tenantGuard, subscriptionGuard, insuranceR
 router.use("/maintenance-budgets", requireAuth, tenantGuard, subscriptionGuard, budgetRouter);
 router.use("/audit-logs", requireAuth, tenantGuard, subscriptionGuard, auditLogRouter);
 router.use("/energy", requireAuth, tenantGuard, subscriptionGuard, energyRouter);
+
+// Tenant Admin — Verwalter reads/sends messages to tenants
+router.use("/tenant-admin", requireAuth, tenantGuard, subscriptionGuard, tenantAdminRouter);
 
 export { router as apiRouter };
