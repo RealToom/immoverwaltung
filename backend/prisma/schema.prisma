@@ -29,6 +29,8 @@ model Company {
   trialEndsAt           DateTime?          @map("trial_ends_at")
   currentPeriodEnd      DateTime?          @map("current_period_end")
   manualOverride        Boolean            @default(false) @map("manual_override")
+  logoUrl               String?            @map("logo_url")
+  primaryColor          String             @default("#2563eb") @map("primary_color")
 
   users              User[]
   properties         Property[]
@@ -59,6 +61,9 @@ model Company {
   insurancePolicies       InsurancePolicy[]
   maintenanceBudgets      MaintenanceBudget[]
   energyPassports         EnergyPassport[]
+  tenantUsers             TenantUser[]
+  tenantMessages          TenantMessage[]
+  tenantUploads           TenantUpload[]
 
   @@map("companies")
 }
@@ -252,6 +257,7 @@ model Tenant {
   documents              Document[]
   emailMessages          EmailMessage[] @relation("EmailMessageTenant")
   suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedTenant")
+  tenantUsers            TenantUser[]
 
   @@map("tenants")
 }
@@ -379,14 +385,20 @@ model Document {
   propertyId     Int?      @map("property_id")
   tenantId       Int?      @map("tenant_id")
   companyId      Int       @map("company_id")
-  retentionUntil DateTime? @map("retention_until")  // DSGVO Art. 17 - Aufbewahrungsfrist
-  isEncrypted    Boolean   @default(false) @map("is_encrypted") // DSGVO Art. 32 - Verschluesselung
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  retentionUntil         DateTime?      @map("retention_until")  // DSGVO Art. 17 - Aufbewahrungsfrist
+  isEncrypted            Boolean        @default(false) @map("is_encrypted") // DSGVO Art. 32 - Verschluesselung
+  requiresSignature      Boolean        @default(false) @map("requires_signature")
+  signatureType          SignatureType? @map("signature_type")
+  signedAt               DateTime?      @map("signed_at")
+  signedByTenantUserId   Int?           @map("signed_by_tenant_user_id")
+  signatureData          String?        @map("signature_data")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
 
-  property Property? @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property           Property?   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tenant             Tenant?     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company            Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  signedByTenantUser TenantUser? @relation("DocumentSignedBy", fields: [signedByTenantUserId], references: [id], onDelete: SetNull)
 
   @@map("documents")
 }
@@ -943,4 +955,72 @@ model EnergyPassport {
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@map("energy_passports")
+}
+
+// ─── Tenant Portal ──────────────────────────────────────────
+
+enum SignatureType {
+  SIMPLE
+  SIGNATURE_PAD
+}
+
+enum TenantMessageDirection {
+  TENANT_TO_ADMIN
+  ADMIN_TO_TENANT
+}
+
+model TenantUser {
+  id              Int       @id @default(autoincrement())
+  email           String
+  passwordHash    String    @map("password_hash")
+  tenantId        Int       @map("tenant_id")
+  companyId       Int       @map("company_id")
+  inviteToken     String?   @map("invite_token")
+  inviteExpiresAt DateTime? @map("invite_expires_at")
+  refreshToken    String?   @map("refresh_token")
+  lastLoginAt     DateTime? @map("last_login_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  signedDocuments Document[]     @relation("DocumentSignedBy")
+  messages        TenantMessage[]
+  uploads         TenantUpload[]
+
+  @@unique([email, companyId])
+  @@map("tenant_users")
+}
+
+model TenantMessage {
+  id           Int                    @id @default(autoincrement())
+  companyId    Int                    @map("company_id")
+  tenantUserId Int                    @map("tenant_user_id")
+  direction    TenantMessageDirection
+  body         String
+  readAt       DateTime?              @map("read_at")
+  createdAt    DateTime               @default(now()) @map("created_at")
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tenantUser TenantUser @relation(fields: [tenantUserId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_messages")
+}
+
+model TenantUpload {
+  id           Int      @id @default(autoincrement())
+  companyId    Int      @map("company_id")
+  tenantUserId Int      @map("tenant_user_id")
+  filename     String
+  mimeType     String   @map("mime_type")
+  sizeBytes    Int      @map("size_bytes")
+  category     String   @default("Sonstiges")
+  description  String?
+  storagePath  String   @map("storage_path")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  company    Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  tenantUser TenantUser @relation(fields: [tenantUserId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_uploads")
 }
