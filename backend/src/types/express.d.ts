@@ -7,5 +7,10 @@ declare namespace Express {
     };
     companyId?: number;
     userId?: number;
+    tenantUser?: {
+      id: number;
+      tenantId: number;
+      companyId: number;
+    };
   }
 }
