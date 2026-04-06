@@ -34,6 +34,13 @@ export function useTenants(search?: string, propertyId?: number) {
   });
 }
 
+export function useInviteTenant() {
+  return useMutation({
+    mutationFn: (tenantId: number) =>
+      api(`/tenants/${tenantId}/invite`, { method: "POST" }),
+  });
+}
+
 export function useCreateTenant() {
   const queryClient = useQueryClient();
   return useMutation({
