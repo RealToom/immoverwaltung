@@ -12,6 +12,7 @@ export async function getMe(tenantUser: TenantUser) {
       id: true,
       email: true,
       lastLoginAt: true,
+      company: { select: { name: true } },
       tenant: {
         select: {
           id: true,
@@ -47,7 +48,8 @@ export async function getMe(tenantUser: TenantUser) {
   });
 
   if (!user) throw new NotFoundError("Benutzer", tenantUser.id);
-  return user;
+  const { company, ...rest } = user;
+  return { ...rest, companyName: company.name };
 }
 
 export async function updateMe(
@@ -256,17 +258,25 @@ export async function getFinances(tenantUser: TenantUser) {
       dueDate: true,
       paidDate: true,
       contract: {
-        select: { monthlyRent: true, unit: { select: { number: true } } },
+        select: { monthlyRent: true },
       },
     },
     orderBy: { month: "desc" },
     take: 24,
   });
 
-  const nextPayment =
-    payments.find((p) => p.status === "AUSSTEHEND" && p.dueDate && p.dueDate >= new Date()) ?? null;
+  const monthlyRent = payments[0]?.contract.monthlyRent ?? 0;
 
-  return { payments, nextPayment };
+  const entries = payments.map((p) => ({
+    id: p.id,
+    date: (p.paidDate ?? p.dueDate ?? new Date(p.month)).toISOString(),
+    description: `Miete ${new Date(p.month).toLocaleDateString("de-DE", { month: "long", year: "numeric" })}`,
+    amount: Number(p.amountDue),
+    type: p.status !== "AUSSTEHEND" ? "INCOME" : "EXPENSE",
+    category: "Miete",
+  }));
+
+  return { monthlyRent: Number(monthlyRent), entries };
 }
 
 // ─── Messages ─────────────────────────────────────────────────────────────────

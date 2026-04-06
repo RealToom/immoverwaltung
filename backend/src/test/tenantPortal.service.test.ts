@@ -60,10 +60,12 @@ describe("tenantPortal.service", () => {
         id: 1,
         email: "max@example.de",
         lastLoginAt: null,
+        company: { name: "Mustermann Verwaltung GmbH" },
         tenant: {
           id: 10,
           name: "Max Mustermann",
           phone: "+49 171 123",
+          moveIn: new Date("2024-01-15"),
           units: [{ id: 1, number: "3 OG", floor: 3, area: 65, rent: 720, type: "WOHNUNG", property: { street: "Hauptstr. 12", zip: "80333", city: "München", name: "Hauptstr." } }],
           contracts: [{ id: 1, monthlyRent: 850, status: "AKTIV", startDate: new Date("2024-01-15"), endDate: null }],
         },
@@ -72,6 +74,7 @@ describe("tenantPortal.service", () => {
       const result = await getMe(mockTenantUser);
 
       expect(result.email).toBe("max@example.de");
+      expect(result.companyName).toBe("Mustermann Verwaltung GmbH");
       expect(result.tenant.name).toBe("Max Mustermann");
       expect(result.tenant.units).toHaveLength(1);
     });
@@ -182,11 +185,12 @@ describe("tenantPortal.service", () => {
   describe("getFinances", () => {
     it("returns rent payments", async () => {
       vi.mocked(prisma.rentPayment.findMany).mockResolvedValueOnce([
-        { id: 1, month: new Date("2026-04-01"), amountDue: 850, amountPaid: 850, status: "PUENKTLICH", dueDate: new Date("2026-04-01"), paidDate: new Date("2026-04-01"), contract: { monthlyRent: 850, unit: { number: "1 OG" } } },
+        { id: 1, month: new Date("2026-04-01"), amountDue: 850, amountPaid: 850, status: "PUENKTLICH", dueDate: new Date("2026-04-01"), paidDate: new Date("2026-04-01"), contract: { monthlyRent: 850 } },
       ] as any);
 
       const result = await getFinances(mockTenantUser);
-      expect(result.payments).toHaveLength(1);
+      expect(result.entries).toHaveLength(1);
+      expect(result.monthlyRent).toBe(850);
     });
   });
 
