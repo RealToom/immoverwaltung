@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { tenantAcceptInviteSchema } from "../schemas/tenantAuth.schema.js";
 
 vi.mock("../lib/prisma.js", () => ({
   prisma: {
@@ -97,5 +98,22 @@ describe("acceptInvite", () => {
         }),
       })
     );
+  });
+});
+
+describe("tenantAcceptInviteSchema password validation", () => {
+  it("rejects password shorter than 10 chars", () => {
+    const result = tenantAcceptInviteSchema.safeParse({ token: "tok", password: "Short1!" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects password without special character", () => {
+    const result = tenantAcceptInviteSchema.safeParse({ token: "tok", password: "LangPasswort1" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts strong password", () => {
+    const result = tenantAcceptInviteSchema.safeParse({ token: "tok", password: "StarkesPW1!" });
+    expect(result.success).toBe(true);
   });
 });
