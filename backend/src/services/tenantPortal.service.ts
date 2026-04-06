@@ -63,19 +63,7 @@ export async function updateMe(
       data: { phone: data.phone },
     });
   }
-
-  if (data.email) {
-    const existing = await prisma.tenantUser.findFirst({
-      where: { email: data.email, companyId: tenantUser.companyId, id: { not: tenantUser.id } },
-    });
-    if (existing) throw new BadRequestError("E-Mail-Adresse bereits vergeben");
-
-    await prisma.tenantUser.update({
-      where: { id: tenantUser.id },
-      data: { email: data.email },
-    });
-  }
-
+  // email changes are not allowed via self-service — contact property manager
   return getMe(tenantUser);
 }
 

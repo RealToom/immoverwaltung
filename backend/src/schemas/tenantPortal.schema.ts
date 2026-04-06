@@ -6,7 +6,6 @@ export const tenantPortalIdParamSchema = z.object({
 
 export const updateMeSchema = z.object({
   phone: z.string().max(30).optional(),
-  email: z.string().email().optional(),
 });
 
 export const MAINTENANCE_CATEGORIES = [
