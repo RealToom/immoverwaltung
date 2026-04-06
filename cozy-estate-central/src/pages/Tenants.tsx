@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useTenants, useCreateTenant } from "@/hooks/api/useTenants";
+import { useTenants, useCreateTenant, useInviteTenant } from "@/hooks/api/useTenants";
 import { useProperties } from "@/hooks/api/useProperties";
 import {
   useTenantDocuments, useUploadTenantDocument,
@@ -70,6 +70,7 @@ export default function Tenants() {
   const { data: tenantsResponse, isLoading } = useTenants(search || undefined, propertyIdFilter);
   const { data: propertiesResponse } = useProperties();
   const createTenant = useCreateTenant();
+  const inviteTenant = useInviteTenant();
 
   const tenants = tenantsResponse?.data ?? [];
   const properties = propertiesResponse?.data ?? [];
@@ -515,10 +516,28 @@ export default function Tenants() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={() => setSelectedTenantId(t.id)}>
-                          <FileText className="h-3.5 w-3.5" />
-                          Details
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1 text-xs"
+                            title="Einladung senden"
+                            disabled={inviteTenant.isPending}
+                            onClick={() =>
+                              inviteTenant.mutate(t.id, {
+                                onSuccess: () => toast({ title: "Einladung gesendet", description: `${t.name} wurde per E-Mail eingeladen.` }),
+                                onError: () => toast({ title: "Fehler", description: "Einladung konnte nicht gesendet werden.", variant: "destructive" }),
+                              })
+                            }
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                            Einladen
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={() => setSelectedTenantId(t.id)}>
+                            <FileText className="h-3.5 w-3.5" />
+                            Details
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
