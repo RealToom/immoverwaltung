@@ -235,4 +235,27 @@ describe("tenantPortal.service", () => {
       expect(msg.direction).toBe("TENANT_TO_ADMIN");
     });
   });
+
+  describe("updateMe", () => {
+    it("updates phone but ignores email changes", async () => {
+      vi.mocked(prisma.tenant.update).mockResolvedValueOnce({} as any);
+      vi.mocked(prisma.tenantUser.findUnique).mockResolvedValueOnce({
+        id: 1,
+        email: "original@example.de",
+        lastLoginAt: null,
+        company: { name: "Test GmbH" },
+        tenant: {
+          id: 10, name: "Max", phone: "+49 171 999", moveIn: null,
+          units: [], contracts: [],
+        },
+      } as any);
+
+      await updateMe(mockTenantUser, { phone: "+49 171 999", email: "hacker@evil.com" });
+
+      expect(prisma.tenantUser.update).not.toHaveBeenCalled();
+      expect(prisma.tenant.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { phone: "+49 171 999" } })
+      );
+    });
+  });
 });
