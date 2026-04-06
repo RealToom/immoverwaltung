@@ -37,11 +37,22 @@ import { auditLogRouter } from "./auditlog.routes.js";
 import { billingRouter } from "./billing.routes.js";
 import { energyRouter } from "./energy.routes.js";
 import { subscriptionGuard } from "../middleware/subscriptionGuard.js";
+import { tenantAuthRouter } from "./tenantAuth.routes.js";
+import { tenantBrandingRouter } from "./tenantBranding.routes.js";
+import { tenantPortalRouter } from "./tenantPortal.routes.js";
+import { resolveCompanySlug } from "../middleware/resolveCompanySlug.js";
+import { tenantAdminRouter } from "./tenantAdmin.routes.js";
 
 const router = Router();
 
 // Allgemeines Rate-Limiting auf alle Write-Requests
 router.use(apiLimiter);
+
+// Tenant Portal — public branding endpoint
+router.use("/tenant/company", tenantBrandingRouter);
+// Tenant Portal — slug-scoped auth + portal API
+router.use("/tenant/:slug/auth", resolveCompanySlug, tenantAuthRouter);
+router.use("/tenant/:slug", resolveCompanySlug, tenantPortalRouter);
 
 // Public routes
 router.use("/auth", authRouter);
@@ -89,5 +100,8 @@ router.use("/insurance", requireAuth, tenantGuard, subscriptionGuard, insuranceR
 router.use("/maintenance-budgets", requireAuth, tenantGuard, subscriptionGuard, budgetRouter);
 router.use("/audit-logs", requireAuth, tenantGuard, subscriptionGuard, auditLogRouter);
 router.use("/energy", requireAuth, tenantGuard, subscriptionGuard, energyRouter);
+
+// Tenant Admin — Verwalter reads/sends messages to tenants
+router.use("/tenant-admin", requireAuth, tenantGuard, subscriptionGuard, tenantAdminRouter);
 
 export { router as apiRouter };
