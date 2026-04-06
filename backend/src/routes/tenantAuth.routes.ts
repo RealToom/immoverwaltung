@@ -22,6 +22,6 @@ router.post("/refresh", authLimiter, refreshHandler);
 router.post("/logout", requireTenantAuth, logoutHandler);
 
 // POST /api/tenant/:slug/auth/accept-invite
-router.post("/accept-invite", validate({ body: tenantAcceptInviteSchema }), acceptInviteHandler);
+router.post("/accept-invite", authLimiter, validate({ body: tenantAcceptInviteSchema }), acceptInviteHandler);
 
 export { router as tenantAuthRouter };
