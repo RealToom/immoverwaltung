@@ -28,13 +28,15 @@ interface RequestOptions {
   isFormData?: boolean;
 }
 
+let _currentSlug: string | null = null;
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 
 async function refreshToken(): Promise<string | null> {
   if (isRefreshing && refreshPromise) return refreshPromise;
+  if (!_currentSlug) return null;
   isRefreshing = true;
-  refreshPromise = fetch("/api/tenant/refresh", {
+  refreshPromise = fetch(`/api/tenant/${_currentSlug}/auth/refresh`, {
     method: "POST",
     credentials: "include",
   })
@@ -92,7 +94,8 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   return res.json() as Promise<T>;
 }
 
-/** Convenience wrapper: prepends /api/tenant/:slug to path. */
+/** Convenience wrapper: prepends /api/tenant/:slug to path. Keeps slug for auto-refresh. */
 export function tenantApi<T>(slug: string, path: string, options: RequestOptions = {}): Promise<T> {
+  _currentSlug = slug;
   return api<T>(`/api/tenant/${slug}${path}`, options);
 }
