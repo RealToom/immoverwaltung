@@ -1,7 +1,7 @@
 # Immoverwaltung - Projektdokumentation
 
-> **Letzte Aktualisierung:** 2026-03-25
-> **Status:** Production-Ready + Bugfixes aus ImmoHub-Bugreport v2 (2026-03-25)
+> **Letzte Aktualisierung:** 2026-04-06
+> **Status:** Production-Ready + Mieter-Portal PWA (2026-04-06)
 
 ## Roadmap / Zukünftige Features
 
@@ -35,9 +35,11 @@
 - `GET /api/finance/utility-statement?propertyId=X&year=Y` — Jahresabrechnung nach Wohnfläche
 - Frontend: PropertyDetail → Tab "Nebenkosten" (Ausgaben markieren + Abrechnung generieren)
 
-### 7. Mieter-Portal (App)
-- Self-Service Login für Mieter
-- Dokumente einsehen, Schäden melden (Tickets), Stammdaten ändern
+### 7. Mieter-Portal (App) ✅ IMPLEMENTIERT
+- White-Label PWA (`tenant-portal/`) — pro Firma eigene Farbe + Logo
+- Self-Service: Dokumente einsehen/signieren/hochladen, Tickets/Schäden melden, Finanzen, Nachrichten-Chat
+- Separate JWT-Auth (eigene Secrets, Cookie `tenant_refresh_token`, Rolle TENANT)
+- Einladung per E-Mail aus Admin-UI (Tenants-Seite → "Einladen"-Button)
 
 ### 8. DATEV / Steuer-Export ✅ IMPLEMENTIERT
 - DATEV Buchungsstapel CSV (EXTF-Format, UTF-8 BOM, CRLF, Soll/Haben)
@@ -456,7 +458,45 @@ Server-Stats via Node.js `os`-Modul + `df -k /`. `lastBackup` = `mtime` der neue
 **Neue npm-Pakete:**
 - `backend`: `pdfkit` (PDF-Generierung), `handlebars` (Template-Engine)
 
-**Nicht implementiert (Roadmap):** Mieter-Portal (öffentliche URL für Mieter, Self-Service Login)
+---
+
+### 2026-04-06: Mieter-Portal (Tenant Portal PWA)
+
+**Neue Features:**
+
+**Backend:**
+- Prisma: neue Models `TenantUser`, `TenantMessage`, `TenantUpload`; `Document` um Signaturfelder erweitert; `Company` um `logoUrl`/`primaryColor`/`slug` erweitert
+- Separate JWT-Auth für Mieter: `JWT_TENANT_ACCESS_SECRET` + `JWT_TENANT_REFRESH_SECRET`, Cookie `tenant_refresh_token` (Path `/api/tenant`, HttpOnly, SameSite=Strict)
+- `resolveCompanySlug` Middleware: URL-Slug → `req.companyId`
+- `requireTenantAuth` Middleware: Bearer-Token → `req.tenantUser`
+- REST-API unter `/api/tenant/:slug/`:
+  - `GET/PATCH /me` — Profil + Stammdaten
+  - `GET /documents` — Dokumente der Verwaltung (mit Signaturstatus)
+  - `POST /documents/:id/sign` — Signatur (SIMPLE oder SIGNATURE_PAD mit Base64-Bild)
+  - `GET/POST /uploads` — Mieter-eigene Uploads (PDF/JPG/PNG, max 10 MB, Multer)
+  - `GET/POST /tickets` — Wartungstickets / Schadensmeldungen
+  - `GET /finances` — Miethistorie als `{monthlyRent, entries[]}`
+  - `GET/POST /messages` — Nachrichten-Chat mit Verwaltung
+- Admin-Endpunkte: `POST /api/tenants/:id/invite` (E-Mail mit Einladungslink), `GET/POST /api/tenant-admin/messages/:tenantUserId` (VERWALTER+)
+- 15 neue Tests (tenantJwt.test.ts + tenantPortal.service.test.ts), 119 Tests gesamt
+
+**Frontend (`tenant-portal/` — eigenständiges Vite-Projekt):**
+- React 18 + TypeScript + Tailwind CSS 3 + TanStack Query v5 + React Router v6
+- PWA: `vite-plugin-pwa` (Workbox Service Worker, Web App Manifest, autoUpdate)
+- White-Label-Theming: `BrandingContext` liest Firmenfarbe (hex→HSL), setzt CSS-Variablen `--primary`/`--primary-foreground`/`--ring` zur Laufzeit
+- `AuthContext`: slug-aware Refresh-on-mount via `/auth/refresh`, Access Token im Memory
+- `api.ts`: `_currentSlug` getrackt → auto-refresh bei 401 nutzt korrekten Slug-Endpoint
+- 10 Seiten: Login, Einladung annehmen, Dashboard, Profil, Dokumente, Signatur-Pad (signature_pad), Upload, Tickets, Schaden melden, Finanzen, Nachrichten-Chat
+- BottomNav (5 Tabs, inline SVG, kein Emoji)
+- Erreichbar unter `http://localhost:5173/{firma-slug}/`
+
+**Admin-UI (cozy-estate-central):**
+- Mieter-Tabelle: "Einladen"-Button → `POST /api/tenants/:id/invite` → E-Mail an Mieter
+
+**Neue npm-Pakete:**
+- `tenant-portal`: `signature_pad`, `vite-plugin-pwa`, `date-fns`
+
+**Neue DB-Models (Migration `20260404184511_tenant_portal`):** TenantUser, TenantMessage, TenantUpload
 
 ---
 
