@@ -162,7 +162,7 @@ export async function sendTenantInvite(
   }
 
   const inviteToken = randomUUID();
-  const inviteExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+  const inviteExpiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
 
   // Upsert TenantUser (create if not exists, update invite token if exists)
   await prisma.tenantUser.upsert({
@@ -193,7 +193,7 @@ export async function sendTenantInvite(
       <p>Sie wurden eingeladen, das Mieter-Portal von <strong>${companyName}</strong> zu nutzen.</p>
       <p>Klicken Sie auf den folgenden Link, um Ihr Passwort zu setzen und sich anzumelden:</p>
       <p><a href="${portalUrl}">${portalUrl}</a></p>
-      <p>Dieser Link ist 7 Tage gültig.</p>
+      <p>Dieser Link ist 48 Stunden gültig.</p>
       <p>Mit freundlichen Grüßen<br>${companyName}</p>
     `
   );
