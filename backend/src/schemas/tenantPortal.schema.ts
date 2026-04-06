@@ -9,10 +9,23 @@ export const updateMeSchema = z.object({
   email: z.string().email().optional(),
 });
 
+export const MAINTENANCE_CATEGORIES = [
+  "SANITAER",
+  "ELEKTRIK",
+  "HEIZUNG",
+  "GEBAEUDE",
+  "AUSSENANLAGE",
+  "SONSTIGES",
+] as const;
+
+export type MaintenanceCategoryType = (typeof MAINTENANCE_CATEGORIES)[number];
+
 export const createTicketSchema = z.object({
   title: z.string().min(3, "Titel muss mindestens 3 Zeichen lang sein").max(200),
   description: z.string().min(10, "Beschreibung muss mindestens 10 Zeichen lang sein").max(2000),
-  category: z.string().min(1),
+  category: z.enum(MAINTENANCE_CATEGORIES, {
+    errorMap: () => ({ message: "Ungültige Kategorie" }),
+  }),
 });
 
 export const createMessageSchema = z.object({

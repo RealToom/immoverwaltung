@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { NotFoundError, BadRequestError } from "../lib/errors.js";
+import { MaintenanceCategoryType, MAINTENANCE_CATEGORIES } from "../schemas/tenantPortal.schema.js";
 
 type TenantUser = { id: number; tenantId: number; companyId: number };
 
@@ -211,6 +212,10 @@ export async function createTicket(
   data: { title: string; description: string; category: string },
   _photoPath?: string
 ) {
+  if (!(MAINTENANCE_CATEGORIES as readonly string[]).includes(data.category)) {
+    throw new BadRequestError("Ungültige Kategorie");
+  }
+
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantUser.tenantId },
     select: { units: { select: { id: true, propertyId: true } } },
@@ -223,7 +228,7 @@ export async function createTicket(
     data: {
       title: data.title,
       description: data.description,
-      category: data.category as any,
+      category: data.category as MaintenanceCategoryType,
       priority: "MITTEL",
       status: "OFFEN",
       reportedBy: "Mieter",

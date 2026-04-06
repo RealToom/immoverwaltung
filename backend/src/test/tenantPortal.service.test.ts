@@ -45,6 +45,7 @@ import {
   getFinances,
   getMessages,
   createMessage,
+  updateMe,
 } from "../services/tenantPortal.service.js";
 
 const mockTenantUser = { id: 1, tenantId: 10, companyId: 3 };
@@ -179,6 +180,20 @@ describe("tenantPortal.service", () => {
           }),
         })
       );
+    });
+
+    it("rejects invalid category", async () => {
+      vi.mocked(prisma.tenant.findUnique).mockResolvedValueOnce({
+        units: [{ id: 1, propertyId: 5 }],
+      } as any);
+
+      await expect(
+        createTicket(mockTenantUser, {
+          title: "Irgendwas kaputt",
+          description: "Eine längere Beschreibung des Problems hier",
+          category: "UNGUELTIG",
+        })
+      ).rejects.toThrow();
     });
   });
 
