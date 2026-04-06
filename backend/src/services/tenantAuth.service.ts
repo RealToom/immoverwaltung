@@ -115,6 +115,10 @@ export async function acceptInvite(
     throw new BadRequestError("Einladungslink ist abgelaufen");
   }
 
+  if (tenantUser.passwordHash !== "") {
+    throw new BadRequestError("Einladung bereits verwendet");
+  }
+
   const passwordHash = await bcrypt.hash(password, env.BCRYPT_COST);
   const tokenPayload = {
     tenantUserId: tenantUser.id,
