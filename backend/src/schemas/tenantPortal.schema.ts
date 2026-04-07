@@ -22,7 +22,7 @@ export type MaintenanceCategoryType = (typeof MAINTENANCE_CATEGORIES)[number];
 export const createTicketSchema = z.object({
   title: z.string().min(3, "Titel muss mindestens 3 Zeichen lang sein").max(200),
   description: z.string().min(10, "Beschreibung muss mindestens 10 Zeichen lang sein").max(2000),
-  category: z.enum(MAINTENANCE_CATEGORIES, {
+  category: z.enum(MAINTENANCE_CATEGORIES as unknown as [string, ...string[]], {
     errorMap: () => ({ message: "Ungültige Kategorie" }),
   }),
 });
