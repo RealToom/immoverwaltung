@@ -1,0 +1,37 @@
+# Dependencies (werden im Dockerfile neu installiert)
+node_modules/
+*/node_modules/
+
+# Build-Artefakte
+dist/
+*/dist/
+
+# Backend (wird in eigenem Image gebaut)
+backend/
+
+# Git
+.git/
+.gitignore
+
+# Docs & Media
+docs/
+*.png
+*.pdf
+
+# Scripts (nicht im Frontend-Image gebraucht)
+*.sh
+scripts/
+
+# IDE / Tools
+.claude/
+.playwright-mcp/
+.worktrees/
+.github/
+
+# Secrets
+.env
+*.env.local
+
+# OS
+.DS_Store
+Thumbs.db
