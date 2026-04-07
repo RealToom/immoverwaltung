@@ -15,7 +15,6 @@ backend/
 
 # Docs & Media
 docs/
-*.png
 *.pdf
 
 # Scripts (nicht im Frontend-Image gebraucht)
