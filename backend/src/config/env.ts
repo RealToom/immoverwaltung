@@ -49,6 +49,7 @@ export const env = {
   // Tenant Portal JWT (completely separate from admin JWT)
   get JWT_TENANT_ACCESS_SECRET() { return requireEnv("JWT_TENANT_ACCESS_SECRET"); },
   get JWT_TENANT_REFRESH_SECRET() { return requireEnv("JWT_TENANT_REFRESH_SECRET"); },
+  get JWT_TENANT_MFA_SECRET() { return requireEnv("JWT_TENANT_MFA_SECRET"); },
   // Tenant Portal frontend URL (for invite links)
   get TENANT_PORTAL_URL() { return process.env.TENANT_PORTAL_URL || "http://localhost:5173"; },
 };

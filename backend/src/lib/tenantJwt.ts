@@ -42,3 +42,33 @@ export function verifyTenantAccessToken(token: string): TenantTokenPayload {
 export function verifyTenantRefreshToken(token: string): TenantTokenPayload {
   return jwt.verify(token, getTenantRefreshSecret()) as TenantTokenPayload;
 }
+
+export interface TenantMfaTokenPayload {
+  tenantUserId: number;
+  companyId: number;
+  type: "tenant_mfa_pending";
+}
+
+function getTenantMfaSecret(): string {
+  const s = process.env.JWT_TENANT_MFA_SECRET;
+  if (!s) throw new Error("JWT_TENANT_MFA_SECRET ist nicht gesetzt");
+  return s;
+}
+
+export function signTenantMfaToken(
+  payload: Omit<TenantMfaTokenPayload, "type">
+): string {
+  return jwt.sign(
+    { ...payload, type: "tenant_mfa_pending" },
+    getTenantMfaSecret(),
+    { expiresIn: "10m" }
+  );
+}
+
+export function verifyTenantMfaToken(token: string): TenantMfaTokenPayload {
+  const payload = jwt.verify(token, getTenantMfaSecret()) as TenantMfaTokenPayload;
+  if (payload.type !== "tenant_mfa_pending") {
+    throw new Error("Token-Typ ungültig");
+  }
+  return payload;
+}
