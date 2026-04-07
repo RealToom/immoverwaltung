@@ -5,7 +5,9 @@ import {
   signTenantAccessToken,
   signTenantRefreshToken,
   verifyTenantRefreshToken,
+  signTenantMfaToken,
 } from "../lib/tenantJwt.js";
+import { isTrustedDevice, sendTwoFactorCode } from "./tenantTwoFactor.service.js";
 import { env } from "../config/env.js";
 import { UnauthorizedError, NotFoundError, BadRequestError } from "../lib/errors.js";
 import { sendMailForCompany } from "../config/email.js";
@@ -15,12 +17,17 @@ const COOKIE_NAME = "tenant_refresh_token";
 
 export { COOKIE_NAME };
 
-/** Login with email + password. Returns access + refresh token. */
+export type LoginResult =
+  | { requiresTwoFactor: false; accessToken: string; refreshToken: string }
+  | { requiresTwoFactor: true; mfaToken: string };
+
+/** Login mit E-Mail + Passwort. Gibt volle Tokens oder mfaToken zurück wenn 2FA erforderlich. */
 export async function loginTenant(
   email: string,
   password: string,
-  companyId: number
-): Promise<{ accessToken: string; refreshToken: string }> {
+  companyId: number,
+  deviceToken?: string
+): Promise<LoginResult> {
   const tenantUser = await prisma.tenantUser.findUnique({
     where: { email_companyId: { email, companyId } },
   });
@@ -34,6 +41,35 @@ export async function loginTenant(
     throw new UnauthorizedError("E-Mail oder Passwort falsch");
   }
 
+  // 2FA-Branch
+  if (tenantUser.twoFactorEnabled) {
+    if (deviceToken) {
+      const trusted = await isTrustedDevice(
+        tenantUser.id,
+        companyId,
+        deviceToken
+      );
+      if (trusted) {
+        return issueTokens(tenantUser);
+      }
+    }
+
+    await sendTwoFactorCode(tenantUser.id, companyId);
+    const mfaToken = signTenantMfaToken({
+      tenantUserId: tenantUser.id,
+      companyId,
+    });
+    return { requiresTwoFactor: true, mfaToken };
+  }
+
+  return issueTokens(tenantUser);
+}
+
+async function issueTokens(tenantUser: {
+  id: number;
+  tenantId: number;
+  companyId: number;
+}): Promise<{ requiresTwoFactor: false; accessToken: string; refreshToken: string }> {
   const tokenPayload = {
     tenantUserId: tenantUser.id,
     tenantId: tenantUser.tenantId,
@@ -45,13 +81,10 @@ export async function loginTenant(
 
   await prisma.tenantUser.update({
     where: { id: tenantUser.id },
-    data: {
-      refreshToken,
-      lastLoginAt: new Date(),
-    },
+    data: { refreshToken, lastLoginAt: new Date() },
   });
 
-  return { accessToken, refreshToken };
+  return { requiresTwoFactor: false, accessToken, refreshToken };
 }
 
 /** Rotate refresh token. Returns new access + refresh token. */
