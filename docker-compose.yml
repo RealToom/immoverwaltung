@@ -52,6 +52,9 @@ services:
       SMTP_FROM: ${SMTP_FROM:-noreply@immoverwalt.de}
       SUPERADMIN_SECRET: ${SUPERADMIN_SECRET:?SUPERADMIN_SECRET muss in .env gesetzt sein (openssl rand -hex 32)}
       SUPERADMIN_JWT_SECRET: ${SUPERADMIN_JWT_SECRET:?SUPERADMIN_JWT_SECRET muss in .env gesetzt sein (openssl rand -base64 48)}
+      JWT_TENANT_ACCESS_SECRET: ${JWT_TENANT_ACCESS_SECRET:?JWT_TENANT_ACCESS_SECRET muss in .env gesetzt sein}
+      JWT_TENANT_REFRESH_SECRET: ${JWT_TENANT_REFRESH_SECRET:?JWT_TENANT_REFRESH_SECRET muss in .env gesetzt sein}
+      JWT_TENANT_MFA_SECRET: ${JWT_TENANT_MFA_SECRET:?JWT_TENANT_MFA_SECRET muss in .env gesetzt sein}
     volumes:
       - uploads_data:/app/uploads
     entrypoint: ["sh", "docker-entrypoint.sh"]
