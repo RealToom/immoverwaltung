@@ -70,7 +70,9 @@ services:
           cpus: "1.0"
 
   frontend:
-    build: ./cozy-estate-central
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     container_name: immoverwaltung-frontend
     restart: unless-stopped
     depends_on:
