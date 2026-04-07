@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useCreateTicket } from "@/hooks/api/useTenantTickets";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Camera, X } from "lucide-react";
 
 const CATEGORIES = [
   "Sanitär",
@@ -18,8 +18,29 @@ export default function NewTicket() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const createMutation = useCreateTicket(slug!);
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Bild darf maximal 10 MB groß sein.");
+      return;
+    }
+    setPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  }
+
+  function removePhoto() {
+    setPhoto(null);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,7 +54,7 @@ export default function NewTicket() {
       return;
     }
     try {
-      await createMutation.mutateAsync({ title: title.trim(), description: description.trim(), category });
+      await createMutation.mutateAsync({ title: title.trim(), description: description.trim(), category, photo });
       navigate(`/${slug}/tickets`);
     } catch {
       setError("Fehler beim Erstellen des Tickets. Bitte versuchen Sie es erneut.");
@@ -74,6 +95,39 @@ export default function NewTicket() {
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Foto (optional)</label>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handlePhotoChange}
+              className="hidden"
+            />
+            {photoPreview ? (
+              <div className="relative rounded-xl overflow-hidden border border-gray-200">
+                <img src={photoPreview} alt="Vorschau" className="w-full max-h-48 object-cover" />
+                <button
+                  type="button"
+                  onClick={removePhoto}
+                  className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full border-2 border-dashed border-gray-300 rounded-xl px-4 py-6 text-sm text-gray-500 flex flex-col items-center gap-2 hover:border-primary hover:text-primary transition-colors"
+              >
+                <Camera className="w-6 h-6" />
+                <span>Foto aufnehmen oder auswählen</span>
+              </button>
+            )}
           </div>
 
           <div>

@@ -16,6 +16,7 @@ export interface CreateTicketInput {
   title: string;
   description: string;
   category: string;
+  photo?: File | null;
 }
 
 export function useTenantTickets(slug: string) {
@@ -29,11 +30,14 @@ export function useTenantTickets(slug: string) {
 export function useCreateTicket(slug: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateTicketInput) =>
-      tenantApi(slug, "/tickets", {
-        method: "POST",
-        body: input,
-      }),
+    mutationFn: ({ title, description, category, photo }: CreateTicketInput) => {
+      const form = new FormData();
+      form.append("title", title);
+      form.append("description", description);
+      form.append("category", category);
+      if (photo) form.append("photo", photo);
+      return tenantApi(slug, "/tickets", { method: "POST", body: form, isFormData: true });
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", slug, "tickets"] }),
   });
 }
