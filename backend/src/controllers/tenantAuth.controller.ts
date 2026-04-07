@@ -1,28 +1,51 @@
 import type { Request, Response } from "express";
 import * as tenantAuthService from "../services/tenantAuth.service.js";
-import type { TenantLoginInput, TenantAcceptInviteInput } from "../schemas/tenantAuth.schema.js";
+import type {
+  TenantLoginInput,
+  TenantAcceptInviteInput,
+} from "../schemas/tenantAuth.schema.js";
+import {
+  DEVICE_COOKIE_NAME,
+  DEVICE_COOKIE_MAX_AGE_SECONDS,
+} from "../services/tenantTwoFactor.service.js";
 
 const COOKIE_NAME = tenantAuthService.COOKIE_NAME;
-const REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const REFRESH_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 const isProduction = process.env.NODE_ENV === "production";
 
-function setTenantRefreshCookie(res: Response, token: string): void {
-  const securePart = isProduction ? " Secure;" : "";
-  res.setHeader(
+function securePart(): string {
+  return isProduction ? " Secure;" : "";
+}
+
+export function setTenantRefreshCookie(res: Response, token: string): void {
+  res.append(
     "Set-Cookie",
-    `${COOKIE_NAME}=${token}; HttpOnly;${securePart} SameSite=Strict; Path=/api/tenant; Max-Age=${REFRESH_COOKIE_MAX_AGE / 1000}`
+    `${COOKIE_NAME}=${token}; HttpOnly;${securePart()} SameSite=Strict; Path=/api/tenant; Max-Age=${REFRESH_COOKIE_MAX_AGE_SECONDS}`
   );
 }
 
 function clearTenantRefreshCookie(res: Response): void {
-  const securePart = isProduction ? " Secure;" : "";
-  res.setHeader(
+  res.append(
     "Set-Cookie",
-    `${COOKIE_NAME}=; HttpOnly;${securePart} SameSite=Strict; Path=/api/tenant; Max-Age=0`
+    `${COOKIE_NAME}=; HttpOnly;${securePart()} SameSite=Strict; Path=/api/tenant; Max-Age=0`
   );
 }
 
-function parseCookie(req: Request, name: string): string | undefined {
+export function setDeviceCookie(res: Response, deviceToken: string): void {
+  res.append(
+    "Set-Cookie",
+    `${DEVICE_COOKIE_NAME}=${deviceToken}; HttpOnly;${securePart()} SameSite=Strict; Path=/api/tenant; Max-Age=${DEVICE_COOKIE_MAX_AGE_SECONDS}`
+  );
+}
+
+export function clearDeviceCookie(res: Response): void {
+  res.append(
+    "Set-Cookie",
+    `${DEVICE_COOKIE_NAME}=; HttpOnly;${securePart()} SameSite=Strict; Path=/api/tenant; Max-Age=0`
+  );
+}
+
+export function parseCookie(req: Request, name: string): string | undefined {
   const header = req.headers.cookie;
   if (!header) return undefined;
   for (const cookie of header.split("; ")) {
@@ -34,16 +57,23 @@ function parseCookie(req: Request, name: string): string | undefined {
 
 export async function loginHandler(req: Request, res: Response) {
   const { email, password } = req.body as TenantLoginInput;
-  const companyId = (req as any).companyId as number;
+  const companyId = req.companyId!;
+  const deviceToken = parseCookie(req, DEVICE_COOKIE_NAME);
 
-  const { accessToken, refreshToken } = await tenantAuthService.loginTenant(
+  const result = await tenantAuthService.loginTenant(
     email,
     password,
-    companyId
+    companyId,
+    deviceToken
   );
 
-  setTenantRefreshCookie(res, refreshToken);
-  res.json({ data: { accessToken } });
+  if (result.requiresTwoFactor) {
+    res.json({ data: { requiresTwoFactor: true, mfaToken: result.mfaToken } });
+    return;
+  }
+
+  setTenantRefreshCookie(res, result.refreshToken);
+  res.json({ data: { accessToken: result.accessToken } });
 }
 
 export async function refreshHandler(req: Request, res: Response) {
@@ -53,7 +83,8 @@ export async function refreshHandler(req: Request, res: Response) {
     return;
   }
 
-  const { accessToken, refreshToken } = await tenantAuthService.refreshTenantToken(token);
+  const { accessToken, refreshToken } =
+    await tenantAuthService.refreshTenantToken(token);
   setTenantRefreshCookie(res, refreshToken);
   res.json({ data: { accessToken } });
 }
@@ -67,8 +98,10 @@ export async function logoutHandler(req: Request, res: Response) {
 
 export async function acceptInviteHandler(req: Request, res: Response) {
   const { token, password } = req.body as TenantAcceptInviteInput;
-
-  const { accessToken, refreshToken } = await tenantAuthService.acceptInvite(token, password);
+  const { accessToken, refreshToken } = await tenantAuthService.acceptInvite(
+    token,
+    password
+  );
   setTenantRefreshCookie(res, refreshToken);
   res.json({ data: { accessToken } });
 }
@@ -76,7 +109,6 @@ export async function acceptInviteHandler(req: Request, res: Response) {
 export async function inviteTenantHandler(req: Request, res: Response) {
   const tenantId = parseInt(req.params.id as string, 10);
   const companyId = req.companyId!;
-
   await tenantAuthService.sendTenantInvite(tenantId, companyId);
   res.json({ data: { message: "Einladung wurde gesendet" } });
 }
