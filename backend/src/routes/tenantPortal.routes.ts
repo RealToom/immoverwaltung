@@ -11,6 +11,17 @@ import {
   uploadMetaSchema,
 } from "../schemas/tenantPortal.schema.js";
 import * as ctrl from "../controllers/tenantPortal.controller.js";
+import { authLimiter } from "../middleware/rateLimiter.js";
+import {
+  get2faStatusHandler,
+  enable2faHandler,
+  confirm2faHandler,
+  disable2faHandler,
+} from "../controllers/tenantTwoFactor.controller.js";
+import {
+  confirm2faSchema,
+  disable2faSchema,
+} from "../schemas/tenantTwoFactor.schema.js";
 
 const router = Router({ mergeParams: true });
 
@@ -43,5 +54,11 @@ router.get("/finances", ctrl.getFinances);
 // ─── Messages ─────────────────────────────────────────────────────────────────
 router.get("/messages", ctrl.getMessages);
 router.post("/messages", validate({ body: createMessageSchema }), ctrl.createMessage);
+
+// ─── 2FA Self-Service ──────────────────────────────────────────────────────────
+router.get("/me/2fa/status", get2faStatusHandler);
+router.post("/me/2fa/enable", authLimiter, enable2faHandler);
+router.post("/me/2fa/confirm", authLimiter, validate({ body: confirm2faSchema }), confirm2faHandler);
+router.delete("/me/2fa", validate({ body: disable2faSchema }), disable2faHandler);
 
 export { router as tenantPortalRouter };
