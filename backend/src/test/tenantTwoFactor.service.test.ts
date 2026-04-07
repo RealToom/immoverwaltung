@@ -87,7 +87,9 @@ describe("isTrustedDevice Logik", () => {
   });
 
   it("falsche tenantUserId wird erkannt", () => {
-    expect(1 !== 2).toBe(true);
+    const a: number = 1;
+    const b: number = 2;
+    expect(a !== b).toBe(true);
   });
 
   it("DEVICE_COOKIE_MAX_AGE_SECONDS entspricht 30 Tagen", async () => {
