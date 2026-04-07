@@ -3,6 +3,7 @@ import { z } from "zod";
 import { validate } from "../middleware/validate.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { adminReplyToTenant, adminGetTenantMessages } from "../services/tenantPortal.service.js";
+import { adminReset2faHandler } from "../controllers/tenantTwoFactor.controller.js";
 
 export const tenantAdminRouter = Router();
 
@@ -36,4 +37,12 @@ tenantAdminRouter.post(
     );
     res.status(201).json({ data: msg });
   }
+);
+
+// DELETE /api/tenant-admin/tenants/:tenantUserId/2fa
+tenantAdminRouter.delete(
+  "/tenants/:tenantUserId/2fa",
+  requireRole("ADMIN", "VERWALTER"),
+  validate({ params: tenantUserIdParam }),
+  adminReset2faHandler
 );
