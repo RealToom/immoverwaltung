@@ -2,7 +2,9 @@ import multer from "multer";
 import path from "node:path";
 import fs from "node:fs";
 import crypto from "node:crypto";
-import type { Request } from "express";
+import type { Request, Response, NextFunction } from "express";
+import { fileTypeFromFile } from "file-type";
+import { BadRequestError } from "../lib/errors.js";
 import { env } from "../config/env.js";
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -10,6 +12,8 @@ const MIME_TO_EXT: Record<string, string> = {
   "image/jpeg": ".jpg",
   "image/png": ".png",
 };
+
+const ALLOWED_MIMES = new Set(Object.keys(MIME_TO_EXT));
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -44,15 +48,26 @@ function fileFilter(
   }
 }
 
-export const tenantUploadMiddleware = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: MAX_FILE_SIZE },
-}).single("file");
+const multerUpload = multer({ storage, fileFilter, limits: { fileSize: MAX_FILE_SIZE } });
+const multerPhoto = multer({ storage, fileFilter, limits: { fileSize: MAX_FILE_SIZE } });
+
+/** Validates magic bytes of the uploaded file and deletes it on failure. */
+async function validateMagicBytes(
+  req: Request,
+  _res: Response,
+  next: NextFunction
+): Promise<void> {
+  if (!req.file) return next();
+
+  const detected = await fileTypeFromFile(req.file.path);
+  if (!detected || !ALLOWED_MIMES.has(detected.mime)) {
+    try { fs.unlinkSync(req.file.path); } catch { /* ignore */ }
+    return next(new BadRequestError("Dateiinhalt entspricht nicht dem erlaubten Typ. Erlaubt: PDF, JPG, PNG"));
+  }
+  next();
+}
+
+export const tenantUploadMiddleware = [multerUpload.single("file"), validateMagicBytes];
 
 /** Optional upload (for ticket photos) — wraps multer to not fail when no file */
-export const tenantPhotoMiddleware = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: MAX_FILE_SIZE },
-}).single("photo");
+export const tenantPhotoMiddleware = [multerPhoto.single("photo"), validateMagicBytes];
