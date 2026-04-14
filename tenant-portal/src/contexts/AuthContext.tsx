@@ -30,10 +30,19 @@ interface TenantUserMe {
   };
 }
 
+export interface MfaChallenge {
+  requiresTwoFactor: true;
+  mfaToken: string;
+}
+
+type LoginResponse =
+  | { requiresTwoFactor: true; mfaToken: string }
+  | { accessToken: string };
+
 interface AuthContextValue {
   user: TenantUserMe | null;
   loading: boolean;
-  login: (slug: string, email: string, password: string) => Promise<void>;
+  login: (slug: string, email: string, password: string) => Promise<MfaChallenge | undefined>;
   logout: (slug: string) => Promise<void>;
   refetchUser: (slug: string) => Promise<void>;
 }
@@ -41,7 +50,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
-  login: async () => {},
+  login: async () => undefined,
   logout: async () => {},
   refetchUser: async () => {},
 });
@@ -70,14 +79,18 @@ export function AuthProvider({ slug, children }: { slug: string; children: React
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
-  const login = useCallback(async (slug: string, email: string, password: string) => {
-    const res = await tenantApi<{ data: { accessToken: string } }>(slug, "/auth/login", {
+  const login = useCallback(async (slug: string, email: string, password: string): Promise<MfaChallenge | undefined> => {
+    const res = await tenantApi<{ data: LoginResponse }>(slug, "/auth/login", {
       method: "POST",
       body: { email, password },
     });
+    if ("requiresTwoFactor" in res.data) {
+      return { requiresTwoFactor: true, mfaToken: res.data.mfaToken };
+    }
     setToken(res.data.accessToken);
     const meRes = await tenantApi<{ data: TenantUserMe }>(slug, "/me");
     setUser(meRes.data);
+    return undefined;
   }, []);
 
   const logout = useCallback(async (slug: string) => {
