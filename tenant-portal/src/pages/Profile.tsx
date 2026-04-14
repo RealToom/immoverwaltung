@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut, Mail, Phone, Home } from "lucide-react";
+import { tenantApi } from "@/lib/api";
+import { LogOut, Mail, Phone, Home, Shield, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 
@@ -10,11 +11,68 @@ export default function Profile() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
+  const [twoFaEnabled, setTwoFaEnabled] = useState<boolean | null>(null);
+  const [twoFaView, setTwoFaView] = useState<"idle" | "confirming" | "disabling">("idle");
+  const [twoFaCode, setTwoFaCode] = useState("");
+  const [twoFaPassword, setTwoFaPassword] = useState("");
+  const [twoFaError, setTwoFaError] = useState<string | null>(null);
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
 
   async function handleLogout() {
     setLoggingOut(true);
     await logout(slug!);
     navigate(`/${slug}/login`);
+  }
+
+  async function handleEnable2fa() {
+    setTwoFaError(null);
+    setTwoFaLoading(true);
+    try {
+      await tenantApi(slug!, "/me/2fa/enable", { method: "POST" });
+      setTwoFaView("confirming");
+    } catch {
+      setTwoFaError("Code konnte nicht gesendet werden. Bitte versuchen Sie es erneut.");
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleConfirm2fa(e: React.FormEvent) {
+    e.preventDefault();
+    setTwoFaError(null);
+    setTwoFaLoading(true);
+    try {
+      await tenantApi(slug!, "/me/2fa/confirm", {
+        method: "POST",
+        body: { code: twoFaCode },
+      });
+      setTwoFaEnabled(true);
+      setTwoFaView("idle");
+      setTwoFaCode("");
+    } catch {
+      setTwoFaError("Ungültiger oder abgelaufener Code.");
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleDisable2fa(e: React.FormEvent) {
+    e.preventDefault();
+    setTwoFaError(null);
+    setTwoFaLoading(true);
+    try {
+      await tenantApi(slug!, "/me/2fa", {
+        method: "DELETE",
+        body: { password: twoFaPassword },
+      });
+      setTwoFaEnabled(false);
+      setTwoFaView("idle");
+      setTwoFaPassword("");
+    } catch {
+      setTwoFaError("Falsches Passwort.");
+    } finally {
+      setTwoFaLoading(false);
+    }
   }
 
   const initials = user?.tenant.name
@@ -26,6 +84,12 @@ export default function Profile() {
 
   const firstUnit = user?.tenant.units[0];
   const activeContract = user?.tenant.contracts[0];
+
+  useEffect(() => {
+    tenantApi<{ data: { enabled: boolean } }>(slug!, "/me/2fa/status")
+      .then((res) => setTwoFaEnabled(res.data.enabled))
+      .catch(() => setTwoFaEnabled(false));
+  }, [slug]);
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 pb-20">
@@ -101,6 +165,125 @@ export default function Profile() {
             )}
           </div>
         </div>
+
+        {/* 2FA */}
+        {twoFaEnabled !== null && (
+          <div className="bg-white border rounded-2xl p-4">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              Zwei-Faktor-Authentifizierung
+            </h3>
+
+            {twoFaView === "idle" && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  {twoFaEnabled ? (
+                    <ShieldCheck className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <Shield className="w-5 h-5 text-gray-400" />
+                  )}
+                  <p className="text-sm text-gray-700">
+                    {twoFaEnabled ? "Aktiv — Ihr Konto ist zusätzlich geschützt." : "Nicht aktiv"}
+                  </p>
+                </div>
+                {twoFaError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    {twoFaError}
+                  </p>
+                )}
+                {twoFaEnabled ? (
+                  <button
+                    onClick={() => { setTwoFaView("disabling"); setTwoFaError(null); }}
+                    className="w-full border border-red-200 text-red-600 text-sm py-2.5 rounded-xl font-medium"
+                  >
+                    2FA deaktivieren
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleEnable2fa}
+                    disabled={twoFaLoading}
+                    className="w-full bg-primary text-primary-foreground text-sm py-2.5 rounded-xl font-medium disabled:opacity-50"
+                  >
+                    {twoFaLoading ? "Code wird gesendet…" : "2FA aktivieren"}
+                  </button>
+                )}
+              </div>
+            )}
+
+            {twoFaView === "confirming" && (
+              <form onSubmit={handleConfirm2fa} className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Wir haben Ihnen einen Code per E-Mail gesendet. Geben Sie ihn ein, um 2FA zu aktivieren.
+                </p>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={twoFaCode}
+                  onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  required
+                  maxLength={6}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-center tracking-widest text-lg font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="123456"
+                />
+                {twoFaError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    {twoFaError}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={twoFaLoading || twoFaCode.length !== 6}
+                  className="w-full bg-primary text-primary-foreground text-sm py-2.5 rounded-xl font-medium disabled:opacity-50"
+                >
+                  {twoFaLoading ? "Wird aktiviert…" : "Bestätigen"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTwoFaView("idle"); setTwoFaCode(""); setTwoFaError(null); }}
+                  className="w-full text-sm text-gray-500 py-2"
+                >
+                  Abbrechen
+                </button>
+              </form>
+            )}
+
+            {twoFaView === "disabling" && (
+              <form onSubmit={handleDisable2fa} className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Geben Sie Ihr Passwort ein, um die Zwei-Faktor-Authentifizierung zu deaktivieren.
+                </p>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={twoFaPassword}
+                  onChange={(e) => setTwoFaPassword(e.target.value)}
+                  required
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Ihr Passwort"
+                />
+                {twoFaError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                    {twoFaError}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={twoFaLoading || !twoFaPassword}
+                  className="w-full border border-red-200 text-red-600 text-sm py-2.5 rounded-xl font-medium disabled:opacity-50"
+                >
+                  {twoFaLoading ? "Wird deaktiviert…" : "2FA deaktivieren"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setTwoFaView("idle"); setTwoFaPassword(""); setTwoFaError(null); }}
+                  className="w-full text-sm text-gray-500 py-2"
+                >
+                  Abbrechen
+                </button>
+              </form>
+            )}
+          </div>
+        )}
 
         {/* Abmelden */}
         <button
