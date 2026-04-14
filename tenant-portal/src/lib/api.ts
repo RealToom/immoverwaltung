@@ -99,3 +99,29 @@ export function tenantApi<T>(slug: string, path: string, options: RequestOptions
   _currentSlug = slug;
   return api<T>(`/api/tenant/${slug}${path}`, options);
 }
+
+/** Schließt den 2FA-Login ab. mfaToken wird als Authorization-Header gesendet. */
+export async function verify2fa(
+  slug: string,
+  mfaToken: string,
+  code: string,
+  rememberDevice: boolean
+): Promise<{ accessToken: string }> {
+  const res = await fetch(`/api/tenant/${slug}/auth/verify-2fa`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${mfaToken}`,
+    },
+    credentials: "include",
+    body: JSON.stringify({ code, rememberDevice }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, body?.error ?? `HTTP ${res.status}`);
+  }
+
+  const json = await res.json();
+  return json.data as { accessToken: string };
+}
