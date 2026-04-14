@@ -123,5 +123,9 @@ export async function verify2fa(
   }
 
   const json = await res.json();
-  return json.data as { accessToken: string };
+  const data = json?.data as { accessToken?: string } | undefined;
+  if (!data?.accessToken) {
+    throw new ApiError(res.status, "Ungültige Server-Antwort");
+  }
+  return { accessToken: data.accessToken };
 }
