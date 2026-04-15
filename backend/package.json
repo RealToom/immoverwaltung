@@ -46,6 +46,9 @@
     "stripe": "^20.4.1",
     "zod": "^4.3.6"
   },
+  "overrides": {
+    "semver": "^7.6.3"
+  },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
