@@ -1,0 +1,105 @@
+<h2>Welche visuelle Sprache soll die App sprechen?</h2>
+<p class="subtitle">Unabhängig von Hell/Dunkel — das ist die Persönlichkeit, die in beiden Modi gilt</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="minimal" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8fafc;padding:20px;font-family:system-ui">
+      <div style="background:#fff;border-radius:10px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #f1f5f9">
+        <div style="font-size:8px;color:#94a3b8;font-weight:500;letter-spacing:.04em;margin-bottom:6px">Immobilien</div>
+        <div style="font-size:22px;font-weight:600;color:#0f172a;letter-spacing:-.02em">24</div>
+        <div style="font-size:8px;color:#94a3b8;margin-top:4px">96 Einheiten gesamt</div>
+      </div>
+      <div style="margin-top:10px;background:#fff;border-radius:10px;border:1px solid #f1f5f9;overflow:hidden">
+        <div style="padding:10px 14px;border-bottom:1px solid #f8fafc;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:9px;color:#0f172a;font-weight:500">Musterstraße 12</span>
+          <span style="font-size:8px;color:#10b981">Vermietet</span>
+        </div>
+        <div style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:9px;color:#0f172a;font-weight:500">Hauptallee 5</span>
+          <span style="font-size:8px;color:#f59e0b">1 Leerstand</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Minimal & Ruhig</h3>
+      <p>Wenig visuelle Lautstärke. Farbe nur für Status. Fühlt sich wie ein gut gemachtes Werkzeug an — kein Aufsehen, pure Effizienz.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="structured" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f8fafc;padding:20px;font-family:system-ui">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <div style="background:#fff;border-radius:8px;padding:10px 12px;flex:1;border:1px solid #e2e8f0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <div style="width:20px;height:20px;background:#eff6ff;border-radius:6px;display:flex;align-items:center;justify-content:center">
+              <div style="width:10px;height:10px;background:#3b82f6;border-radius:2px"></div>
+            </div>
+            <span style="font-size:8px;color:#64748b;font-weight:500">Immobilien</span>
+          </div>
+          <div style="font-size:20px;font-weight:700;color:#1e293b">24</div>
+        </div>
+        <div style="background:#fff;border-radius:8px;padding:10px 12px;flex:1;border:1px solid #e2e8f0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+            <div style="width:20px;height:20px;background:#f0fdf4;border-radius:6px;display:flex;align-items:center;justify-content:center">
+              <div style="width:10px;height:10px;background:#22c55e;border-radius:2px"></div>
+            </div>
+            <span style="font-size:8px;color:#64748b;font-weight:500">Einnahmen</span>
+          </div>
+          <div style="font-size:20px;font-weight:700;color:#1e293b">48k€</div>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:8px;border:1px solid #e2e8f0;overflow:hidden">
+        <div style="background:#f8fafc;padding:8px 12px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between">
+          <span style="font-size:8px;color:#1e293b;font-weight:600">Objekte</span>
+          <span style="font-size:8px;color:#3b82f6">Filter</span>
+        </div>
+        <div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f1f5f9">
+          <span style="font-size:9px;color:#334155">Musterstraße 12</span>
+          <span style="font-size:8px;background:#dcfce7;color:#15803d;padding:2px 6px;border-radius:4px;font-weight:500">Voll</span>
+        </div>
+        <div style="padding:8px 12px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:9px;color:#334155">Hauptallee 5</span>
+          <span style="font-size:8px;background:#fef9c3;color:#a16207;padding:2px 6px;border-radius:4px;font-weight:500">1 frei</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Strukturiert & Klar</h3>
+      <p>Farbige Icon-Chips pro Kategorie, klare Tabellen-Header, semantische Badges. Wirkt wie ein professionelles SaaS-Tool — z.B. Linear oder Vercel Dashboard.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="editorial" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#fafaf9;padding:20px;font-family:system-ui">
+      <div style="margin-bottom:10px">
+        <div style="font-size:8px;color:#a3a3a3;font-weight:500;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">Übersicht</div>
+        <div style="font-size:15px;font-weight:700;color:#171717;letter-spacing:-.02em">Guten Morgen, Thomas</div>
+      </div>
+      <div style="display:flex;gap:0;border:1px solid #e5e5e5;border-radius:8px;overflow:hidden;margin-bottom:10px">
+        <div style="flex:1;padding:10px 12px;border-right:1px solid #e5e5e5">
+          <div style="font-size:8px;color:#737373;margin-bottom:2px">Objekte</div>
+          <div style="font-size:18px;font-weight:700;color:#171717">24</div>
+        </div>
+        <div style="flex:1;padding:10px 12px;border-right:1px solid #e5e5e5">
+          <div style="font-size:8px;color:#737373;margin-bottom:2px">Mieter</div>
+          <div style="font-size:18px;font-weight:700;color:#171717">89</div>
+        </div>
+        <div style="flex:1;padding:10px 12px">
+          <div style="font-size:8px;color:#737373;margin-bottom:2px">Leerstand</div>
+          <div style="font-size:18px;font-weight:700;color:#f97316">3</div>
+        </div>
+      </div>
+      <div style="border-top:2px solid #171717;padding-top:8px">
+        <div style="font-size:8px;color:#a3a3a3;font-weight:500;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px">Zuletzt aktiv</div>
+        <div style="font-size:9px;color:#404040">Musterstraße 12 · Wartungsticket offen</div>
+        <div style="font-size:9px;color:#404040;margin-top:3px">Hauptallee 5 · Mieter eingeladen</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Editorial & Eigenständig</h3>
+      <p>Typografie-getrieben, Grid-Kanten als Trenner statt Karten, Akzentfarbe sparsam. Würde aus der SaaS-Masse herausstechen — eigene Handschrift.</p>
+    </div>
+  </div>
+
+</div>

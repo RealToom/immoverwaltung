@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mieter-Portal — Mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --primary: #2563eb;
+    --primary-light: #eff6ff;
+    --primary-dark: #1d4ed8;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-600: #4b5563;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --green: #16a34a;
+    --green-light: #dcfce7;
+    --yellow: #ca8a04;
+    --yellow-light: #fef9c3;
+    --red: #dc2626;
+    --red-light: #fee2e2;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.05);
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: var(--gray-800); min-height: 100vh; padding: 40px 20px; }
+
+  h1.page-title { color: white; text-align: center; font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  p.page-sub { color: #94a3b8; text-align: center; margin-bottom: 40px; font-size: 14px; }
+
+  .screens-grid { display: flex; flex-wrap: wrap; gap: 32px; justify-content: center; max-width: 1400px; margin: 0 auto; }
+
+  /* Phone frame */
+  .screen-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .screen-label { color: #94a3b8; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .phone { width: 375px; background: white; border-radius: 44px; overflow: hidden; box-shadow: 0 25px 50px rgba(0,0,0,0.5), inset 0 0 0 2px rgba(255,255,255,0.1); border: 3px solid #1e293b; position: relative; min-height: 720px; display: flex; flex-direction: column; }
+  .phone-notch { background: #0f172a; height: 30px; width: 140px; border-radius: 0 0 20px 20px; position: absolute; top: 0; left: 50%; transform: translateX(-50%); z-index: 10; }
+  .phone-screen { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding-top: 30px; }
+
+  /* Status bar */
+  .status-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 24px 4px; font-size: 11px; font-weight: 600; color: var(--gray-700); }
+
+  /* Top nav */
+  .top-nav { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 12px; border-bottom: 1px solid var(--gray-100); background: white; }
+  .top-nav .logo { display: flex; align-items: center; gap: 8px; }
+  .top-nav .logo-icon { width: 28px; height: 28px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-size: 14px; font-weight: 700; }
+  .top-nav .logo-text { font-size: 14px; font-weight: 700; color: var(--gray-800); }
+  .top-nav .avatar { width: 30px; height: 30px; background: var(--primary-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--primary); }
+
+  /* Bottom nav */
+  .bottom-nav { display: flex; border-top: 1px solid var(--gray-100); background: white; padding: 8px 0 20px; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; padding: 4px; }
+  .nav-icon { font-size: 18px; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; }
+  .nav-icon svg { width: 20px; height: 20px; stroke: var(--gray-400); stroke-width: 1.75; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .nav-item.active .nav-icon svg { stroke: var(--primary); }
+  .nav-text { font-size: 9px; font-weight: 500; color: var(--gray-400); }
+  .nav-item.active .nav-text { color: var(--primary); }
+  .nav-item.active .nav-icon { filter: sepia(1) saturate(10) hue-rotate(200deg); }
+
+  /* Content scroll */
+  .content { flex: 1; overflow-y: auto; background: var(--gray-50); }
+
+  /* Cards */
+  .card { background: white; border-radius: var(--radius); margin: 12px 12px 0; padding: 14px; box-shadow: var(--shadow); }
+  .card:last-child { margin-bottom: 12px; }
+  .card-title { font-size: 12px; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .card-value { font-size: 24px; font-weight: 700; color: var(--gray-800); }
+  .card-sub { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+
+  /* Hero card */
+  .hero-card { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: white; border-radius: var(--radius); margin: 12px 12px 0; padding: 16px; box-shadow: var(--shadow-md); }
+  .hero-greeting { font-size: 13px; opacity: 0.85; }
+  .hero-name { font-size: 20px; font-weight: 700; margin-top: 2px; }
+  .hero-address { font-size: 12px; opacity: 0.75; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+  .hero-stats { display: flex; gap: 12px; margin-top: 14px; }
+  .hero-stat { background: rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 10px; flex: 1; }
+  .hero-stat-value { font-size: 16px; font-weight: 700; }
+  .hero-stat-label { font-size: 10px; opacity: 0.8; margin-top: 1px; }
+
+  /* Quick actions */
+  .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 12px 0; }
+  .qa-btn { background: white; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; box-shadow: var(--shadow); cursor: pointer; }
+  .qa-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .qa-label { font-size: 12px; font-weight: 600; color: var(--gray-700); }
+
+  /* List items */
+  .list-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--gray-100); }
+  .list-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .list-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+  .list-body { flex: 1; min-width: 0; }
+  .list-title { font-size: 13px; font-weight: 600; color: var(--gray-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-sub { font-size: 11px; color: var(--gray-500); margin-top: 1px; }
+  .list-right { text-align: right; flex-shrink: 0; }
+  .list-amount { font-size: 13px; font-weight: 700; }
+  .list-date { font-size: 11px; color: var(--gray-500); }
+
+  /* Badges */
+  .badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 600; }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-yellow { background: var(--yellow-light); color: var(--yellow); }
+  .badge-red { background: var(--red-light); color: var(--red); }
+  .badge-blue { background: var(--primary-light); color: var(--primary); }
+  .badge-gray { background: var(--gray-100); color: var(--gray-500); }
+
+  /* Login screen */
+  .login-screen { background: white; flex: 1; display: flex; flex-direction: column; padding: 40px 24px 24px; }
+  .login-logo { display: flex; flex-direction: column; align-items: center; margin-bottom: 32px; }
+  .login-logo-icon { width: 64px; height: 64px; background: var(--primary); border-radius: 18px; display: flex; align-items: center; justify-content: center; color: white; font-size: 32px; font-weight: 700; margin-bottom: 12px; box-shadow: 0 8px 24px rgba(37,99,235,0.35); }
+  .login-logo-name { font-size: 18px; font-weight: 700; color: var(--gray-800); }
+  .login-logo-sub { font-size: 13px; color: var(--gray-500); margin-top: 2px; }
+  .login-title { font-size: 22px; font-weight: 700; color: var(--gray-800); margin-bottom: 4px; }
+  .login-sub { font-size: 13px; color: var(--gray-500); margin-bottom: 24px; }
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 12px; font-weight: 600; color: var(--gray-700); margin-bottom: 5px; display: block; }
+  .form-input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--gray-200); border-radius: 10px; font-size: 14px; color: var(--gray-800); background: var(--gray-50); }
+  .form-input:focus { border-color: var(--primary); background: white; outline: none; }
+  .btn-primary { width: 100%; padding: 13px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+  .btn-outline { width: 100%; padding: 11px; background: white; color: var(--primary); border: 1.5px solid var(--primary); border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+  /* Section header */
+  .section-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 12px 6px; }
+  .section-title { font-size: 16px; font-weight: 700; color: var(--gray-800); }
+  .section-link { font-size: 12px; color: var(--primary); font-weight: 600; }
+
+  /* Ticket item */
+  .ticket-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--gray-100); }
+  .ticket-item:last-child { border-bottom: none; }
+  .ticket-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .ticket-body { flex: 1; }
+  .ticket-title { font-size: 13px; font-weight: 600; color: var(--gray-800); }
+  .ticket-meta { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+
+  /* Chat */
+  .chat-list { padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 85%; }
+  .msg-in { align-self: flex-start; }
+  .msg-out { align-self: flex-end; }
+  .msg-bubble { padding: 9px 12px; border-radius: 14px; font-size: 13px; line-height: 1.4; }
+  .msg-in .msg-bubble { background: white; color: var(--gray-800); border-bottom-left-radius: 4px; box-shadow: var(--shadow); }
+  .msg-out .msg-bubble { background: var(--primary); color: white; border-bottom-right-radius: 4px; }
+  .msg-time { font-size: 10px; color: var(--gray-400); margin-top: 3px; padding: 0 4px; }
+  .msg-out .msg-time { text-align: right; }
+  .chat-input-bar { padding: 10px 12px 20px; border-top: 1px solid var(--gray-100); background: white; display: flex; gap: 8px; align-items: center; }
+  .chat-input { flex: 1; padding: 10px 14px; border: 1.5px solid var(--gray-200); border-radius: 24px; font-size: 13px; background: var(--gray-50); }
+  .chat-send { width: 36px; height: 36px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; flex-shrink: 0; }
+
+  /* Profile */
+  .profile-header { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); padding: 24px 16px 20px; display: flex; flex-direction: column; align-items: center; }
+  .profile-avatar { width: 64px; height: 64px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; color: white; border: 3px solid rgba(255,255,255,0.4); margin-bottom: 10px; }
+  .profile-name { font-size: 18px; font-weight: 700; color: white; }
+  .profile-email { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+  .profile-field { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--gray-100); }
+  .profile-field:last-child { border-bottom: none; }
+  .profile-field-label { font-size: 12px; color: var(--gray-500); }
+  .profile-field-value { font-size: 13px; font-weight: 500; color: var(--gray-800); }
+
+  /* Invite screen */
+  .invite-progress { display: flex; gap: 4px; margin-bottom: 24px; }
+  .progress-step { height: 4px; flex: 1; border-radius: 2px; background: var(--gray-200); }
+  .progress-step.done { background: var(--primary); }
+
+  /* Doc item */
+  .doc-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--gray-100); }
+  .doc-item:last-child { border-bottom: none; }
+  .doc-icon { width: 36px; height: 36px; background: #fef3c7; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .doc-title { font-size: 13px; font-weight: 600; color: var(--gray-800); }
+  .doc-meta { font-size: 11px; color: var(--gray-500); margin-top: 1px; }
+  .doc-arrow { color: var(--gray-300); font-size: 14px; }
+
+  /* FAB */
+  .fab { position: absolute; bottom: 80px; right: 16px; width: 48px; height: 48px; background: var(--primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 22px; box-shadow: 0 4px 12px rgba(37,99,235,0.4); }
+
+  .section-note { background: #e0f2fe; border-left: 3px solid #0284c7; padding: 10px 14px; margin: 16px; border-radius: 6px; font-size: 12px; color: #0369a1; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<h1 class="page-title">🏠 Mieter-Portal — Visuelles Design</h1>
+<p class="page-sub">Swipe durch alle Screens und gib Feedback. Tech-Stack: React PWA + Tailwind + Shadcn/UI</p>
+
+<div class="screens-grid">
+
+  <!-- 1. LOGIN -->
+  <div class="screen-wrap">
+    <div class="screen-label">1 — Login</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="status-bar"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="login-screen">
+          <div class="login-logo">
+            <div class="login-logo-icon">M</div>
+            <div class="login-logo-name">Mustermann Hausverwaltung</div>
+            <div class="login-logo-sub">Mieter-Portal</div>
+          </div>
+          <div class="login-title">Willkommen zurück</div>
+          <div class="login-sub">Melden Sie sich mit Ihrer E-Mail an</div>
+          <div class="form-group">
+            <label class="form-label">E-Mail</label>
+            <div class="form-input" style="color:#9ca3af">max.mustermann@email.de</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Passwort</label>
+            <div class="form-input" style="color:#374151">••••••••</div>
+          </div>
+          <div style="text-align:right;margin-bottom:16px;"><span style="font-size:12px;color:var(--primary);font-weight:600;">Passwort vergessen?</span></div>
+          <button class="btn-primary">Anmelden</button>
+          <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--gray-500);">Probleme? Kontaktieren Sie Ihre Hausverwaltung</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. EINLADUNG ANNEHMEN -->
+  <div class="screen-wrap">
+    <div class="screen-label">2 — Einladung annehmen</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="status-bar"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="login-screen">
+          <div class="login-logo">
+            <div class="login-logo-icon">M</div>
+            <div class="login-logo-name">Mustermann Hausverwaltung</div>
+            <div class="login-logo-sub">Mieter-Portal</div>
+          </div>
+          <div class="invite-progress">
+            <div class="progress-step done"></div>
+            <div class="progress-step done"></div>
+            <div class="progress-step"></div>
+          </div>
+          <div class="login-title">Konto einrichten</div>
+          <div class="login-sub">Willkommen, Max! Wählen Sie ein sicheres Passwort.</div>
+          <div class="form-group">
+            <label class="form-label">E-Mail (bestätigt)</label>
+            <div class="form-input" style="color:#374151;background:#f0fdf4;border-color:#86efac;">max.mustermann@email.de ✓</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Neues Passwort</label>
+            <div class="form-input" style="color:#9ca3af">Mindestens 8 Zeichen</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Passwort bestätigen</label>
+            <div class="form-input" style="color:#9ca3af">Passwort wiederholen</div>
+          </div>
+          <button class="btn-primary">Konto aktivieren</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. DASHBOARD -->
+  <div class="screen-wrap">
+    <div class="screen-label">3 — Dashboard</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="status-bar"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="top-nav">
+          <div class="logo">
+            <div class="logo-icon">M</div>
+            <div class="logo-text">Mustermann HV</div>
+          </div>
+          <div class="avatar">MM</div>
+        </div>
+        <div class="content">
+          <div class="hero-card">
+            <div class="hero-greeting">Guten Morgen,</div>
+            <div class="hero-name">Max Mustermann</div>
+            <div class="hero-address">📍 Hauptstr. 12, Wohnung 3 OG</div>
+            <div class="hero-stats">
+              <div class="hero-stat">
+                <div class="hero-stat-value">850 €</div>
+                <div class="hero-stat-label">Nächste Miete</div>
+              </div>
+              <div class="hero-stat">
+                <div class="hero-stat-value">01.05.</div>
+                <div class="hero-stat-label">Fällig am</div>
+              </div>
+              <div class="hero-stat">
+                <div class="hero-stat-value">2 offen</div>
+                <div class="hero-stat-label">Tickets</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="quick-actions">
+            <div class="qa-btn">
+              <div class="qa-icon" style="background:#eff6ff;">📋</div>
+              <div class="qa-label">Dokumente</div>
+            </div>
+            <div class="qa-btn">
+              <div class="qa-icon" style="background:#fef3c7;">🔧</div>
+              <div class="qa-label">Schaden melden</div>
+            </div>
+            <div class="qa-btn">
+              <div class="qa-icon" style="background:#f0fdf4;">💰</div>
+              <div class="qa-label">Finanzen</div>
+            </div>
+            <div class="qa-btn">
+              <div class="qa-icon" style="background:#fdf4ff;">💬</div>
+              <div class="qa-label">Nachrichten</div>
+            </div>
+          </div>
+
+          <div class="section-header">
+            <div class="section-title">Aktuelle Tickets</div>
+            <div class="section-link">Alle anzeigen</div>
+          </div>
+          <div class="card">
+            <div class="ticket-item">
+              <div class="ticket-dot" style="background:var(--yellow)"></div>
+              <div class="ticket-body">
+                <div class="ticket-title">Heizung in Schlafzimmer defekt</div>
+                <div class="ticket-meta">Vor 3 Tagen · <span class="badge badge-yellow">In Bearbeitung</span></div>
+              </div>
+            </div>
+            <div class="ticket-item">
+              <div class="ticket-dot" style="background:var(--red)"></div>
+              <div class="ticket-body">
+                <div class="ticket-title">Wasserhahn tropft</div>
+                <div class="ticket-meta">Vor 7 Tagen · <span class="badge badge-red">Offen</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-header">
+            <div class="section-title">Letzte Zahlung</div>
+          </div>
+          <div class="card">
+            <div class="list-item">
+              <div class="list-icon" style="background:var(--green-light);">✓</div>
+              <div class="list-body">
+                <div class="list-title">Miete März 2026</div>
+                <div class="list-sub">01.03.2026</div>
+              </div>
+              <div class="list-right">
+                <div class="list-amount" style="color:var(--green)">850,00 €</div>
+                <span class="badge badge-green">Bezahlt</span>
+              </div>
+            </div>
+          </div>
+          <div style="height:12px"></div>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item active">
+            <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg></div>
+            <div class="nav-text" style="color:var(--primary)">Start</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div>
+            <div class="nav-text">Dokumente</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            <div class="nav-text">Tickets</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div class="nav-text">Nachrichten</div>
+          </div>
+          <div class="nav-item">
+            <div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+            <div class="nav-text">Profil</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. DOKUMENTE -->
+  <div class="screen-wrap">
+    <div class="screen-label">4 — Dokumente</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="status-bar"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="top-nav">
+          <div class="logo">
+            <div class="logo-icon">M</div>
+            <div class="logo-text">Dokumente</div>
+          </div>
+          <div class="avatar">MM</div>
+        </div>
+        <div class="content">
+          <div style="margin:12px 12px 0;background:#fef3c7;border:1.5px solid #fbbf24;border-radius:var(--radius);padding:12px;">
+            <div style="font-size:11px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Zur Unterschrift ausstehend</div>
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #fde68a;">
+              <div style="width:32px;height:32px;background:#fde68a;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">✍️</div>
+              <div style="flex:1"><div style="font-size:12px;font-weight:600;color:#78350f;">Mietvertragsverlängerung 2026</div><div style="font-size:10px;color:#a16207;margin-top:1px;">Frist: 15.04.2026</div></div>
+              <span class="badge" style="background:#fde68a;color:#92400e;">Offen</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:6px 0;">
+              <div style="width:32px;height:32px;background:#fde68a;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">✍️</div>
+              <div style="flex:1"><div style="font-size:12px;font-weight:600;color:#78350f;">SEPA-Lastschriftmandat</div><div style="font-size:10px;color:#a16207;margin-top:1px;">Frist: 30.04.2026</div></div>
+              <span class="badge" style="background:#fde68a;color:#92400e;">Offen</span>
+            </div>
+          </div>
+
+          <div style="margin:8px 12px 0;display:flex;gap:8px;">
+            <button style="flex:1;padding:10px;background:var(--primary);color:white;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;">Dokument hochladen</button>
+          </div>
+
+          <div class="section-header">
+            <div class="section-title">Verträge</div>
+          </div>
+          <div class="card">
+            <div class="doc-item">
+              <div class="doc-icon">📄</div>
+              <div style="flex:1">
+                <div class="doc-title">Mietvertrag_2024.pdf</div>
+                <div class="doc-meta">Mietvertrag · 15.01.2024 · 2,4 MB</div>
+              </div>
+              <div class="doc-arrow">›</div>
+            </div>
+            <div class="doc-item">
+              <div class="doc-icon">📄</div>
+              <div style="flex:1">
+                <div class="doc-title">Übergabeprotokoll.pdf</div>
+                <div class="doc-meta">Protokoll · 15.01.2024 · 1,1 MB</div>
+              </div>
+              <div class="doc-arrow">›</div>
+            </div>
+          </div>
+
+          <div class="section-header">
+            <div class="section-title">Nebenkostenabrechnungen</div>
+          </div>
+          <div class="card">
+            <div class="doc-item">
+              <div class="doc-icon" style="background:#e0f2fe;">📊</div>
+              <div style="flex:1">
+                <div class="doc-title">Nebenkostenabrechnung 2025</div>
+                <div class="doc-meta">Abrechnung · 15.02.2026 · 890 KB</div>
+              </div>
+              <div class="doc-arrow">›</div>
+            </div>
+            <div class="doc-item">
+              <div class="doc-icon" style="background:#e0f2fe;">📊</div>
+              <div style="flex:1">
+                <div class="doc-title">Nebenkostenabrechnung 2024</div>
+                <div class="doc-meta">Abrechnung · 12.02.2025 · 820 KB</div>
+              </div>
+              <div class="doc-arrow">›</div>
+            </div>
+          </div>
+
+          <div class="section-header">
+            <div class="section-title">Sonstiges</div>
+          </div>
+          <div class="card">
+            <div class="doc-item">
+              <div class="doc-icon" style="background:#fce7f3;">📋</div>
+              <div style="flex:1">
+                <div class="doc-title">Hausordnung.pdf</div>
+                <div class="doc-meta">Hausordnung · 15.01.2024 · 340 KB</div>
+              </div>
+              <div class="doc-arrow">›</div>
+            </div>
+          </div>
+          <div style="height:12px"></div>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg></div><div class="nav-text">Start</div></div>
+          <div class="nav-item active"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div><div class="nav-text" style="color:var(--primary)">Dokumente</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="nav-text">Tickets</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="nav-text">Nachrichten</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="nav-text">Profil</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. TICKETS -->
+  <div class="screen-wrap">
+    <div class="screen-label">5 — Tickets / Schaden melden</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen" style="position:relative">
+        <div class="status-bar"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="top-nav">
+          <div class="logo">
+            <div class="logo-icon">M</div>
+            <div class="logo-text">Meine Tickets</div>
+          </div>
+          <div class="avatar">MM</div>
+        </div>
+        <div class="content">
+          <div style="display:flex;gap:6px;padding:12px 12px 0;overflow-x:auto;">
+            <span class="badge badge-blue" style="padding:5px 12px;font-size:11px;white-space:nowrap;">Alle (4)</span>
+            <span class="badge badge-gray" style="padding:5px 12px;font-size:11px;white-space:nowrap;">Offen (2)</span>
+            <span class="badge badge-gray" style="padding:5px 12px;font-size:11px;white-space:nowrap;">In Bearbeitung (1)</span>
+            <span class="badge badge-gray" style="padding:5px 12px;font-size:11px;white-space:nowrap;">Geschlossen (1)</span>
+          </div>
+
+          <div class="card" style="margin-top:8px;">
+            <div class="ticket-item">
+              <div class="ticket-dot" style="background:var(--yellow)"></div>
+              <div class="ticket-body">
+                <div class="ticket-title">Heizung in Schlafzimmer defekt</div>
+                <div class="ticket-meta">Sanitär · 29.03.2026</div>
+              </div>
+              <span class="badge badge-yellow">In Bearb.</span>
+            </div>
+            <div class="ticket-item">
+              <div class="ticket-dot" style="background:var(--red)"></div>
+              <div class="ticket-body">
+                <div class="ticket-title">Wasserhahn tropft</div>
+                <div class="ticket-meta">Sanitär · 25.03.2026</div>
+              </div>
+              <span class="badge badge-red">Offen</span>
+            </div>
+            <div class="ticket-item">
+              <div class="ticket-dot" style="background:var(--red)"></div>
+              <div class="ticket-body">
+                <div class="ticket-title">Fenster schließt nicht</div>
+                <div class="ticket-meta">Sonstige · 20.03.2026</div>
+              </div>
+              <span class="badge badge-red">Offen</span>
+            </div>
+            <div class="ticket-item" style="opacity:0.5">
+              <div class="ticket-dot" style="background:var(--gray-300)"></div>
+              <div class="ticket-body">
+                <div class="ticket-title">Steckdose defekt (Bad)</div>
+                <div class="ticket-meta">Elektro · 10.02.2026</div>
+              </div>
+              <span class="badge badge-gray">Geschl.</span>
+            </div>
+          </div>
+
+          <div class="section-note">
+            ✚ Schaden melden — Tippen Sie auf den Button unten rechts, um einen neuen Schaden zu melden. Fügen Sie optional ein Foto hinzu.
+          </div>
+          <div style="height:70px"></div>
+        </div>
+        <div class="fab">＋</div>
+        <div class="bottom-nav">
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg></div><div class="nav-text">Start</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div><div class="nav-text">Dokumente</div></div>
+          <div class="nav-item active"><div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="nav-text" style="color:var(--primary)">Tickets</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="nav-text">Nachrichten</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="nav-text">Profil</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. FINANZEN -->
+  <div class="screen-wrap">
+    <div class="screen-label">6 — Miethistorie / Finanzen</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="status-bar"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="top-nav">
+          <div class="logo">
+            <div class="logo-icon">M</div>
+            <div class="logo-text">Finanzen</div>
+          </div>
+          <div class="avatar">MM</div>
+        </div>
+        <div class="content">
+          <div class="hero-card" style="padding:14px 16px;">
+            <div style="font-size:11px;opacity:0.8;margin-bottom:4px;">NÄCHSTE MIETE</div>
+            <div style="font-size:28px;font-weight:700;">850,00 €</div>
+            <div style="font-size:12px;opacity:0.8;margin-top:2px;">Fällig am 01.05.2026</div>
+            <div style="display:flex;justify-content:space-between;margin-top:12px;font-size:11px;opacity:0.75;">
+              <span>Kaltmiete: 720,00 €</span>
+              <span>NK-Vorauszahlung: 130,00 €</span>
+            </div>
+          </div>
+
+          <div class="section-header">
+            <div class="section-title">Zahlungshistorie 2026</div>
+          </div>
+          <div class="card">
+            <div class="list-item">
+              <div class="list-icon" style="background:var(--green-light);">✓</div>
+              <div class="list-body"><div class="list-title">April 2026</div><div class="list-sub">01.04.2026</div></div>
+              <div class="list-right"><div class="list-amount" style="color:var(--green)">850,00 €</div><span class="badge badge-green">Bezahlt</span></div>
+            </div>
+            <div class="list-item">
+              <div class="list-icon" style="background:var(--green-light);">✓</div>
+              <div class="list-body"><div class="list-title">März 2026</div><div class="list-sub">01.03.2026</div></div>
+              <div class="list-right"><div class="list-amount" style="color:var(--green)">850,00 €</div><span class="badge badge-green">Bezahlt</span></div>
+            </div>
+            <div class="list-item">
+              <div class="list-icon" style="background:var(--green-light);">✓</div>
+              <div class="list-body"><div class="list-title">Februar 2026</div><div class="list-sub">01.02.2026</div></div>
+              <div class="list-right"><div class="list-amount" style="color:var(--green)">850,00 €</div><span class="badge badge-green">Bezahlt</span></div>
+            </div>
+            <div class="list-item">
+              <div class="list-icon" style="background:var(--red-light);">!</div>
+              <div class="list-body"><div class="list-title">Januar 2026</div><div class="list-sub">Fällig: 01.01.2026</div></div>
+              <div class="list-right"><div class="list-amount" style="color:var(--red)">850,00 €</div><span class="badge badge-red">Offen</span></div>
+            </div>
+          </div>
+          <div style="height:12px"></div>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg></div><div class="nav-text">Start</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></div><div class="nav-text">Dokumente</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="nav-text">Tickets</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="nav-text">Nachrichten</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="nav-text">Profil</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. NACHRICHTEN -->
+  <div class="screen-wrap">
+    <div class="screen-label">7 — Nachrichten</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="status-bar"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="top-nav">
+          <div class="logo">
+            <div class="logo-icon">M</div>
+            <div class="logo-text">Nachrichten</div>
+          </div>
+          <div class="avatar">MM</div>
+        </div>
+        <div class="content" style="background:white;">
+          <div style="background:var(--gray-50);padding:8px 12px;text-align:center;font-size:11px;color:var(--gray-500);border-bottom:1px solid var(--gray-100);">
+            Direktnachrichten an Mustermann Hausverwaltung
+          </div>
+          <div class="chat-list">
+            <div class="msg msg-in">
+              <div class="msg-bubble">Guten Tag Herr Mustermann, wir haben Ihren Schaden bezüglich der Heizung erhalten und werden uns morgen darum kümmern.</div>
+              <div class="msg-time">Mustermann HV · 29.03. 10:14</div>
+            </div>
+            <div class="msg msg-out">
+              <div class="msg-bubble">Vielen Dank! Ich bin ab 10 Uhr zuhause.</div>
+              <div class="msg-time">29.03. 11:02</div>
+            </div>
+            <div class="msg msg-in">
+              <div class="msg-bubble">Perfekt, unser Techniker kommt zwischen 10 und 12 Uhr. Bitte halten Sie die Zugangstür bereit.</div>
+              <div class="msg-time">Mustermann HV · 29.03. 11:15</div>
+            </div>
+            <div class="msg msg-out">
+              <div class="msg-bubble">Alles klar, ich bin informiert. Danke!</div>
+              <div class="msg-time">29.03. 11:18</div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <div class="chat-input">Nachricht schreiben...</div>
+          <div class="chat-send">➤</div>
+        </div>
+        <div class="bottom-nav" style="padding-bottom:10px;">
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg></div><div class="nav-text">Start</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div><div class="nav-text">Dokumente</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="nav-text">Tickets</div></div>
+          <div class="nav-item active"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="nav-text" style="color:var(--primary)">Nachrichten</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="nav-text">Profil</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 8. PROFIL -->
+  <div class="screen-wrap">
+    <div class="screen-label">8 — Profil / Stammdaten</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="status-bar" style="position:relative;z-index:1;color:white;background:transparent;margin-bottom:-30px;"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="profile-header">
+          <div class="profile-avatar">MM</div>
+          <div class="profile-name">Max Mustermann</div>
+          <div class="profile-email">max.mustermann@email.de</div>
+        </div>
+        <div class="content" style="background:white;">
+          <div class="card" style="margin-top:12px;">
+            <div class="card-title">Mietdaten</div>
+            <div class="profile-field">
+              <span class="profile-field-label">Einheit</span>
+              <span class="profile-field-value">Wohnung 3 OG</span>
+            </div>
+            <div class="profile-field">
+              <span class="profile-field-label">Adresse</span>
+              <span class="profile-field-value">Hauptstr. 12, 80333 München</span>
+            </div>
+            <div class="profile-field">
+              <span class="profile-field-label">Miete seit</span>
+              <span class="profile-field-value">15.01.2024</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Kontaktdaten <span style="float:right;color:var(--primary);font-size:11px;cursor:pointer;">Bearbeiten</span></div>
+            <div class="profile-field">
+              <span class="profile-field-label">E-Mail</span>
+              <span class="profile-field-value">max.mustermann@email.de</span>
+            </div>
+            <div class="profile-field">
+              <span class="profile-field-label">Telefon</span>
+              <span class="profile-field-value">+49 171 1234567</span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">Sicherheit</div>
+            <div class="profile-field" style="cursor:pointer;">
+              <span class="profile-field-label">Passwort ändern</span>
+              <span style="color:var(--gray-300)">›</span>
+            </div>
+          </div>
+          <div style="padding:12px;">
+            <button class="btn-outline" style="color:var(--red);border-color:var(--red);">Abmelden</button>
+          </div>
+          <div style="height:12px"></div>
+        </div>
+        <div class="bottom-nav">
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"/><polyline points="9 21 9 12 15 12 15 21"/></svg></div><div class="nav-text">Start</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div><div class="nav-text">Dokumente</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><div class="nav-text">Tickets</div></div>
+          <div class="nav-item"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div class="nav-text">Nachrichten</div></div>
+          <div class="nav-item active"><div class="nav-icon"><svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="nav-text" style="color:var(--primary)">Profil</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+  <!-- 9. DOKUMENT UNTERSCHREIBEN — Einfach -->
+  <div class="screen-wrap">
+    <div class="screen-label">9 — Unterschreiben (Einfach)</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="status-bar"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="top-nav">
+          <div class="logo">
+            <div style="font-size:16px;cursor:pointer;color:var(--gray-500);">‹</div>
+            <div class="logo-text" style="margin-left:6px;">Dokument unterschreiben</div>
+          </div>
+        </div>
+        <div class="content" style="background:white;">
+          <div style="padding:14px 14px 0;">
+            <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:10px;padding:12px;margin-bottom:12px;">
+              <div style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;margin-bottom:6px;">Dokument</div>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;background:#fef3c7;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;">📄</div>
+                <div>
+                  <div style="font-size:13px;font-weight:600;color:var(--gray-800);">Mietvertragsverlängerung 2026</div>
+                  <div style="font-size:11px;color:var(--primary);margin-top:2px;cursor:pointer;">PDF ansehen ›</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="border:1px solid var(--gray-200);border-radius:10px;overflow:hidden;margin-bottom:12px;">
+              <div style="background:var(--gray-50);padding:8px 12px;font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;border-bottom:1px solid var(--gray-200);">Vorschau (Seite 1 / 3)</div>
+              <div style="background:#fff;height:160px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:var(--gray-300);">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                <div style="font-size:11px;">Dokument-Vorschau</div>
+              </div>
+            </div>
+
+            <div style="background:var(--primary-light);border:1px solid #bfdbfe;border-radius:10px;padding:12px;margin-bottom:12px;">
+              <div style="font-size:12px;font-weight:600;color:var(--primary);margin-bottom:6px;">Einfache Zustimmung</div>
+              <div style="font-size:12px;color:var(--gray-700);line-height:1.5;">Mit Ihrer Zustimmung bestätigen Sie, dass Sie das Dokument gelesen und verstanden haben. Ihre Zustimmung wird mit Datum, Uhrzeit und IP-Adresse protokolliert.</div>
+            </div>
+
+            <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:16px;padding:10px;background:var(--gray-50);border-radius:10px;">
+              <div style="width:18px;height:18px;border:2px solid var(--primary);border-radius:4px;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div style="font-size:12px;color:var(--gray-700);line-height:1.5;">Ich, <strong>Max Mustermann</strong>, stimme dem Dokument "Mietvertragsverlängerung 2026" zu und erkenne dessen Inhalt verbindlich an.</div>
+            </div>
+
+            <button class="btn-primary" style="margin-bottom:8px;">Zustimmung erteilen</button>
+            <button class="btn-outline" style="margin-bottom:16px;">Ablehnen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. DOKUMENT UNTERSCHREIBEN — Signatur-Pad -->
+  <div class="screen-wrap">
+    <div class="screen-label">10 — Unterschreiben (Signatur-Pad)</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="status-bar"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="top-nav">
+          <div class="logo">
+            <div style="font-size:16px;cursor:pointer;color:var(--gray-500);">‹</div>
+            <div class="logo-text" style="margin-left:6px;">Dokument unterschreiben</div>
+          </div>
+        </div>
+        <div class="content" style="background:white;">
+          <div style="padding:14px 14px 0;">
+            <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:10px;padding:10px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">
+              <div style="width:32px;height:32px;background:#fef3c7;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">📄</div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:var(--gray-800);">SEPA-Lastschriftmandat</div>
+                <div style="font-size:11px;color:var(--primary);cursor:pointer;">PDF ansehen ›</div>
+              </div>
+            </div>
+
+            <div style="margin-bottom:12px;">
+              <div style="font-size:12px;font-weight:600;color:var(--gray-700);margin-bottom:8px;">Ihre Unterschrift</div>
+              <div style="border:2px dashed var(--gray-300);border-radius:10px;height:130px;background:#fafafa;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;color:var(--gray-400);position:relative;overflow:hidden;">
+                <!-- simulated signature -->
+                <svg width="200" height="60" viewBox="0 0 200 60" style="position:absolute;">
+                  <path d="M20,40 C30,20 40,10 50,30 C60,50 70,15 85,25 C100,35 110,20 125,30 C140,40 150,15 165,25 C175,32 180,38 185,35" stroke="#1d4ed8" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+                </svg>
+              </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+                <span style="font-size:11px;color:var(--primary);cursor:pointer;">Löschen</span>
+              </div>
+            </div>
+
+            <div style="background:var(--gray-50);border-radius:10px;padding:10px;margin-bottom:12px;font-size:11px;color:var(--gray-600);line-height:1.5;">
+              Mit Ihrer handschriftlichen Unterschrift bestätigen Sie die rechtliche Bindung. Signiert am <strong>01.04.2026, 09:41</strong> als <strong>Max Mustermann</strong>.
+            </div>
+
+            <button class="btn-primary" style="margin-bottom:8px;">Unterschrift bestätigen</button>
+            <button class="btn-outline" style="margin-bottom:16px;">Ablehnen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 11. DOKUMENT HOCHLADEN -->
+  <div class="screen-wrap">
+    <div class="screen-label">11 — Dokument hochladen</div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-screen">
+        <div class="status-bar"><span>9:41</span><span>▲ ▲ ▲ 🔋</span></div>
+        <div class="top-nav">
+          <div class="logo">
+            <div style="font-size:16px;cursor:pointer;color:var(--gray-500);">‹</div>
+            <div class="logo-text" style="margin-left:6px;">Dokument hochladen</div>
+          </div>
+        </div>
+        <div class="content" style="background:white;">
+          <div style="padding:14px;">
+            <div style="border:2px dashed var(--gray-300);border-radius:12px;padding:28px 16px;text-align:center;background:var(--gray-50);margin-bottom:14px;">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--gray-300)" stroke-width="1.5" style="margin:0 auto 10px;display:block;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              <div style="font-size:13px;font-weight:600;color:var(--gray-600);margin-bottom:4px;">Datei auswählen oder aufnehmen</div>
+              <div style="font-size:11px;color:var(--gray-400);">PDF, JPG, PNG bis 10 MB</div>
+              <div style="display:flex;gap:8px;margin-top:14px;justify-content:center;">
+                <button style="padding:8px 14px;background:white;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;font-weight:600;color:var(--gray-700);cursor:pointer;">Kamera</button>
+                <button style="padding:8px 14px;background:white;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;font-weight:600;color:var(--gray-700);cursor:pointer;">Galerie</button>
+                <button style="padding:8px 14px;background:white;border:1.5px solid var(--gray-200);border-radius:8px;font-size:12px;font-weight:600;color:var(--gray-700);cursor:pointer;">Dateien</button>
+              </div>
+            </div>
+
+            <div style="margin-bottom:14px;">
+              <div style="font-size:11px;font-weight:600;color:var(--gray-500);text-transform:uppercase;margin-bottom:8px;">Ausgewählt</div>
+              <div style="background:var(--gray-50);border-radius:10px;padding:10px;display:flex;align-items:center;gap:10px;">
+                <div style="width:36px;height:36px;background:#dcfce7;border-radius:8px;display:flex;align-items:center;justify-content:center;">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </div>
+                <div style="flex:1">
+                  <div style="font-size:12px;font-weight:600;color:var(--gray-800);">Einkommensnachweis_2026.pdf</div>
+                  <div style="font-size:11px;color:var(--gray-500);">1,2 MB · Bereit</div>
+                </div>
+                <div style="color:var(--gray-300);font-size:16px;cursor:pointer;">×</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Kategorie</label>
+              <div class="form-input" style="color:var(--gray-700);">Einkommensnachweis ▾</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Beschreibung (optional)</label>
+              <div class="form-input" style="color:var(--gray-400);">z.B. Gehaltsnachweis März 2026</div>
+            </div>
+
+            <button class="btn-primary">Hochladen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div style="text-align:center;margin-top:48px;color:#64748b;font-size:13px;padding-bottom:40px;">
+  11 Screens — Bitte Feedback geben: Was soll geändert werden?
+</div>
+
+</body>
+</html>
