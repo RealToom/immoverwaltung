@@ -83,15 +83,13 @@ export async function handleCallback(ref: string): Promise<string> {
   }
 
   // Find the Nordigen account that matches our IBAN
-  let nordigenAccountId: string = status.accounts[0];
-  let ibanMatched = false;
+  let nordigenAccountId: string | null = null;
 
   for (const accId of status.accounts) {
     try {
       const details = await nordigen.getAccountDetails(accId);
       if (details.iban === account.iban) {
         nordigenAccountId = accId;
-        ibanMatched = true;
         break;
       }
     } catch {
@@ -99,11 +97,23 @@ export async function handleCallback(ref: string): Promise<string> {
     }
   }
 
-  if (!ibanMatched) {
+  // No fallback to the first account: linking a non-matching account would sync
+  // transactions of an unintended (possibly foreign) account into this company.
+  if (!nordigenAccountId) {
     logger.warn(
       { bankAccountId: account.id },
-      "[BANKING] IBAN-Match fehlgeschlagen, verwende erstes Nordigen-Konto als Fallback"
+      "[BANKING] Keine der autorisierten Nordigen-Konten passt zur hinterlegten IBAN — Verknüpfung abgelehnt"
     );
+    await prisma.bankAccount.update({
+      where: { id: account.id },
+      data: { status: "error" },
+    });
+    await createAuditLog(
+      "BANK_LINK_IBAN_MISMATCH",
+      { companyId: account.companyId },
+      { bankAccountId: account.id, requisitionId: ref }
+    );
+    return env.NORDIGEN_REDIRECT_BASE + "/bank-accounts?error=iban_mismatch";
   }
 
   await prisma.bankAccount.update({

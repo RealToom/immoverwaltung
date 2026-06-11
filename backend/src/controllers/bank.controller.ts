@@ -29,17 +29,8 @@ export async function sync(req: Request, res: Response): Promise<void> {
 }
 
 export async function importCsv(req: Request, res: Response): Promise<void> {
+    // Body is validated by importTransactionsSchema (date parseable, amount finite, max 1000 rows)
     const { transactions } = req.body;
-
-    if (!Array.isArray(transactions)) {
-        throw new BadRequestError("Transactions array required");
-    }
-
-    // Basic validation
-    if (transactions.some(t => !t.date || !t.amount || !t.description)) {
-        throw new BadRequestError("Invalid transaction format. Required: date, amount, description");
-    }
-
     const result = await bankService.importTransactions(req.companyId!, transactions);
     res.json({ data: result });
 }

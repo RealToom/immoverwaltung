@@ -56,11 +56,15 @@ export async function yousignWebhookHandler(req: Request, res: Response): Promis
           where: { id: contractId, signatureRequestId: { not: null } },
           data: {
             signatureStatus: "ABGESCHLOSSEN",
-            // Only activate contracts that are in ENTWURF state (not already AKTIV or GEKUENDIGT)
-            status: "AKTIV",
             signedDocumentId: doc?.id ?? null,
             signedDocumentUrl: doc?.signed_file_url ?? null,
           },
+        });
+        // Only activate contracts still in ENTWURF — a late or replayed "done" event must
+        // not reactivate a contract that was meanwhile terminated (GEKUENDIGT).
+        await prisma.contract.updateMany({
+          where: { id: contractId, signatureRequestId: { not: null }, status: "ENTWURF" },
+          data: { status: "AKTIV" },
         });
       }
     } else if (event.type === "signature_request.declined") {

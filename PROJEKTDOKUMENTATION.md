@@ -55,6 +55,25 @@
 
 ## Changelog
 
+### 2026-06-12: Code-Review + Security-Fixes (Webhook, Superadmin, Banking)
+
+Vollständiger Review-Durchlauf (Backend 141 Tests grün, beide Frontends tsc-sauber) mit anschließenden Fixes:
+
+**Security-Fixes:**
+- `yousign-webhook.routes.ts`: `signature_request.done` aktiviert Verträge nur noch im Status `ENTWURF` — verspätete/wiederholte Webhook-Events können gekündigte Verträge nicht mehr reaktivieren (Status-Update vom Metadaten-Update getrennt)
+- `superadmin.routes.ts` / `superadmin.controller.ts`: `authLimiter` (10 Req/15min) auf `/superadmin/login` + zeitkonstanter Passwortvergleich (SHA-256-Digests + `crypto.timingSafeEqual`)
+- `bank.service.ts` (CSV-Import): IBAN-Zuordnung nur noch per exaktem Match (normalisiert, case-insensitive) statt `contains` — leere/partielle IBAN konnte vorher beliebiges Firmenkonto treffen. Import läuft jetzt in einer DB-Transaktion (kein Teil-Import mehr) + Audit-Log `BANK_CSV_IMPORT`
+- `banking.schema.ts` / `bank.routes.ts`: Zod-Schema `importTransactionsSchema` für `POST /bank-accounts/import` (Datum parsebar, Betrag endlich, max. 1000 Zeilen)
+- `rateLimiter.ts` / `routes/index.ts`: neuer `callbackLimiter` (20 Req/15min) auf öffentlichem `GET /api/banking/callback` (GETs sind vom apiLimiter ausgenommen)
+- `banking.service.ts` (`handleCallback`): IBAN-Mismatch verknüpft nicht mehr das erste Nordigen-Konto als Fallback, sondern setzt `status=error`, schreibt Audit-Log `BANK_LINK_IBAN_MISMATCH` und leitet mit `?error=iban_mismatch` um
+
+**Build-Fix:**
+- `tenant-portal`: `vite-plugin-pwa` 0.20.5 → 0.21.2 (inkompatibel mit `workbox-build` 7.4, Build schlug fehl)
+
+**Tests:** Neue Suite `banking-security.test.ts` (6 Tests: exakter IBAN-Match, Empty/Substring-Regression, Audit-Log, IBAN-Mismatch-Ablehnung) + Yousign-Suite erweitert (keine Reaktivierung GEKUENDIGT)
+
+**Offene Befunde (niedrige Prio, nicht gefixt):** kein Lockout für TenantUser-Logins (nur IP-Limit), Admin-Refresh prüft `lockedUntil` nicht, `[object Object]`-Fehlermeldungen im tenant-portal `api.ts`, Slug-Kollision bei Registrierung → 500
+
 ### 2026-03-17: Stripe Billing Integration
 
 Vollständige Abonnement-Verwaltung mit Stripe-Integration. Drei Plan-Tiers (Trial 14d, Pro 49€, Business 99€) mit Hard-Lock für auslaufende Abos. Superadmin-Kontrolle über manuelle Overrides für Tests.

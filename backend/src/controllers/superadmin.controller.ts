@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import os from "os";
 import { execSync } from "child_process";
+import crypto from "crypto";
 import fs from "fs";
 import { z } from "zod";
 import { env } from "../config/env.js";
@@ -12,9 +13,16 @@ import { AppError } from "../lib/errors.js";
 import { updateSubscriptionSchema } from "../schemas/billing.schema.js";
 import { logger } from "../lib/logger.js";
 
+/** Timing-safe comparison via SHA-256 digests (equal lengths required by timingSafeEqual). */
+function secretsMatch(provided: string, expected: string): boolean {
+  const a = crypto.createHash("sha256").update(provided).digest();
+  const b = crypto.createHash("sha256").update(expected).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
 export async function login(req: Request, res: Response): Promise<void> {
   const { password } = req.body as { password?: string };
-  if (!password || password !== env.SUPERADMIN_SECRET) {
+  if (!password || !secretsMatch(password, env.SUPERADMIN_SECRET)) {
     throw new AppError(401, "Falsches Passwort");
   }
   const token = jwt.sign({ superadmin: true }, env.SUPERADMIN_JWT_SECRET, { expiresIn: "8h" });

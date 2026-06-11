@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { NotFoundError, ForbiddenError } from "../lib/errors.js";
+import { createAuditLog } from "./audit.service.js";
 
 function maskIban(iban: string): string {
   if (iban.length < 8) return "****";
@@ -66,37 +67,54 @@ interface CsvTransaction {
 export async function importTransactions(companyId: number, transactions: CsvTransaction[]) {
     let importedCount = 0;
 
-    for (const tx of transactions) {
-        // skip if value is 0 or invalid
-        if (!tx.amount || !tx.date) continue;
+    // Resolve account links via exact IBAN match only — a substring/empty match must
+    // never credit a different account than the one in the CSV row.
+    const accounts = await prisma.bankAccount.findMany({
+        where: { companyId },
+        select: { id: true, iban: true },
+    });
+    const normalizeIban = (iban: string) => iban.replace(/\s+/g, "").toUpperCase();
+    const accountByIban = new Map(accounts.map((a) => [normalizeIban(a.iban), a.id]));
 
-        // Find bank account by IBAN
-        const bankAccount = await prisma.bankAccount.findFirst({
-            where: { companyId, iban: { contains: tx.iban, mode: "insensitive" } },
-        });
+    // Single DB transaction: either the whole import succeeds or nothing is written
+    await prisma.$transaction(
+        async (tx) => {
+            for (const row of transactions) {
+                // skip if value is 0 or invalid
+                if (!row.amount || !row.date) continue;
 
-        // Create transaction
-        await prisma.transaction.create({
-            data: {
-                date: new Date(tx.date),
-                description: tx.description,
-                amount: tx.amount,
-                type: tx.amount >= 0 ? "EINNAHME" : "AUSGABE",
-                companyId,
-                bankAccountId: bankAccount?.id, // Link if found, otherwise just company transaction
-            },
-        });
+                const bankAccountId = row.iban
+                    ? accountByIban.get(normalizeIban(row.iban))
+                    : undefined;
 
-        // Update balance if account found
-        if (bankAccount) {
-            await prisma.bankAccount.update({
-                where: { id: bankAccount.id },
-                data: { balance: { increment: tx.amount } },
-            });
-        }
+                await tx.transaction.create({
+                    data: {
+                        date: new Date(row.date),
+                        description: row.description,
+                        amount: row.amount,
+                        type: row.amount >= 0 ? "EINNAHME" : "AUSGABE",
+                        companyId,
+                        bankAccountId, // Link if IBAN matches exactly, otherwise just company transaction
+                    },
+                });
 
-        importedCount++;
-    }
+                if (bankAccountId) {
+                    await tx.bankAccount.update({
+                        where: { id: bankAccountId },
+                        data: { balance: { increment: row.amount } },
+                    });
+                }
+
+                importedCount++;
+            }
+        },
+        { timeout: 30000 }
+    );
+
+    await createAuditLog("BANK_CSV_IMPORT", { companyId }, {
+        rows: transactions.length,
+        imported: importedCount,
+    });
 
     return { imported: importedCount };
 }

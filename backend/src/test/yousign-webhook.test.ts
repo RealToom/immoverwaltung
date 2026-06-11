@@ -51,8 +51,8 @@ describe("yousignWebhookHandler", () => {
     expect(mockUpdateMany).not.toHaveBeenCalled();
   });
 
-  it("sets signatureStatus=ABGESCHLOSSEN, status=AKTIV, saves document ids on signature_request.done", async () => {
-    mockUpdateMany.mockResolvedValueOnce({});
+  it("sets signatureStatus=ABGESCHLOSSEN, saves document ids on signature_request.done", async () => {
+    mockUpdateMany.mockResolvedValue({});
     const event = {
       type: "signature_request.done",
       data: {
@@ -70,12 +70,29 @@ describe("yousignWebhookHandler", () => {
       where: { id: 42, signatureRequestId: { not: null } },
       data: expect.objectContaining({
         signatureStatus: "ABGESCHLOSSEN",
-        status: "AKTIV",
         signedDocumentId: "doc_456",
         signedDocumentUrl: "https://example.com/signed.pdf",
       }),
     });
     expect(res.sendStatus).toHaveBeenCalledWith(200);
+  });
+
+  it("activates only ENTWURF contracts on signature_request.done (no reactivation of GEKUENDIGT)", async () => {
+    mockUpdateMany.mockResolvedValue({});
+    const event = {
+      type: "signature_request.done",
+      data: { object: { external_id: "42", documents: [] } },
+    };
+    const req = makeReq(event);
+    const res = makeRes();
+    await yousignWebhookHandler(req as Request, res as unknown as Response);
+    expect(mockUpdateMany).toHaveBeenCalledWith({
+      where: { id: 42, signatureRequestId: { not: null }, status: "ENTWURF" },
+      data: { status: "AKTIV" },
+    });
+    // The unconditional update must not touch the contract status
+    const firstCall = mockUpdateMany.mock.calls[0][0];
+    expect(firstCall.data).not.toHaveProperty("status");
   });
 
   it("sets signatureStatus=ABGELEHNT on signature_request.declined", async () => {

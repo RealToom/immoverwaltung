@@ -24,6 +24,19 @@ export const apiLimiter = rateLimit({
   skip: (req) => req.method === "GET",
 });
 
+// Limiter fuer den oeffentlichen Nordigen-OAuth-Callback (GET, daher nicht vom
+// apiLimiter abgedeckt). Legitime Nutzer treffen ihn einmal pro Bank-Verknuepfung;
+// verhindert unauthentifiziertes Probing von Requisition-IDs.
+export const callbackLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 Minuten
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Zu viele Anfragen. Bitte versuchen Sie es in 15 Minuten erneut.",
+  },
+});
+
 // Strikter Limiter fuer sensitive Admin-Aktionen (Passwort-Reset, Account-Entsperren)
 export const adminActionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 Minuten

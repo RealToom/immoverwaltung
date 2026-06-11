@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { tenantGuard } from "../middleware/tenantGuard.js";
-import { apiLimiter } from "../middleware/rateLimiter.js";
+import { apiLimiter, callbackLimiter } from "../middleware/rateLimiter.js";
 import { authRouter } from "./auth.routes.js";
 import { propertyRouter } from "./property.routes.js";
 import { unitRouter } from "./unit.routes.js";
@@ -88,7 +88,7 @@ router.use("/maintenance-schedules", requireAuth, tenantGuard, subscriptionGuard
 router.use("/document-templates", requireAuth, tenantGuard, subscriptionGuard, documentTemplateRouter);
 
 // Public: Nordigen OAuth callback (no auth — browser is redirected here by Nordigen)
-router.get("/banking/callback", bankingCallbackHandler);
+router.get("/banking/callback", callbackLimiter, bankingCallbackHandler);
 
 // Protected banking and DATEV routes
 router.use("/banking", requireAuth, tenantGuard, subscriptionGuard, bankingRouter);
