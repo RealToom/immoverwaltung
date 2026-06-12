@@ -36,3 +36,8 @@ ALTER TABLE "notifications" ADD CONSTRAINT "notifications_company_id_fkey"
   FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_fkey"
   FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- CreateIndex
+CREATE INDEX "notifications_company_id_idx" ON "notifications"("company_id");
+CREATE INDEX "calendar_events_property_id_idx" ON "calendar_events"("property_id");
+CREATE INDEX "calendar_events_tenant_id_idx" ON "calendar_events"("tenant_id");

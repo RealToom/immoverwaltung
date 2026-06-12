@@ -791,6 +791,8 @@ model CalendarEvent {
   tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
+  @@index([propertyId])
+  @@index([tenantId])
   @@map("calendar_events")
 }
 
@@ -825,6 +827,7 @@ model Notification {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, readAt])
+  @@index([companyId])
   @@map("notifications")
 }
 
