@@ -65,6 +65,7 @@ model Company {
   tenantMessages          TenantMessage[]
   tenantUploads           TenantUpload[]
   trustedDevices          TrustedDevice[]
+  notifications           Notification[]
 
   @@map("companies")
 }
@@ -94,6 +95,7 @@ model User {
   company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   refreshTokens RefreshToken[]
   customRole    CustomRole?    @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+  notifications Notification[]
 
   @@map("users")
 }
@@ -195,6 +197,7 @@ model Property {
   energyPassport        EnergyPassport?
   emailMessages          EmailMessage[] @relation("EmailMessageProperty")
   suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedProperty")
+  calendarEvents         CalendarEvent[]
 
   @@map("properties")
 }
@@ -259,6 +262,7 @@ model Tenant {
   emailMessages          EmailMessage[] @relation("EmailMessageTenant")
   suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedTenant")
   tenantUsers            TenantUser[]
+  calendarEvents         CalendarEvent[]
 
   @@map("tenants")
 }
@@ -767,10 +771,24 @@ model CalendarEvent {
   color           String?
   companyId       Int               @map("company_id")
   createdByUserId Int?              @map("created_by_user_id")
+  // Wiederholung (einfache Presets, server-seitig expandiert)
+  recurrenceFreq     RecurrenceFreq? @map("recurrence_freq")
+  recurrenceInterval Int             @default(1) @map("recurrence_interval")
+  recurrenceUntil    DateTime?       @map("recurrence_until")
+  // Erinnerung
+  reminderMinutes Int?      @map("reminder_minutes")
+  reminderSentFor DateTime? @map("reminder_sent_for")
+  // Verknuepfungen
+  propertyId     Int?    @map("property_id")
+  tenantId       Int?    @map("tenant_id")
+  visitorName    String? @map("visitor_name")
+  visitorContact String? @map("visitor_contact")
   createdAt       DateTime          @default(now()) @map("created_at")
   updatedAt       DateTime          @updatedAt @map("updated_at")
 
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
+  tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   @@index([companyId])
   @@map("calendar_events")
@@ -783,6 +801,31 @@ enum CalendarEventType {
   AUTO_MIETE
   AUTO_EMAIL
   BESICHTIGUNG
+}
+
+enum RecurrenceFreq {
+  TAEGLICH
+  WOECHENTLICH
+  MONATLICH
+  JAEHRLICH
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  companyId Int       @map("company_id")
+  userId    Int       @map("user_id")
+  type      String
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@map("notifications")
 }
 
 // ─── EmailAccount (Verbundene Postfächer) ────────────────────
