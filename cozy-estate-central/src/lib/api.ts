@@ -1,7 +1,16 @@
 const TOKEN_KEY = "accessToken";
 
-let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
+
+/** Dedupliziert parallele Refreshes: alle 401-Aufrufer teilen sich denselben Promise. */
+function getRefreshedToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = refreshAccessToken().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
+}
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -78,13 +87,7 @@ export async function api<T = unknown>(path: string, options: RequestOptions = {
 
   // Token refresh on 401
   if (res.status === 401 && token) {
-    if (!isRefreshing) {
-      isRefreshing = true;
-      refreshPromise = refreshAccessToken();
-    }
-    const newToken = await refreshPromise;
-    isRefreshing = false;
-    refreshPromise = null;
+    const newToken = await getRefreshedToken();
 
     if (newToken) {
       headers["Authorization"] = `Bearer ${newToken}`;
@@ -142,13 +145,7 @@ export async function uploadFile<T = unknown>(path: string, formData: FormData):
   });
 
   if (res.status === 401 && token) {
-    if (!isRefreshing) {
-      isRefreshing = true;
-      refreshPromise = refreshAccessToken();
-    }
-    const newToken = await refreshPromise;
-    isRefreshing = false;
-    refreshPromise = null;
+    const newToken = await getRefreshedToken();
 
     if (newToken) {
       headers["Authorization"] = `Bearer ${newToken}`;

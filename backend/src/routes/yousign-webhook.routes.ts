@@ -25,9 +25,10 @@ function parseContractId(obj: { external_id?: string }): number | null {
 }
 
 export async function yousignWebhookHandler(req: Request, res: Response): Promise<void> {
-  // Note: Verify exact header name against Yousign sandbox during first integration test.
-  // Yousign may send "X-Yousign-Signature" or "X-Yousign-Signature-256".
-  const sig = req.headers["x-yousign-signature-256"] as string | undefined;
+  // Yousign sends "X-Yousign-Signature-256" (v3 docs); accept the legacy
+  // "X-Yousign-Signature" as well — the HMAC check below is required either way.
+  const sig = (req.headers["x-yousign-signature-256"] ??
+    req.headers["x-yousign-signature"]) as string | undefined;
 
   if (!sig || !validateHmac(req.body as Buffer, sig)) {
     logger.warn("Yousign webhook: invalid signature");

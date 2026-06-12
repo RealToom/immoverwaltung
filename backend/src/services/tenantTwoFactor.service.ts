@@ -37,7 +37,8 @@ export async function sendTwoFactorCode(
     throw new NotFoundError("TenantUser", tenantUserId);
   }
 
-  const code = randomInt(100000, 999999).toString();
+  // randomInt: obere Grenze exklusiv — 1000000 damit auch 999999 möglich ist
+  const code = randomInt(100000, 1000000).toString();
   const codeHash = sha256(code);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
