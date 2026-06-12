@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -32,6 +33,30 @@ export default function BankIntegration() {
     const [csvUploadOpen, setCsvUploadOpen] = useState(false);
     const [newBank, setNewBank] = useState({ name: "", iban: "", bic: "" });
     const [csvFile, setCsvFile] = useState<File | null>(null);
+
+    // Ergebnis des Nordigen-OAuth-Callbacks (?status= / ?error=) als Toast anzeigen
+    const [searchParams, setSearchParams] = useSearchParams();
+    useEffect(() => {
+        const status = searchParams.get("status");
+        const error = searchParams.get("error");
+        if (!status && !error) return;
+
+        if (status === "linked") {
+            toast({ title: "Bank verknüpft", description: "Das Bankkonto wurde erfolgreich verbunden." });
+        } else if (status === "pending") {
+            toast({ title: "Autorisierung ausstehend", description: "Die Bank-Autorisierung ist noch nicht abgeschlossen." });
+        } else if (error === "iban_mismatch") {
+            toast({
+                title: "IBAN stimmt nicht überein",
+                description: "Keines der bei der Bank autorisierten Konten passt zur hinterlegten IBAN. Bitte IBAN prüfen und erneut verknüpfen.",
+                variant: "destructive",
+            });
+        } else if (error) {
+            toast({ title: "Verknüpfung fehlgeschlagen", description: "Die Bank-Verknüpfung konnte nicht abgeschlossen werden.", variant: "destructive" });
+        }
+        setSearchParams({}, { replace: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const totalBalance = banks.reduce((s, b) => s + b.balance, 0);
 

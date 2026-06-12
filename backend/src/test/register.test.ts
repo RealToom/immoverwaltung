@@ -14,6 +14,10 @@ vi.mock("../lib/prisma.js", () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
     },
+    company: {
+      // uniqueCompanySlug: null = slug frei
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
     refreshToken: {
       create: vi.fn(),
     },

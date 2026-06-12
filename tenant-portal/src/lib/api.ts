@@ -88,10 +88,21 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, body?.error ?? `HTTP ${res.status}`);
+    throw new ApiError(res.status, extractErrorMessage(body) ?? `HTTP ${res.status}`);
   }
 
   return res.json() as Promise<T>;
+}
+
+/** Backend liefert { error: { message } }; Rate-Limiter liefert { error: string }. */
+function extractErrorMessage(body: unknown): string | null {
+  const err = (body as { error?: unknown })?.error;
+  if (typeof err === "string") return err;
+  if (err && typeof err === "object") {
+    const msg = (err as { message?: unknown }).message;
+    if (typeof msg === "string") return msg;
+  }
+  return null;
 }
 
 /** Convenience wrapper: prepends /api/tenant/:slug to path. Keeps slug for auto-refresh. */
@@ -119,7 +130,7 @@ export async function verify2fa(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(res.status, body?.error ?? `HTTP ${res.status}`);
+    throw new ApiError(res.status, extractErrorMessage(body) ?? `HTTP ${res.status}`);
   }
 
   const json = await res.json();

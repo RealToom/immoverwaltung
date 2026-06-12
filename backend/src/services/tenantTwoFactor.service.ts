@@ -68,7 +68,10 @@ export async function sendTwoFactorCode(
   }
 }
 
-/** Code gegen gespeicherten Hash prüfen. Löscht Code nach Erfolg (Einmalcode). */
+const MAX_CODE_ATTEMPTS = 5;
+
+/** Code gegen gespeicherten Hash prüfen. Löscht Code nach Erfolg (Einmalcode).
+ *  Nach 5 Fehlversuchen wird der Code invalidiert (Brute-Force-Schutz für 6-stellige Codes). */
 export async function verifyTwoFactorCode(
   tenantUserId: number,
   code: string
@@ -84,15 +87,27 @@ export async function verifyTwoFactorCode(
   if (
     !tenantUser.twoFactorCode ||
     !tenantUser.twoFactorCodeExpiresAt ||
-    tenantUser.twoFactorCodeExpiresAt < new Date() ||
-    tenantUser.twoFactorCode !== sha256(code)
+    tenantUser.twoFactorCodeExpiresAt < new Date()
   ) {
+    throw new BadRequestError("Code ungültig oder abgelaufen");
+  }
+
+  if (tenantUser.twoFactorCode !== sha256(code)) {
+    const attempts = tenantUser.failedLoginAttempts + 1;
+    await prisma.tenantUser.update({
+      where: { id: tenantUserId },
+      data:
+        attempts >= MAX_CODE_ATTEMPTS
+          ? // Invalidate the code entirely — a fresh login (new code) is required
+            { failedLoginAttempts: 0, twoFactorCode: null, twoFactorCodeExpiresAt: null }
+          : { failedLoginAttempts: attempts },
+    });
     throw new BadRequestError("Code ungültig oder abgelaufen");
   }
 
   await prisma.tenantUser.update({
     where: { id: tenantUserId },
-    data: { twoFactorCode: null, twoFactorCodeExpiresAt: null },
+    data: { twoFactorCode: null, twoFactorCodeExpiresAt: null, failedLoginAttempts: 0 },
   });
 }
 

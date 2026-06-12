@@ -30,7 +30,7 @@ export async function initiateRequisition(req: Request, res: Response): Promise<
 export async function handleCallback(req: Request, res: Response): Promise<void> {
   const ref = req.query.ref as string;
   if (!ref) {
-    res.redirect(`${env.NORDIGEN_REDIRECT_BASE}/bank-accounts?error=missing_ref`);
+    res.redirect(`${env.NORDIGEN_REDIRECT_BASE}/bank?error=missing_ref`);
     return;
   }
 
@@ -38,7 +38,7 @@ export async function handleCallback(req: Request, res: Response): Promise<void>
     const redirectUrl = await bankingService.handleCallback(ref);
     res.redirect(redirectUrl);
   } catch {
-    res.redirect(`${env.NORDIGEN_REDIRECT_BASE}/bank-accounts?error=callback_failed`);
+    res.redirect(`${env.NORDIGEN_REDIRECT_BASE}/bank?error=callback_failed`);
   }
 }
 

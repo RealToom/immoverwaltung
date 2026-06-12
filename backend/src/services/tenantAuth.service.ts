@@ -9,7 +9,7 @@ import {
 } from "../lib/tenantJwt.js";
 import { isTrustedDevice, sendTwoFactorCode } from "./tenantTwoFactor.service.js";
 import { env } from "../config/env.js";
-import { UnauthorizedError, NotFoundError, BadRequestError } from "../lib/errors.js";
+import { AppError, UnauthorizedError, NotFoundError, BadRequestError } from "../lib/errors.js";
 import { sendMailForCompany } from "../config/email.js";
 import { logger } from "../lib/logger.js";
 
@@ -36,9 +36,29 @@ export async function loginTenant(
     throw new UnauthorizedError("E-Mail oder Passwort falsch");
   }
 
+  // Account lockout — same policy as admin users (10 attempts → 30 min)
+  if (tenantUser.lockedUntil && tenantUser.lockedUntil > new Date()) {
+    const minutes = Math.ceil((tenantUser.lockedUntil.getTime() - Date.now()) / 60000);
+    throw new AppError(423, `Konto gesperrt. Versuchen Sie es in ${minutes} Minuten erneut.`);
+  }
+
   const valid = await bcrypt.compare(password, tenantUser.passwordHash);
   if (!valid) {
+    const attempts = tenantUser.failedLoginAttempts + 1;
+    const lockout = attempts >= 10 ? new Date(Date.now() + 30 * 60 * 1000) : null;
+    await prisma.tenantUser.update({
+      where: { id: tenantUser.id },
+      data: { failedLoginAttempts: attempts, lockedUntil: lockout },
+    });
     throw new UnauthorizedError("E-Mail oder Passwort falsch");
+  }
+
+  // Reset failed attempts on successful login
+  if (tenantUser.failedLoginAttempts > 0 || tenantUser.lockedUntil) {
+    await prisma.tenantUser.update({
+      where: { id: tenantUser.id },
+      data: { failedLoginAttempts: 0, lockedUntil: null },
+    });
   }
 
   // 2FA-Branch
@@ -104,6 +124,11 @@ export async function refreshTenantToken(
 
   if (!tenantUser || tenantUser.refreshToken !== token) {
     throw new UnauthorizedError("Refresh Token ungültig");
+  }
+
+  // A locked account must not be able to keep refreshing tokens
+  if (tenantUser.lockedUntil && tenantUser.lockedUntil > new Date()) {
+    throw new UnauthorizedError("Konto gesperrt");
   }
 
   const tokenPayload = {

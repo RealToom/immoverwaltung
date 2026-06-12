@@ -9,13 +9,7 @@ import {
   signMfaToken,
 } from "../lib/jwt.js";
 import { AppError, UnauthorizedError } from "../lib/errors.js";
-
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
+import { uniqueCompanySlug } from "../lib/slug.js";
 
 function issueTokens(user: { id: number; companyId: number; role: string }) {
   const payload = { userId: user.id, companyId: user.companyId, role: user.role };
@@ -41,7 +35,7 @@ export async function register(
     throw new AppError(409, "E-Mail wird bereits verwendet");
   }
 
-  const slug = slugify(companyName);
+  const slug = await uniqueCompanySlug(companyName);
 
   const passwordHash = await bcrypt.hash(password, env.BCRYPT_COST);
 
@@ -179,6 +173,11 @@ export async function refreshToken(token: string) {
 
   if (!user) {
     throw new UnauthorizedError("Benutzer nicht gefunden");
+  }
+
+  // A locked account must not be able to keep refreshing tokens
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    throw new UnauthorizedError("Konto gesperrt");
   }
 
   const tokenPayload = {

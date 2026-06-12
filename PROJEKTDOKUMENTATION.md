@@ -72,7 +72,18 @@ Vollständiger Review-Durchlauf (Backend 141 Tests grün, beide Frontends tsc-sa
 
 **Tests:** Neue Suite `banking-security.test.ts` (6 Tests: exakter IBAN-Match, Empty/Substring-Regression, Audit-Log, IBAN-Mismatch-Ablehnung) + Yousign-Suite erweitert (keine Reaktivierung GEKUENDIGT)
 
-**Offene Befunde (niedrige Prio, nicht gefixt):** kein Lockout für TenantUser-Logins (nur IP-Limit), Admin-Refresh prüft `lockedUntil` nicht, `[object Object]`-Fehlermeldungen im tenant-portal `api.ts`, Slug-Kollision bei Registrierung → 500
+**Zweite Runde (alle offenen Befunde abgearbeitet):**
+- TenantUser-Lockout: `failedLoginAttempts` + `lockedUntil` auf `tenant_users` (Migration `20260612000000_add_tenant_user_lockout`), 10 Versuche → 30 Min Sperre, Reset bei Erfolg — gleiche Policy wie Admin-User
+- Refresh-Endpunkte (Admin + Tenant) lehnen gesperrte Konten ab (vorher konnte ein gesperrtes Konto 7 Tage weiter Tokens beziehen)
+- 2FA-E-Mail-Code: max. 5 Fehlversuche pro Code, danach Invalidierung (Brute-Force-Schutz für 6-stellige Codes)
+- Slug-Kollision: `uniqueCompanySlug()` in `lib/slug.ts` hängt `-2`, `-3`, … an (vorher 500 bei gleichem Firmennamen); genutzt von Registrierung + Superadmin-Firmenanlage
+- tenant-portal `api.ts`: Fehlermeldungen extrahieren jetzt `error.message` (vorher `[object Object]`)
+- Nordigen-Callback-Redirects zeigten auf nicht existierende Route `/bank-accounts` → korrigiert auf `/bank`; `BankIntegration.tsx` zeigt Callback-Ergebnis (`status=linked/pending`, `error=iban_mismatch/...`) jetzt als Toast
+- Tests: 153 Backend-Tests grün (12 neue: Lockout Login/Refresh, Banking-Security)
+
+**Bekannte Dev-Umgebungs-Notiz:** Lokale Dev-DB hat Migrations-Drift (Spalte `calendar_token` ohne Migration, 2 nachträglich editierte Migrationsdateien) — `prisma migrate dev` will deshalb resetten; neue Migrationen daher manuell anlegen + `prisma migrate deploy` nutzen, bis die Drift bereinigt ist.
+
+**Noch offen für Go-Live (außerhalb des Codes):** DEPLOYMENT.md-Checkliste (Secrets, SSL, SMTP, Backup-Cron, Monitoring, Firewall), LEGAL_TEMPLATES.md (Impressum/Datenschutz/AGB/AVV), Yousign-Webhook-Header gegen Sandbox verifizieren, Stripe/Nordigen einmal end-to-end im Live-Modus testen
 
 ### 2026-03-17: Stripe Billing Integration
 

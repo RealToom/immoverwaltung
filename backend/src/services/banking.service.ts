@@ -71,7 +71,7 @@ export async function handleCallback(ref: string): Promise<string> {
       where: { id: account.id },
       data: { status: "pending_auth" },
     });
-    return env.NORDIGEN_REDIRECT_BASE + "/bank-accounts?status=pending";
+    return env.NORDIGEN_REDIRECT_BASE + "/bank?status=pending";
   }
 
   if (status.accounts.length === 0) {
@@ -113,7 +113,7 @@ export async function handleCallback(ref: string): Promise<string> {
       { companyId: account.companyId },
       { bankAccountId: account.id, requisitionId: ref }
     );
-    return env.NORDIGEN_REDIRECT_BASE + "/bank-accounts?error=iban_mismatch";
+    return env.NORDIGEN_REDIRECT_BASE + "/bank?error=iban_mismatch";
   }
 
   await prisma.bankAccount.update({
@@ -136,7 +136,7 @@ export async function handleCallback(ref: string): Promise<string> {
     "[BANKING] Bank-Konto verknüpft"
   );
 
-  return env.NORDIGEN_REDIRECT_BASE + "/bank-accounts?status=linked";
+  return env.NORDIGEN_REDIRECT_BASE + "/bank?status=linked";
 }
 
 // ── syncBankAccount ───────────────────────────────────────────────────────────

@@ -983,6 +983,8 @@ model TenantUser {
   twoFactorEnabled       Boolean   @default(false) @map("two_factor_enabled")
   twoFactorCode          String?   @map("two_factor_code")
   twoFactorCodeExpiresAt DateTime? @map("two_factor_code_expires_at")
+  failedLoginAttempts    Int       @default(0) @map("failed_login_attempts")
+  lockedUntil            DateTime? @map("locked_until")
   createdAt              DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

@@ -34,7 +34,7 @@ vi.mock("../config/env.js", () => ({
 
 import bcrypt from "bcrypt";
 import { prisma } from "../lib/prisma.js";
-import { acceptInvite } from "../services/tenantAuth.service.js";
+import { acceptInvite, loginTenant, refreshTenantToken } from "../services/tenantAuth.service.js";
 
 describe("acceptInvite", () => {
   beforeEach(() => {
@@ -98,6 +98,90 @@ describe("acceptInvite", () => {
         }),
       })
     );
+  });
+});
+
+describe("loginTenant — account lockout", () => {
+  const baseUser = {
+    id: 1,
+    tenantId: 2,
+    companyId: 3,
+    passwordHash: "$2b$10$hash",
+    twoFactorEnabled: false,
+    failedLoginAttempts: 0,
+    lockedUntil: null as Date | null,
+  };
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects login while account is locked", async () => {
+    vi.mocked(prisma.tenantUser.findUnique).mockResolvedValueOnce({
+      ...baseUser,
+      lockedUntil: new Date(Date.now() + 10 * 60 * 1000),
+    } as any);
+
+    await expect(loginTenant("m@example.de", "pw", 3)).rejects.toThrow("Konto gesperrt");
+    expect(bcrypt.compare).not.toHaveBeenCalled();
+  });
+
+  it("increments failedLoginAttempts on wrong password", async () => {
+    vi.mocked(prisma.tenantUser.findUnique).mockResolvedValueOnce({ ...baseUser } as any);
+    vi.mocked(bcrypt.compare).mockResolvedValueOnce(false as never);
+
+    await expect(loginTenant("m@example.de", "falsch", 3)).rejects.toThrow(
+      "E-Mail oder Passwort falsch"
+    );
+    expect(prisma.tenantUser.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { failedLoginAttempts: 1, lockedUntil: null },
+    });
+  });
+
+  it("locks the account after the 10th failed attempt", async () => {
+    vi.mocked(prisma.tenantUser.findUnique).mockResolvedValueOnce({
+      ...baseUser,
+      failedLoginAttempts: 9,
+    } as any);
+    vi.mocked(bcrypt.compare).mockResolvedValueOnce(false as never);
+
+    await expect(loginTenant("m@example.de", "falsch", 3)).rejects.toThrow();
+    expect(prisma.tenantUser.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { failedLoginAttempts: 10, lockedUntil: expect.any(Date) },
+    });
+  });
+
+  it("resets the counter on successful login", async () => {
+    vi.mocked(prisma.tenantUser.findUnique).mockResolvedValueOnce({
+      ...baseUser,
+      failedLoginAttempts: 4,
+    } as any);
+    vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
+    vi.mocked(prisma.tenantUser.update).mockResolvedValue({} as any);
+
+    const result = await loginTenant("m@example.de", "richtig", 3);
+    expect(result.requiresTwoFactor).toBe(false);
+    expect(prisma.tenantUser.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { failedLoginAttempts: 0, lockedUntil: null },
+    });
+  });
+});
+
+describe("refreshTenantToken — locked account", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rejects refresh while account is locked", async () => {
+    vi.mocked(prisma.tenantUser.findUnique).mockResolvedValueOnce({
+      id: 1,
+      tenantId: 2,
+      companyId: 3,
+      refreshToken: "some-token",
+      lockedUntil: new Date(Date.now() + 10 * 60 * 1000),
+    } as any);
+
+    await expect(refreshTenantToken("some-token")).rejects.toThrow("Konto gesperrt");
+    expect(prisma.tenantUser.update).not.toHaveBeenCalled();
   });
 });
 

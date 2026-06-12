@@ -11,6 +11,7 @@ import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
 import { updateSubscriptionSchema } from "../schemas/billing.schema.js";
+import { uniqueCompanySlug } from "../lib/slug.js";
 import { logger } from "../lib/logger.js";
 
 /** Timing-safe comparison via SHA-256 digests (equal lengths required by timingSafeEqual). */
@@ -114,7 +115,7 @@ export async function createCompany(req: Request, res: Response): Promise<void> 
   if (!companyName || !adminEmail || !adminPassword) {
     throw new AppError(400, "companyName, adminEmail und adminPassword sind Pflichtfelder");
   }
-  const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const slug = await uniqueCompanySlug(companyName);
   const cost = env.BCRYPT_COST;
   const passwordHash = await bcrypt.hash(adminPassword, cost);
 
