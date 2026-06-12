@@ -62,4 +62,30 @@ describe("expandRecurrence", () => {
     expect(expandRecurrence(single, d("2026-06-01T00:00:00Z"), d("2026-06-02T00:00:00Z"))).toHaveLength(1);
     expect(expandRecurrence(single, d("2026-07-01T00:00:00Z"), d("2026-07-02T00:00:00Z"))).toHaveLength(0);
   });
+
+  it("findet Occurrences auch jenseits der 500. Instanz (tägliche Serie, spätes Fenster)", () => {
+    const daily = { ...weekly, recurrenceFreq: "TAEGLICH" as const };
+    // Tag 600-602 nach Start — innerhalb des 2-Jahres-Horizonts, aber > 500 Instanzen
+    const occs = expandRecurrence(daily, d("2028-01-22T00:00:00Z"), d("2028-01-24T23:59:59Z"));
+    expect(occs).toHaveLength(3);
+    expect(occs[0]).toEqual(d("2028-01-22T10:00:00Z"));
+  });
+
+  it("expandiert mit Intervall > 1 korrekt", () => {
+    const biweekly = { ...weekly, recurrenceInterval: 2 };
+    const occs = expandRecurrence(biweekly, d("2026-06-01T00:00:00Z"), d("2026-07-13T23:59:59Z"));
+    expect(occs.map((o) => o.toISOString())).toEqual([
+      "2026-06-01T10:00:00.000Z", "2026-06-15T10:00:00.000Z", "2026-06-29T10:00:00.000Z", "2026-07-13T10:00:00.000Z",
+    ]);
+  });
+
+  it("from exakt auf einer Occurrence ist inklusiv", () => {
+    const occs = expandRecurrence(weekly, d("2026-06-08T10:00:00Z"), d("2026-06-08T10:00:00Z"));
+    expect(occs).toHaveLength(1);
+  });
+
+  it("recurrenceUntil vor start ergibt leere Liste", () => {
+    const e = { ...weekly, recurrenceUntil: d("2026-05-01T00:00:00Z") };
+    expect(expandRecurrence(e, d("2026-01-01T00:00:00Z"), d("2026-12-31T00:00:00Z"))).toHaveLength(0);
+  });
 });
