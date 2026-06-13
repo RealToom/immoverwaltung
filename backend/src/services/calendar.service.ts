@@ -1,5 +1,6 @@
 import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
+import { expandRecurrence } from "../lib/recurrence.js";
 
 // Auto-generated events from existing data
 async function getAutoEvents(companyId: number, from?: Date, to?: Date) {
@@ -64,38 +65,89 @@ async function getAutoEvents(companyId: number, from?: Date, to?: Date) {
   return autoEvents;
 }
 
+const ENTITY_INCLUDE = {
+  property: { select: { id: true, name: true } },
+  tenant: { select: { id: true, name: true } },
+} as const;
+
 export async function listEvents(companyId: number, from?: Date, to?: Date) {
   const dateFilter = from && to ? { start: { gte: from, lte: to } } : {};
 
-  const manual = await prisma.calendarEvent.findMany({
-    where: { companyId, ...dateFilter },
-    orderBy: { start: "asc" },
+  const [single, recurring] = await Promise.all([
+    prisma.calendarEvent.findMany({
+      where: { companyId, recurrenceFreq: null, ...dateFilter },
+      include: ENTITY_INCLUDE,
+      orderBy: { start: "asc" },
+    }),
+    // Serien können vor dem Fenster starten — nur nach oben begrenzen
+    prisma.calendarEvent.findMany({
+      where: { companyId, recurrenceFreq: { not: null }, ...(to ? { start: { lte: to } } : {}) },
+      include: ENTITY_INCLUDE,
+    }),
+  ]);
+
+  const now = new Date();
+  const windowFrom = from ?? now;
+  const windowTo = to ?? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000);
+
+  const expanded = recurring.flatMap((e) => {
+    const durationMs = e.end ? e.end.getTime() - e.start.getTime() : 0;
+    return expandRecurrence(e, windowFrom, windowTo).map((occStart) => ({
+      ...e,
+      id: `evt-${e.id}-${occStart.toISOString().slice(0, 10)}`,
+      seriesId: e.id,
+      start: occStart,
+      end: e.end ? new Date(occStart.getTime() + durationMs) : null,
+    }));
   });
 
   const auto = await getAutoEvents(companyId, from, to);
-  return [...manual, ...auto];
+  return [...single, ...expanded, ...auto];
 }
 
-export async function createEvent(companyId: number, userId: number, data: {
-  title: string; description?: string; start: Date; end?: Date; allDay?: boolean; color?: string;
-  type?: "MANUELL" | "BESICHTIGUNG";
-}) {
+async function assertEntityOwnership(companyId: number, propertyId?: number | null, tenantId?: number | null): Promise<void> {
+  if (propertyId) {
+    const p = await prisma.property.findFirst({ where: { id: propertyId, companyId }, select: { id: true } });
+    if (!p) throw new AppError(404, "Immobilie nicht gefunden");
+  }
+  if (tenantId) {
+    const t = await prisma.tenant.findFirst({ where: { id: tenantId, companyId }, select: { id: true } });
+    if (!t) throw new AppError(404, "Mieter nicht gefunden");
+  }
+}
+
+export interface CalendarEventInput {
+  title: string; description?: string | null; start: Date; end?: Date | null; allDay?: boolean;
+  color?: string | null; type?: "MANUELL" | "BESICHTIGUNG";
+  recurrenceFreq?: "TAEGLICH" | "WOECHENTLICH" | "MONATLICH" | "JAEHRLICH" | null;
+  recurrenceInterval?: number; recurrenceUntil?: Date | null;
+  reminderMinutes?: number | null;
+  propertyId?: number | null; tenantId?: number | null;
+  visitorName?: string | null; visitorContact?: string | null;
+}
+
+export async function createEvent(companyId: number, userId: number, data: CalendarEventInput) {
+  await assertEntityOwnership(companyId, data.propertyId, data.tenantId);
   const { type = "MANUELL", ...rest } = data;
   return prisma.calendarEvent.create({
     data: { ...rest, companyId, createdByUserId: userId, type },
   });
 }
 
-export async function updateEvent(companyId: number, id: number, data: Partial<{
-  title: string; description: string; start: Date; end: Date; allDay: boolean; color: string;
-}>) {
+export async function updateEvent(companyId: number, id: number, data: Partial<CalendarEventInput>) {
   const event = await prisma.calendarEvent.findFirst({ where: { id, companyId } });
   if (!event) throw new AppError(404, "Termin nicht gefunden");
   const editable = ["MANUELL", "AUTO_EMAIL", "BESICHTIGUNG"] as const;
   if (!(editable as readonly string[]).includes(event.type)) {
     throw new AppError(403, "Nur manuelle Termine können bearbeitet werden");
   }
-  return prisma.calendarEvent.update({ where: { id }, data });
+  await assertEntityOwnership(companyId, data.propertyId, data.tenantId);
+  // Start oder Erinnerung geändert -> Erinnerung darf erneut feuern
+  const resetReminder = data.start !== undefined || data.reminderMinutes !== undefined;
+  return prisma.calendarEvent.update({
+    where: { id },
+    data: { ...data, ...(resetReminder ? { reminderSentFor: null } : {}) },
+  });
 }
 
 export async function deleteEvent(companyId: number, id: number) {
