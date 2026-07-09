@@ -160,7 +160,7 @@ export function useScanReceipt() {
 export function useUpdateTransaction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { allocatable?: boolean; category?: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { allocatable?: boolean; category?: string; betrkvCategory?: string; co2TaxAmount?: number } }) =>
       api(`/finance/transactions/${id}`, { method: "PATCH", body: data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["finance", "transactions"] });
