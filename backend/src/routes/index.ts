@@ -10,6 +10,7 @@ import { contractRouter } from "./contract.routes.js";
 import { maintenanceRouter } from "./maintenance.routes.js";
 import { documentRouter, tenantDocumentRouter } from "./document.routes.js";
 import { financeRouter } from "./finance.routes.js";
+import { utilityBillingRouter } from "./utility-billing.routes.js";
 import receiptRouter from "./receipt.routes.js";
 import { dashboardRouter } from "./dashboard.routes.js";
 import { companyRouter } from "./company.routes.js";
@@ -73,6 +74,7 @@ router.use("/maintenance", requireAuth, tenantGuard, subscriptionGuard, maintena
 router.use("/documents", requireAuth, tenantGuard, subscriptionGuard, documentRouter);
 router.use("/finance", requireAuth, tenantGuard, subscriptionGuard, financeRouter);
 router.use("/finance", requireAuth, tenantGuard, subscriptionGuard, receiptRouter);
+router.use("/utility-billing", requireAuth, tenantGuard, subscriptionGuard, utilityBillingRouter);
 router.use("/dashboard", requireAuth, tenantGuard, subscriptionGuard, dashboardRouter);
 router.use("/company", requireAuth, tenantGuard, subscriptionGuard, companyRouter);
 router.use("/bank-accounts", requireAuth, tenantGuard, subscriptionGuard, bankRouter);
