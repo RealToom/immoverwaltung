@@ -1,40 +1,29 @@
-import React, { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, AlertTriangle, ShieldAlert, CreditCard } from "lucide-react";
-import { toast } from "sonner";
+import { useState } from "react";
+import { useParams } from "react-router-dom";
+import { ShieldAlert, CreditCard } from "lucide-react";
+import { useTenantUtility } from "@/hooks/api/useTenantUtility";
+import { useCreateDispute } from "@/hooks/api/useTenantDisputes";
 
 const BETRKV_CATEGORIES = [
-  "Grundsteuer",
-  "Wasserversorgung",
-  "Entwässerung",
-  "Aufzug",
-  "Straßenreinigung & Müll",
-  "Gebäudereinigung",
-  "Gartenpflege",
-  "Beleuchtung",
-  "Schornsteinreinigung",
-  "Versicherungen",
-  "Hauswart",
-  "Gemeinschaftsantenne",
-  "Waschraum",
-  "Heizung (Grundkosten)",
-  "Heizung (Verbrauchskosten)",
-  "Sonstige Kosten",
+  "Grundsteuer", "Wasserversorgung", "Entwässerung", "Aufzug",
+  "Straßenreinigung & Müll", "Gebäudereinigung", "Gartenpflege",
+  "Beleuchtung", "Schornsteinreinigung", "Versicherungen", "Hauswart",
+  "Gemeinschaftsantenne", "Waschraum", "Sonstige Kosten",
 ];
 
-interface Props {
-  billingYear?: number;
-  totalBalance?: number;
+function formatEur(n: number) {
+  return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(n);
 }
 
-export default function BillingDisputeForm({ billingYear = 2024, totalBalance = -185.40 }: Props) {
+export default function BillingDisputeForm() {
+  const { slug } = useParams<{ slug: string }>();
+  const { data: utility } = useTenantUtility(slug!);
+  const createDispute = useCreateDispute(slug!);
+
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const toggleCategory = (cat: string) => {
     setSelectedCategories((prev) =>
@@ -42,161 +31,136 @@ export default function BillingDisputeForm({ billingYear = 2024, totalBalance = 
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (selectedCategories.length === 0 || !reason.trim()) {
-      toast.error("Bitte wähle mindestens eine Kostenart und gib eine Begründung ein.");
+      setError("Bitte wähle mindestens eine Kostenart und gib eine Begründung ein.");
       return;
     }
-    setIsSubmitting(true);
-    // Mock API call
-    setTimeout(() => {
-      setIsSubmitting(false);
+    const fullReason = `Kostenart(en): ${selectedCategories.join(", ")}. Begründung: ${reason.trim()}`;
+    try {
+      await createDispute.mutateAsync({
+        reason: fullReason,
+        amount: utility ? Math.abs(utility.balance) : undefined,
+      });
       setSubmitted(true);
-      toast.success("Widerspruch erfolgreich eingereicht");
-    }, 1000);
+    } catch {
+      setError("Einreichung fehlgeschlagen. Bitte erneut versuchen.");
+    }
   };
 
-  function formatEur(n: number) {
-    return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(n);
-  }
+  const balance = utility?.balance ?? 0;
 
   if (submitted) {
     return (
-      <div className="space-y-6 pb-20">
-        <div className="flex flex-col items-center justify-center space-y-4 py-16">
-          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
-            <ShieldAlert className="w-8 h-8 text-amber-600" />
-          </div>
-          <h2 className="text-xl font-bold text-center">Widerspruch eingereicht</h2>
-          <p className="text-muted-foreground text-center max-w-sm text-sm">
-            Dein Widerspruch wurde erfolgreich an die Hausverwaltung übermittelt.
-            Du zahlst den strittigen Betrag vorerst <strong>unter Vorbehalt</strong>.
-            Die Verwaltung hat 12 Monate Zeit, dir eine Stellungnahme zu senden.
-          </p>
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-4 text-sm text-amber-800 dark:text-amber-200 max-w-sm">
-            <p className="font-semibold">Dein Widerspruch umfasst:</p>
-            <ul className="mt-2 space-y-1">
-              {selectedCategories.map((c) => (
-                <li key={c}>• {c}</li>
-              ))}
-            </ul>
-          </div>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 space-y-4 py-16 px-6">
+        <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
+          <ShieldAlert className="w-8 h-8 text-amber-600" />
+        </div>
+        <h2 className="text-xl font-bold text-center">Widerspruch eingereicht</h2>
+        <p className="text-gray-500 text-center max-w-sm text-sm">
+          Dein Widerspruch wurde erfolgreich an die Hausverwaltung übermittelt.
+          Du zahlst den strittigen Betrag vorerst <strong>unter Vorbehalt</strong>.
+        </p>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800 max-w-sm w-full">
+          <p className="font-semibold">Dein Widerspruch umfasst:</p>
+          <ul className="mt-2 space-y-1">
+            {selectedCategories.map((c) => (
+              <li key={c}>• {c}</li>
+            ))}
+          </ul>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Nebenkostenabrechnung {billingYear}</h1>
-        <p className="text-sm text-muted-foreground">
-          Deine Abrechnung ist bereit. Du kannst akzeptieren oder Widerspruch einlegen.
+    <div className="flex flex-col min-h-screen bg-gray-50 pb-20">
+      <div className="bg-white border-b px-4 py-4">
+        <h1 className="text-xl font-semibold">Nebenkostenabrechnung {utility?.year ?? ""}</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Wenn du mit deiner Abrechnung nicht einverstanden bist, kannst du hier Widerspruch einlegen.
         </p>
       </div>
 
-      {/* Ergebnis-Karte */}
-      <Card className={totalBalance < 0 ? "border-red-200 dark:border-red-900" : "border-green-200 dark:border-green-900"}>
-        <CardContent className="pt-6">
+      <div className="flex-1 p-4 space-y-4">
+        <div className={`bg-white border rounded-2xl p-4 ${balance < 0 ? "border-red-200" : "border-green-200"}`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">
-                {totalBalance < 0 ? "Nachzahlung" : "Guthaben"}
+              <p className="text-sm text-gray-500">
+                {balance < 0 ? "Nachzahlung" : "Guthaben"}
               </p>
-              <p className={`text-3xl font-bold ${totalBalance < 0 ? "text-red-600" : "text-green-600"}`}>
-                {formatEur(Math.abs(totalBalance))}
+              <p className={`text-3xl font-bold ${balance < 0 ? "text-red-600" : "text-green-600"}`}>
+                {formatEur(Math.abs(balance))}
               </p>
             </div>
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${totalBalance < 0 ? "bg-red-100" : "bg-green-100"}`}>
-              <CreditCard className={`w-6 h-6 ${totalBalance < 0 ? "text-red-600" : "text-green-600"}`} />
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${balance < 0 ? "bg-red-100" : "bg-green-100"}`}>
+              <CreditCard className={`w-6 h-6 ${balance < 0 ? "text-red-600" : "text-green-600"}`} />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Aktions-Buttons */}
-      <div className="grid grid-cols-2 gap-3">
-        <Button
-          size="lg"
-          className="bg-green-600 hover:bg-green-700 h-auto py-4 flex flex-col gap-1"
-          onClick={() => toast.success("Abrechnung akzeptiert")}
-        >
-          <CheckCircle2 className="w-5 h-5" />
-          <span className="text-xs">Akzeptieren & Bezahlen</span>
-        </Button>
-        <Button
-          size="lg"
-          variant="outline"
-          className="border-amber-400 text-amber-700 hover:bg-amber-50 h-auto py-4 flex flex-col gap-1"
-          onClick={() => {
-            const el = document.getElementById("dispute-form");
-            el?.scrollIntoView({ behavior: "smooth" });
-          }}
-        >
-          <AlertTriangle className="w-5 h-5" />
-          <span className="text-xs">Widerspruch einlegen</span>
-        </Button>
-      </div>
-
-      {/* Widerspruchs-Formular */}
-      <Card id="dispute-form" className="border-amber-200 dark:border-amber-900">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+        <form onSubmit={handleSubmit} id="dispute-form" className="bg-white border border-amber-200 rounded-2xl p-4 space-y-4">
+          <h2 className="flex items-center gap-2 font-semibold text-amber-700">
             <ShieldAlert className="w-5 h-5" />
             Widerspruch – Zahlung unter Vorbehalt
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-gray-500">
             Wähle die Kostenart(en), die du beanstandest, und begründe deinen Widerspruch. Die Hausverwaltung wird benachrichtigt.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label className="font-semibold">Betroffene Kostenart(en) auswählen:</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {BETRKV_CATEGORIES.map((cat) => (
-                  <button
-                    type="button"
-                    key={cat}
-                    onClick={() => toggleCategory(cat)}
-                    className={`text-left text-xs p-2 rounded-lg border transition-colors ${
-                      selectedCategories.includes(cat)
-                        ? "bg-amber-100 border-amber-400 text-amber-900 font-medium dark:bg-amber-950 dark:text-amber-200"
-                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
-                    }`}
-                  >
-                    {selectedCategories.includes(cat) && "✓ "}{cat}
-                  </button>
-                ))}
-              </div>
-            </div>
+          </p>
 
-            <div className="space-y-2">
-              <Label htmlFor="reason" className="font-semibold">Begründung</Label>
-              <Textarea
-                id="reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="z.B. Die Gartenpflegekosten sind im Vergleich zum Vorjahr um 40% gestiegen. Bitte um Nachweis der Einzelpositionen."
-                rows={4}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Tipp: Je konkreter deine Begründung, desto schneller kann die Verwaltung antworten.
-              </p>
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold">Betroffene Kostenart(en) auswählen:</label>
+            <div className="grid grid-cols-2 gap-2">
+              {BETRKV_CATEGORIES.map((cat) => (
+                <button
+                  type="button"
+                  key={cat}
+                  onClick={() => toggleCategory(cat)}
+                  className={`text-left text-xs p-2 rounded-lg border transition-colors ${
+                    selectedCategories.includes(cat)
+                      ? "bg-amber-100 border-amber-400 text-amber-900 font-medium"
+                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {selectedCategories.includes(cat) && "✓ "}{cat}
+                </button>
+              ))}
             </div>
+          </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-amber-600 hover:bg-amber-700"
-              disabled={selectedCategories.length === 0 || !reason.trim() || isSubmitting}
-            >
-              {isSubmitting ? "Wird gesendet..." : "Widerspruch verbindlich einreichen"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          <div className="space-y-2">
+            <label htmlFor="reason" className="block text-sm font-semibold">Begründung</label>
+            <textarea
+              id="reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="z.B. Die Gartenpflegekosten sind im Vergleich zum Vorjahr um 40% gestiegen. Bitte um Nachweis der Einzelpositionen."
+              rows={4}
+              required
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <p className="text-xs text-gray-500">
+              Tipp: Je konkreter deine Begründung, desto schneller kann die Verwaltung antworten.
+            </p>
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={selectedCategories.length === 0 || !reason.trim() || createDispute.isPending}
+            className="w-full bg-amber-600 text-white py-3.5 rounded-2xl font-semibold disabled:opacity-50"
+          >
+            {createDispute.isPending ? "Wird gesendet…" : "Widerspruch verbindlich einreichen"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
