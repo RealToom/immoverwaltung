@@ -237,10 +237,6 @@ export class UtilityBillingService {
       throw new AppError(404, "Vertrag nicht gefunden oder kein Zugriff");
     }
 
-    // TODO: The contract model currently doesn't explicitly store the utility prepayment amount.
-    // For now, we assume a hypothetical field `utilityPrepayment` exists, 
-    // or we calculate it based on custom logic if they separated it in RentPayment.
-    // Let's assume we fetch all paid RentPayments in that year.
     const startOfYear = new Date(billingYear, 0, 1);
     const endOfYear = new Date(billingYear, 11, 31);
 
@@ -258,28 +254,15 @@ export class UtilityBillingService {
       }
     });
 
-    // Summing up only the utility prepayment parts. 
-    // As a placeholder before DB update, we assume `utilityPrepayment` on Contract.
-    // Let's assume utilityPrepayment is a new field we will add or it's implicitly totalPaid - (monthlyRent * paidMonths)
-    // We will update this later. For now, we mock the prepayment extraction.
     let totalPrepaid = 0;
-    
-    // Fallback: If no explicit utilityPrepayment, we cannot reliably extract it if partially paid.
-    // For this implementation, we will query `amountPaid` and subtract `contract.monthlyRent`.
-    // (This is a simplified assumption that underpayments first cover cold rent, or similar).
-    
-    // We will add utilityPrepayment to schema in the next step, so let's cast any here temporarily:
-    const utilityPrepayment = (contract as any).utilityPrepayment || 0;
-    
     for (const p of payments) {
-      // If fully paid, the prepayment is fully received.
       if (p.amountPaid >= p.amountDue) {
-        totalPrepaid += utilityPrepayment;
+        totalPrepaid += contract.utilityPrepayment;
       } else {
-        // Partial payment logic: assume rent is paid first, remainder is utility prepayment
+        // Partial payment: assume rent is paid first, remainder is utility prepayment
         const remainder = p.amountPaid - contract.monthlyRent;
         if (remainder > 0) {
-          totalPrepaid += Math.min(remainder, utilityPrepayment);
+          totalPrepaid += Math.min(remainder, contract.utilityPrepayment);
         }
       }
     }
