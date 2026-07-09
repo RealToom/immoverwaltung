@@ -145,10 +145,12 @@ export class UtilityBillingService {
   }
 
   /**
-   * Berechnet und erstellt eine Eigentümer-Rechnung für Leerstände,
-   * damit leere Einheiten nicht von anderen Mietern subventioniert werden.
+   * Computes the fixed-cost deduction owed by the property owner for unit
+   * vacancy days, without persisting anything — used by generateStatement()'s
+   * live recompute path. See generateOwnerVacancyInvoice() for the persisting
+   * variant (reserved for an explicit future "finalize statement" action).
    */
-  public async generateOwnerVacancyInvoice(propertyId: number, billingYear: number, totalFixedCosts: number) {
+  public async calculateVacancyDeduction(propertyId: number, billingYear: number, totalFixedCosts: number) {
     const startOfYear = new Date(billingYear, 0, 1);
     const endOfYear = new Date(billingYear, 11, 31);
 
@@ -180,10 +182,7 @@ export class UtilityBillingService {
           (isBefore(c.startDate, current) || c.startDate.getTime() === current.getTime()) &&
           (!c.endDate || isAfter(c.endDate, current) || c.endDate.getTime() === current.getTime())
         );
-
-        if (!hasActiveContract) {
-          unitVacancyDays++;
-        }
+        if (!hasActiveContract) unitVacancyDays++;
         current = new Date(current.getTime() + 24 * 60 * 60 * 1000);
       }
 
@@ -195,14 +194,28 @@ export class UtilityBillingService {
 
     const totalUnitDays = units.length * daysInYear;
     const vacancyRatio = totalVacancyDays / totalUnitDays;
-    const ownerCost = totalFixedCosts * vacancyRatio;
+    const amount = totalFixedCosts * vacancyRatio;
 
+    return { amount, vacancyDays: totalVacancyDays, affectedUnits };
+  }
+
+  /**
+   * Persisting variant: computes the same vacancy deduction, then creates an
+   * internal Transaction so the property's ledger stays balanced. Reserved
+   * for an explicit "finalize statement" action — do not call this from a
+   * read/preview path (see calculateVacancyDeduction()).
+   */
+  public async generateOwnerVacancyInvoice(propertyId: number, billingYear: number, totalFixedCosts: number) {
+    const deduction = await this.calculateVacancyDeduction(propertyId, billingYear, totalFixedCosts);
+    if (!deduction) return null;
+
+    const endOfYear = new Date(billingYear, 11, 31);
     const transaction = await prisma.transaction.create({
       data: {
         date: endOfYear,
         description: `Eigentümer-Abrechnung Leerstand ${billingYear}`,
         type: "EINNAHME",
-        amount: ownerCost,
+        amount: deduction.amount,
         category: "Leerstands-Ausgleich",
         allocatable: false,
         propertyId,
@@ -210,7 +223,7 @@ export class UtilityBillingService {
       }
     });
 
-    return { transaction, vacancyDays: totalVacancyDays, affectedUnits };
+    return { transaction, vacancyDays: deduction.vacancyDays, affectedUnits: deduction.affectedUnits };
   }
 
   /**
@@ -313,8 +326,8 @@ export class UtilityBillingService {
     const grossCosts = transactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
     const totalAllocatable = grossCosts - totalCo2LandlordShare;
 
-    const vacancyResult = await this.generateOwnerVacancyInvoice(propertyId, year, totalAllocatable);
-    const vacancyDeduction = vacancyResult?.transaction.amount ?? 0;
+    const vacancyResult = await this.calculateVacancyDeduction(propertyId, year, totalAllocatable);
+    const vacancyDeduction = vacancyResult?.amount ?? 0;
     const netAllocatable = totalAllocatable - vacancyDeduction;
 
     const contracts = await prisma.contract.findMany({
