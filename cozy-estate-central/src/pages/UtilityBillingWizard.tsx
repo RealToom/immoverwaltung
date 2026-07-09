@@ -7,7 +7,7 @@ import { CheckCircle2, ChevronRight, Settings, FileText, Send, AlertTriangle, Le
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useProperties } from "@/hooks/api/useProperties";
-import { useGenerateUtilityStatement } from "@/hooks/api/useUtilityBilling";
+import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus } from "@/hooks/api/useUtilityBilling";
 import type { UtilityStatementTransaction } from "@/hooks/api/useUtilityBilling";
 import { useUpdateTransaction } from "@/hooks/api/useFinance";
 
@@ -33,6 +33,9 @@ export default function UtilityBillingWizard() {
   const generateStatement = useGenerateUtilityStatement();
   const updateTransaction = useUpdateTransaction();
   const statement = generateStatement.data?.data ?? null;
+  const { data: disputesRes } = useUtilityDisputes("OPEN");
+  const disputes = disputesRes?.data ?? [];
+  const updateDisputeStatus = useUpdateDisputeStatus();
 
   const handleGenerate = () => {
     if (!propertyId) {
@@ -96,6 +99,11 @@ export default function UtilityBillingWizard() {
           <TabsTrigger value="disputes" className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" />
             4. Widersprüche
+            {disputes.length > 0 && (
+              <Badge variant="outline" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-[10px] border-amber-500 text-amber-600">
+                {disputes.length}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -311,7 +319,64 @@ export default function UtilityBillingWizard() {
 
         {/* ─── Tab 4: Widersprüche ─── */}
         <TabsContent value="disputes">
-          {/* wired in a follow-up task */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500" />
+                Offene Abrechnungs-Widersprüche
+              </CardTitle>
+              <CardDescription>
+                Mieter haben über das Mieter-Portal „Zahlung unter Vorbehalt" gewählt. Bitte prüfen und beantworten.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {disputes.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <CheckCircle2 className="w-10 h-10 mx-auto mb-3 text-green-500" />
+                  <p>Keine offenen Widersprüche. Alles erledigt!</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {disputes.map((d) => (
+                    <div key={d.id} className="border rounded-lg p-4 bg-white dark:bg-slate-800 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-semibold">{d.contract.tenant.name}</p>
+                          <p className="text-sm text-muted-foreground mt-1">{d.reason}</p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant="outline" className="border-amber-500 text-amber-600">{d.status}</Badge>
+                          {d.amount != null && <p className="text-sm font-bold mt-1">{formatEur(d.amount)}</p>}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t">
+                        <span className="text-xs text-muted-foreground">
+                          Eingereicht am {new Date(d.createdAt).toLocaleDateString("de-DE")}
+                        </span>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => updateDisputeStatus.mutate({ id: d.id, status: "ABGELEHNT" })}
+                          >
+                            Ablehnen
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs bg-green-600 hover:bg-green-700"
+                            onClick={() => updateDisputeStatus.mutate({ id: d.id, status: "GELOEST" })}
+                          >
+                            Als gelöst markieren
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>
