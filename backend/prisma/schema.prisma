@@ -61,6 +61,7 @@ model Company {
   insurancePolicies       InsurancePolicy[]
   maintenanceBudgets      MaintenanceBudget[]
   energyPassports         EnergyPassport[]
+  billingDisputes         BillingDispute[]
   tenantUsers             TenantUser[]
   tenantMessages          TenantMessage[]
   tenantUploads           TenantUpload[]
@@ -199,6 +200,8 @@ model Property {
   suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedProperty")
   calendarEvents         CalendarEvent[]
 
+  costConfiguration    Json?       @map("cost_configuration") // Format: { "GRUNDSTEUER": "WOHNFLAECHE", "HAUSWART": "WOHNEINHEIT" }
+
   @@map("properties")
 }
 
@@ -220,6 +223,10 @@ model Unit {
   tenantId   Int?       @map("tenant_id")
   createdAt  DateTime   @default(now()) @map("created_at")
   updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  sqm                  Float       @default(0) // Wohnfläche für m²-Verteilung
+  coownershipShare     Float?      @map("coownership_share") // Miteigentumsanteil (MEA) für WEG-Abrechnungen
+  currentInhabitants   Int         @default(1) @map("current_inhabitants") // Für personenschlüsselbasierte Verteilung
 
   property           Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   tenant             Tenant?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
@@ -263,6 +270,7 @@ model Tenant {
   suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedTenant")
   tenantUsers            TenantUser[]
   calendarEvents         CalendarEvent[]
+  disputes               BillingDispute[]
 
   @@map("tenants")
 }
@@ -296,8 +304,9 @@ model Contract {
   property     Property      @relation(fields: [propertyId], references: [id])
   unit         Unit          @relation(fields: [unitId], references: [id])
   company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  rentPayments   RentPayment[]
-  dunningRecords DunningRecord[]
+  rentPayments     RentPayment[]
+  dunningRecords   DunningRecord[]
+  billingDisputes  BillingDispute[]
 
   @@map("contracts")
 }
@@ -417,6 +426,9 @@ model Transaction {
   amount        Float
   category      String          @default("")
   allocatable   Boolean         @default(false)
+  betrkvCategory BetrkvCategory? @map("betrkv_category")
+  co2TaxAmount  Float?          @default(0) @map("co2_tax_amount")
+  maintenanceWarning String?    @map("maintenance_warning")
   propertyId    Int?            @map("property_id")
   bankAccountId Int?            @map("bank_account_id") // Optional: Verknuepfung mit echtem Bankkonto
   companyId     Int             @map("company_id")
@@ -591,6 +603,11 @@ model Meter {
   companyId  Int       @map("company_id")
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  interfaceType        MeterInterfaceType @default(MANUAL) @map("interface_type")
+  mqttTopic            String?            @map("mqtt_topic")
+  modbusRegister       Int?               @map("modbus_register")
+  knxGroupAddress      String?            @map("knx_group_address")
 
   unit     Unit?         @relation(fields: [unitId], references: [id], onDelete: SetNull)
   property Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
@@ -812,6 +829,39 @@ enum RecurrenceFreq {
   JAEHRLICH
 }
 
+// ─── Utility Billing (Nebenkostenabrechnung) ──────────────────
+
+enum BetrkvCategory {
+  GRUNDSTEUER
+  WASSERVERSORGUNG
+  ENTWAESSERUNG
+  AUFZUG
+  STRASSENREINIGUNG_MUELL
+  GEBAEUDE_REINIGUNG
+  GARTENPFLEGE
+  BELEUCHTUNG
+  SCHORNSTEINREINIGUNG
+  VERSICHERUNGEN
+  HAUSWART
+  GEMEINSCHAFTS_ANTENNE
+  WASCHRAUM
+  SONSTIGE_KOSTEN
+}
+
+enum DistributionKey {
+  WOHNFLAECHE
+  PERSONEN
+  WOHNEINHEIT
+  VERBRAUCH
+}
+
+enum MeterInterfaceType {
+  MANUAL
+  MQTT
+  MODBUS_TCP
+  KNX
+}
+
 model Notification {
   id        Int       @id @default(autoincrement())
   companyId Int       @map("company_id")
@@ -993,6 +1043,7 @@ model EnergyPassport {
   issuedAt            DateTime           @map("issued_at")
   validUntil          DateTime           @map("valid_until")
   certificateNumber   String?            @map("certificate_number")
+  co2Emissions        Float?             @map("co2_emissions") // Für CO2-Kostenaufteilung
   propertyId          Int                @unique @map("property_id")
   companyId           Int                @map("company_id")
   createdAt           DateTime           @default(now()) @map("created_at")
@@ -1090,4 +1141,21 @@ model TrustedDevice {
   company       Company    @relation(fields: [companyId], references: [id])
 
   @@map("trusted_devices")
+}
+
+// ─── BillingDispute (Widerspruchs-Management) ──────────────────
+model BillingDispute {
+  id          Int      @id @default(autoincrement())
+  contractId  Int      @map("contract_id")
+  companyId   Int      @map("company_id")
+  reason      String
+  status      String   @default("OPEN")
+  amount      Float?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("billing_disputes")
 }

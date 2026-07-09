@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBranding } from "@/contexts/BrandingContext";
-import { AlertCircle, FileText, MessageSquare, TrendingUp } from "lucide-react";
+import { AlertCircle, FileText, MessageSquare, TrendingUp, BarChart3, Camera, ShieldAlert } from "lucide-react";
 import { format } from "date-fns";
 import { de } from "date-fns/locale";
 
@@ -42,6 +42,24 @@ export default function Dashboard() {
       icon: <TrendingUp className="w-6 h-6" />,
       onClick: () => navigate(`/${slug}/finances`),
       color: "bg-purple-50 text-purple-600",
+    },
+    {
+      label: "Energie & Wasser",
+      icon: <BarChart3 className="w-6 h-6" />,
+      onClick: () => navigate(`/${slug}/utility`),
+      color: "bg-orange-50 text-orange-600",
+    },
+    {
+      label: "Zählerstand melden",
+      icon: <Camera className="w-6 h-6" />,
+      onClick: () => navigate(`/${slug}/meter-reading`),
+      color: "bg-teal-50 text-teal-600",
+    },
+    {
+      label: "Abrechnung prüfen",
+      icon: <ShieldAlert className="w-6 h-6" />,
+      onClick: () => navigate(`/${slug}/billing-dispute`),
+      color: "bg-amber-50 text-amber-600",
     },
   ];
 

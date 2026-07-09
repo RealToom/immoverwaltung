@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, BetrkvCategory } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { logger } from "../lib/logger.js";
 import { createAuditLog } from "./audit.service.js";
@@ -188,6 +188,109 @@ export async function matchPendingTransactions(
 }
 
 /**
+ * Automatisches Matching für Nebenkosten-Versorger (Ausgaben).
+ * Setzt allocatable = true und die passende BetrkvCategory.
+ */
+export async function matchUtilityTransactions(
+  companyId: number
+): Promise<{ matched: number }> {
+  const bankTxs = await prisma.bankTransaction.findMany({
+    where: {
+      companyId,
+      status: "UNMATCHED",
+      amount: { lt: 0 }, // Ausgaben sind meist negativ
+    },
+    orderBy: { bookingDate: "asc" },
+  });
+
+  if (bankTxs.length === 0) return { matched: 0 };
+
+  // Bekannte Versorger-Muster
+  const utilityRules = [
+    { keywords: ["stadtwerke", "wasser", "energie"], category: BetrkvCategory.WASSERVERSORGUNG },
+    { keywords: ["stadtkasse", "grundsteuer", "finanzamt"], category: BetrkvCategory.GRUNDSTEUER },
+    { keywords: ["versicherung", "allianz", "axa"], category: BetrkvCategory.VERSICHERUNGEN },
+    { keywords: ["müll", "awg", "entsorgung"], category: BetrkvCategory.STRASSENREINIGUNG_MUELL },
+    { keywords: ["schornsteinfeger"], category: BetrkvCategory.SCHORNSTEINREINIGUNG }
+  ];
+
+  const properties = await prisma.property.findMany({
+    where: { companyId, status: "AKTIV" },
+    select: { id: true, name: true, street: true }
+  });
+
+  let matched = 0;
+
+  for (const bankTx of bankTxs) {
+    const textToMatch = [bankTx.creditorName, bankTx.remittanceInfo, bankTx.debtorName]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    // Regel-Engine auswerten
+    let matchedCategory: BetrkvCategory | null = null;
+    for (const rule of utilityRules) {
+      if (rule.keywords.some((kw) => textToMatch.includes(kw))) {
+        matchedCategory = rule.category;
+        break;
+      }
+    }
+
+    if (!matchedCategory) continue;
+
+    // Immobilie finden (durch Straße oder Name im Verwendungszweck)
+    let matchedPropertyId: number | null = null;
+    if (properties.length === 1) {
+      matchedPropertyId = properties[0].id;
+    } else {
+      for (const p of properties) {
+        if (textToMatch.includes(p.street.toLowerCase()) || textToMatch.includes(p.name.toLowerCase())) {
+          matchedPropertyId = p.id;
+          break;
+        }
+      }
+    }
+
+    let didMatch = false;
+    await prisma.$transaction(async (tx) => {
+      const current = await tx.bankTransaction.findUnique({
+        where: { id: bankTx.id },
+        select: { status: true },
+      });
+      if (!current || current.status !== "UNMATCHED") return;
+
+      const ledgerTx = await tx.transaction.create({
+        data: {
+          date: bankTx.bookingDate,
+          description: bankTx.creditorName || "Versorgerabrechnung",
+          type: "AUSGABE",
+          amount: Number(Math.abs(Number(bankTx.amount)).toFixed(2)),
+          category: "Nebenkosten",
+          allocatable: true,
+          betrkvCategory: matchedCategory,
+          companyId,
+          bankAccountId: bankTx.bankAccountId,
+          propertyId: matchedPropertyId,
+        },
+      });
+
+      await tx.bankTransaction.update({
+        where: { id: bankTx.id },
+        data: {
+          status: "MATCHED",
+          transactionId: ledgerTx.id,
+        },
+      });
+      didMatch = true;
+    });
+
+    if (didMatch) matched++;
+  }
+
+  return { matched };
+}
+
+/**
  * Führt automatisches Matching für alle Firmen mit ungematchten Transaktionen durch.
  * Wird z.B. per Cron aufgerufen.
  */
@@ -201,6 +304,7 @@ export async function matchAllPendingTransactions(): Promise<void> {
   for (const { companyId } of companies) {
     try {
       await matchPendingTransactions(companyId);
+      await matchUtilityTransactions(companyId);
     } catch (err) {
       logger.error(
         { err, companyId },

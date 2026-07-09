@@ -15,6 +15,9 @@ import Tickets from "@/pages/Tickets";
 import NewTicket from "@/pages/NewTicket";
 import Finances from "@/pages/Finances";
 import Messages from "@/pages/Messages";
+import UtilityTransparency from "@/pages/UtilityTransparency";
+import MeterReadingSelfService from "@/pages/MeterReadingSelfService";
+import BillingDisputeForm from "@/pages/BillingDisputeForm";
 
 /**
  * Wraps all slug-scoped routes with branding + auth providers.
@@ -49,6 +52,9 @@ function SlugApp() {
             <Route path="tickets/new" element={<NewTicket />} />
             <Route path="finances" element={<Finances />} />
             <Route path="messages" element={<Messages />} />
+            <Route path="utility" element={<UtilityTransparency />} />
+            <Route path="meter-reading" element={<MeterReadingSelfService />} />
+            <Route path="billing-dispute" element={<BillingDisputeForm />} />
           </Route>
         </Routes>
       </AuthProvider>

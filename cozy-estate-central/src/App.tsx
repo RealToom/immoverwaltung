@@ -38,6 +38,7 @@ import Register from "./pages/Register";
 import LandingPage from "./pages/LandingPage";
 import TwoFactorSetup from "./pages/TwoFactorSetup";
 import TwoFactorVerify from "./pages/TwoFactorVerify";
+import UtilityBillingWizard from "./pages/UtilityBillingWizard";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +76,7 @@ const AppLayout = () => (
         <Route path="/insurance" element={<Insurances />} />
         <Route path="/audit-logs" element={<AuditLog />} />
         <Route path="/energie" element={<Energie />} />
+        <Route path="/utility-billing" element={<UtilityBillingWizard />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
