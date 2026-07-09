@@ -247,14 +247,14 @@ export async function createTransaction(
 export async function updateTransaction(
   companyId: number,
   id: number,
-  data: { allocatable?: boolean; category?: string }
+  data: { allocatable?: boolean; category?: string; betrkvCategory?: string | null; co2TaxAmount?: number }
 ) {
   const existing = await prisma.transaction.findFirst({ where: { id, companyId } });
   if (!existing) {
     const { NotFoundError } = await import("../lib/errors.js");
     throw new NotFoundError("Transaktion", id);
   }
-  return prisma.transaction.update({ where: { id }, data });
+  return prisma.transaction.update({ where: { id }, data: data as never });
 }
 
 export async function getUtilityStatement(companyId: number, propertyId: number, year: number) {
