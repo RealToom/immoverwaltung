@@ -44,3 +44,8 @@ export const uploadMetaSchema = z.object({
 export const utilityQuerySchema = z.object({
   year: z.coerce.number().int().min(2000).max(2100).optional(),
 });
+
+export const createDisputeSchema = z.object({
+  reason: z.string().min(10, "Begründung muss mindestens 10 Zeichen lang sein").max(1000),
+  amount: z.number().positive().optional(),
+});

@@ -126,3 +126,15 @@ export async function scanMeterReadingPhoto(req: Request, res: Response): Promis
     fs.unlink(file.path, () => {});
   }
 }
+
+// ─── Billing Disputes ─────────────────────────────────────────────────────────
+
+export async function createDispute(req: Request, res: Response): Promise<void> {
+  const data = await svc.createDispute(req.tenantUser!, req.body as { reason: string; amount?: number });
+  res.status(201).json({ data });
+}
+
+export async function getDisputes(req: Request, res: Response): Promise<void> {
+  const data = await svc.getDisputes(req.tenantUser!);
+  res.json({ data });
+}

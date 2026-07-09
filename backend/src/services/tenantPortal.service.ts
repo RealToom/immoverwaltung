@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { NotFoundError, BadRequestError } from "../lib/errors.js";
 import { MaintenanceCategoryType, MAINTENANCE_CATEGORIES } from "../schemas/tenantPortal.schema.js";
 import { UtilityBillingService } from "./utility-billing.service.js";
+import * as disputeSvc from "./billing-dispute.service.js";
 
 type TenantUser = { id: number; tenantId: number; companyId: number };
 
@@ -374,6 +375,18 @@ export async function addOwnMeterReading(
   return prisma.meterReading.create({
     data: { value: data.value, readAt: new Date(data.readAt), note: data.note, meterId, companyId: tenantUser.companyId },
   });
+}
+
+// ─── Billing Disputes ─────────────────────────────────────────────────────────
+
+export async function createDispute(tenantUser: TenantUser, data: { reason: string; amount?: number }) {
+  const contract = await getActiveContract(tenantUser);
+  return disputeSvc.createDispute(tenantUser.companyId, contract.id, data);
+}
+
+export async function getDisputes(tenantUser: TenantUser) {
+  const contract = await getActiveContract(tenantUser);
+  return disputeSvc.listDisputesByContract(tenantUser.companyId, contract.id);
 }
 
 // ─── Admin functions ───────────────────────────────────────────────────────────

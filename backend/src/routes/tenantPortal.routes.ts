@@ -10,6 +10,7 @@ import {
   signDocumentSchema,
   uploadMetaSchema,
   utilityQuerySchema,
+  createDisputeSchema,
 } from "../schemas/tenantPortal.schema.js";
 import { createMeterReadingSchema } from "../schemas/meter.schema.js";
 import * as ctrl from "../controllers/tenantPortal.controller.js";
@@ -62,6 +63,10 @@ router.post(
   ctrl.addMeterReading
 );
 router.post("/meters/:id/readings/scan", tenantPhotoMiddleware, ctrl.scanMeterReadingPhoto);
+
+// ─── Billing Disputes ─────────────────────────────────────────────────────────
+router.post("/billing-disputes", validate({ body: createDisputeSchema }), ctrl.createDispute);
+router.get("/billing-disputes", ctrl.getDisputes);
 
 // ─── Messages ─────────────────────────────────────────────────────────────────
 router.get("/messages", ctrl.getMessages);
