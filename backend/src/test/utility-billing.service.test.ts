@@ -87,7 +87,7 @@ describe("UtilityBillingService", () => {
       });
       mockRentPaymentFindMany.mockResolvedValueOnce(
         Array.from({ length: 12 }, (_, i) => ({
-          id: i, amountDue: 900, amountPaid: 900, status: "PUENCTLICH",
+          id: i, amountDue: 900, amountPaid: 900, status: "PUENKTLICH",
         }))
       );
       const svc = new UtilityBillingService(1);
