@@ -154,7 +154,7 @@ export class UtilityBillingService {
     
     // Finde alle Units der Property
     const units = await prisma.unit.findMany({
-      where: { propertyId, companyId: this.companyId },
+      where: { propertyId, property: { companyId: this.companyId } },
       include: {
         contracts: {
           where: {
@@ -234,7 +234,7 @@ export class UtilityBillingService {
     });
 
     if (!contract || contract.companyId !== this.companyId) {
-      throw new AppError("Vertrag nicht gefunden oder kein Zugriff", 404);
+      throw new AppError(404, "Vertrag nicht gefunden oder kein Zugriff");
     }
 
     // TODO: The contract model currently doesn't explicitly store the utility prepayment amount.

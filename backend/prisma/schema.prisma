@@ -270,7 +270,6 @@ model Tenant {
   suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedTenant")
   tenantUsers            TenantUser[]
   calendarEvents         CalendarEvent[]
-  disputes               BillingDispute[]
 
   @@map("tenants")
 }
@@ -283,6 +282,7 @@ model Contract {
   endDate      DateTime?      @map("end_date")
   noticePeriod Int            @map("notice_period")
   monthlyRent  Float          @map("monthly_rent")
+  utilityPrepayment Float     @default(0) @map("utility_prepayment")
   deposit      Float          @default(0)
   status       ContractStatus @default(ENTWURF)
   nextReminder DateTime?      @map("next_reminder")
