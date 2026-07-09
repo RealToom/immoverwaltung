@@ -423,7 +423,7 @@ In `backend/src/services/utility-billing.service.ts`, replace the whole `generat
     const endOfYear = new Date(billingYear, 11, 31);
 
     const units = await prisma.unit.findMany({
-      where: { propertyId, companyId: this.companyId },
+      where: { propertyId, property: { companyId: this.companyId } },
       include: {
         contracts: {
           where: {
@@ -2260,12 +2260,12 @@ export function useTenantUtility(slug: string, year?: number) {
 
 - [ ] **Step 2: Rewrite the page**
 
+**Note (discovered during Task 11 implementation, applies here too):** `tenant-portal` has no `src/components/ui/` (shadcn) directory and no `sonner` dependency — those exist only in `cozy-estate-central`. Every real tenant-portal page (`Finances.tsx`, `NewTicket.tsx`) uses plain Tailwind with the `bg-gray-50`/white-card/`rounded-2xl` convention and the CSS custom-property `primary`/`primary-foreground` tokens from `tenant-portal/src/index.css` (not `muted-foreground`, which doesn't exist here either — use `text-gray-500`). The code below already reflects this; do not reintroduce `@/components/ui/*` or `sonner` imports.
+
 Replace `tenant-portal/src/pages/UtilityTransparency.tsx` entirely:
 
 ```tsx
-import React from "react";
 import { useParams } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreditCard, ListChecks } from "lucide-react";
 import { useTenantUtility } from "@/hooks/api/useTenantUtility";
 
@@ -2278,66 +2278,62 @@ export default function UtilityTransparency() {
   const { data, isLoading } = useTenantUtility(slug!);
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Verbrauchstransparenz</h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="flex flex-col min-h-screen bg-gray-50 pb-20">
+      <div className="bg-white border-b px-4 py-4">
+        <h1 className="text-xl font-semibold">Verbrauchstransparenz</h1>
+        <p className="text-sm text-gray-500 mt-1">
           Deine Nebenkosten {data ? `für ${data.year}` : ""} im Überblick.
         </p>
       </div>
 
-      {isLoading ? (
-        <div className="bg-white border rounded-2xl p-6 animate-pulse h-32" />
-      ) : !data ? (
-        <Card>
-          <CardContent className="pt-6 text-center text-muted-foreground">
+      <div className="flex-1 p-4 space-y-4">
+        {isLoading ? (
+          <div className="bg-white border rounded-2xl p-6 animate-pulse h-32" />
+        ) : !data ? (
+          <div className="bg-white border rounded-2xl p-6 text-center text-gray-500 text-sm">
             Noch keine Abrechnungsdaten für dein Vertragsjahr verfügbar.
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <Card className={data.balance < 0 ? "border-red-200 dark:border-red-900" : "border-green-200 dark:border-green-900"}>
-            <CardContent className="pt-6">
+          </div>
+        ) : (
+          <>
+            <div className={`bg-white border rounded-2xl p-4 ${data.balance < 0 ? "border-red-200" : "border-green-200"}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm text-gray-500">
                     {data.balance < 0 ? "Nachzahlung" : "Guthaben"}
                   </p>
                   <p className={`text-3xl font-bold ${data.balance < 0 ? "text-red-600" : "text-green-600"}`}>
                     {formatEur(Math.abs(data.balance))}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">Gesamtkosten: {formatEur(data.totalCosts)}</p>
+                  <p className="text-xs text-gray-500 mt-1">Gesamtkosten: {formatEur(data.totalCosts)}</p>
                 </div>
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center ${data.balance < 0 ? "bg-red-100" : "bg-green-100"}`}>
                   <CreditCard className={`w-6 h-6 ${data.balance < 0 ? "text-red-600" : "text-green-600"}`} />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <div className="bg-white border rounded-2xl p-4">
+              <h2 className="flex items-center gap-2 font-semibold mb-1">
                 <ListChecks className="w-5 h-5" />
                 Kostenaufstellung nach Kategorie
-              </CardTitle>
-              <CardDescription>Anteil der einzelnen Betriebskostenarten an deiner Abrechnung.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
+              </h2>
+              <p className="text-sm text-gray-500 mb-3">Anteil der einzelnen Betriebskostenarten an deiner Abrechnung.</p>
               {data.categories.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Keine kategorisierten Kosten vorhanden.</p>
+                <p className="text-sm text-gray-500">Keine kategorisierten Kosten vorhanden.</p>
               ) : (
-                data.categories.map((c, i) => (
-                  <div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm">
-                    <span>{c.category}</span>
-                    <span className="font-medium">{formatEur(c.amount)}</span>
-                  </div>
-                ))
+                <div className="space-y-2">
+                  {data.categories.map((c, i) => (
+                    <div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm">
+                      <span>{c.category}</span>
+                      <span className="font-medium">{formatEur(c.amount)}</span>
+                    </div>
+                  ))}
+                </div>
               )}
-            </CardContent>
-          </Card>
-        </>
-      )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -2389,17 +2385,14 @@ export function useCreateDispute(slug: string) {
 
 - [ ] **Step 2: Wire the form**
 
+**Note (discovered during Task 11 implementation, applies here too):** `tenant-portal` has no `src/components/ui/` (shadcn) directory and no `sonner` dependency — those exist only in `cozy-estate-central`. Use plain Tailwind matching `Finances.tsx`/`NewTicket.tsx` conventions (`bg-gray-50`, white `rounded-2xl` cards, `text-gray-500` instead of `text-muted-foreground`), a plain `<textarea>` instead of shadcn's `Textarea`, inline success/error banners instead of `toast`. The code below already reflects this; do not reintroduce `@/components/ui/*` or `sonner` imports.
+
 Replace `tenant-portal/src/pages/BillingDisputeForm.tsx` entirely:
 
 ```tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, AlertTriangle, ShieldAlert, CreditCard } from "lucide-react";
-import { toast } from "sonner";
+import { ShieldAlert, CreditCard } from "lucide-react";
 import { useTenantUtility } from "@/hooks/api/useTenantUtility";
 import { useCreateDispute } from "@/hooks/api/useTenantDisputes";
 
@@ -2421,6 +2414,7 @@ export default function BillingDisputeForm() {
 
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   const toggleCategory = (cat: string) => {
@@ -2431,8 +2425,9 @@ export default function BillingDisputeForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (selectedCategories.length === 0 || !reason.trim()) {
-      toast.error("Bitte wähle mindestens eine Kostenart und gib eine Begründung ein.");
+      setError("Bitte wähle mindestens eine Kostenart und gib eine Begründung ein.");
       return;
     }
     const fullReason = `Kostenart(en): ${selectedCategories.join(", ")}. Begründung: ${reason.trim()}`;
@@ -2442,9 +2437,8 @@ export default function BillingDisputeForm() {
         amount: utility ? Math.abs(utility.balance) : undefined,
       });
       setSubmitted(true);
-      toast.success("Widerspruch erfolgreich eingereicht");
     } catch {
-      toast.error("Einreichung fehlgeschlagen. Bitte erneut versuchen.");
+      setError("Einreichung fehlgeschlagen. Bitte erneut versuchen.");
     }
   };
 
@@ -2452,43 +2446,41 @@ export default function BillingDisputeForm() {
 
   if (submitted) {
     return (
-      <div className="space-y-6 pb-20">
-        <div className="flex flex-col items-center justify-center space-y-4 py-16">
-          <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
-            <ShieldAlert className="w-8 h-8 text-amber-600" />
-          </div>
-          <h2 className="text-xl font-bold text-center">Widerspruch eingereicht</h2>
-          <p className="text-muted-foreground text-center max-w-sm text-sm">
-            Dein Widerspruch wurde erfolgreich an die Hausverwaltung übermittelt.
-            Du zahlst den strittigen Betrag vorerst <strong>unter Vorbehalt</strong>.
-          </p>
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-4 text-sm text-amber-800 dark:text-amber-200 max-w-sm">
-            <p className="font-semibold">Dein Widerspruch umfasst:</p>
-            <ul className="mt-2 space-y-1">
-              {selectedCategories.map((c) => (
-                <li key={c}>• {c}</li>
-              ))}
-            </ul>
-          </div>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 space-y-4 py-16 px-6">
+        <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
+          <ShieldAlert className="w-8 h-8 text-amber-600" />
+        </div>
+        <h2 className="text-xl font-bold text-center">Widerspruch eingereicht</h2>
+        <p className="text-gray-500 text-center max-w-sm text-sm">
+          Dein Widerspruch wurde erfolgreich an die Hausverwaltung übermittelt.
+          Du zahlst den strittigen Betrag vorerst <strong>unter Vorbehalt</strong>.
+        </p>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800 max-w-sm w-full">
+          <p className="font-semibold">Dein Widerspruch umfasst:</p>
+          <ul className="mt-2 space-y-1">
+            {selectedCategories.map((c) => (
+              <li key={c}>• {c}</li>
+            ))}
+          </ul>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Nebenkostenabrechnung {utility?.year ?? ""}</h1>
-        <p className="text-sm text-muted-foreground">
+    <div className="flex flex-col min-h-screen bg-gray-50 pb-20">
+      <div className="bg-white border-b px-4 py-4">
+        <h1 className="text-xl font-semibold">Nebenkostenabrechnung {utility?.year ?? ""}</h1>
+        <p className="text-sm text-gray-500 mt-1">
           Wenn du mit deiner Abrechnung nicht einverstanden bist, kannst du hier Widerspruch einlegen.
         </p>
       </div>
 
-      <Card className={balance < 0 ? "border-red-200 dark:border-red-900" : "border-green-200 dark:border-green-900"}>
-        <CardContent className="pt-6">
+      <div className="flex-1 p-4 space-y-4">
+        <div className={`bg-white border rounded-2xl p-4 ${balance < 0 ? "border-red-200" : "border-green-200"}`}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-gray-500">
                 {balance < 0 ? "Nachzahlung" : "Guthaben"}
               </p>
               <p className={`text-3xl font-bold ${balance < 0 ? "text-red-600" : "text-green-600"}`}>
@@ -2499,66 +2491,68 @@ export default function BillingDisputeForm() {
               <CreditCard className={`w-6 h-6 ${balance < 0 ? "text-red-600" : "text-green-600"}`} />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <Card id="dispute-form" className="border-amber-200 dark:border-amber-900">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+        <form onSubmit={handleSubmit} id="dispute-form" className="bg-white border border-amber-200 rounded-2xl p-4 space-y-4">
+          <h2 className="flex items-center gap-2 font-semibold text-amber-700">
             <ShieldAlert className="w-5 h-5" />
             Widerspruch – Zahlung unter Vorbehalt
-          </CardTitle>
-          <CardDescription>
+          </h2>
+          <p className="text-sm text-gray-500">
             Wähle die Kostenart(en), die du beanstandest, und begründe deinen Widerspruch. Die Hausverwaltung wird benachrichtigt.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label className="font-semibold">Betroffene Kostenart(en) auswählen:</Label>
-              <div className="grid grid-cols-2 gap-2">
-                {BETRKV_CATEGORIES.map((cat) => (
-                  <button
-                    type="button"
-                    key={cat}
-                    onClick={() => toggleCategory(cat)}
-                    className={`text-left text-xs p-2 rounded-lg border transition-colors ${
-                      selectedCategories.includes(cat)
-                        ? "bg-amber-100 border-amber-400 text-amber-900 font-medium dark:bg-amber-950 dark:text-amber-200"
-                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300"
-                    }`}
-                  >
-                    {selectedCategories.includes(cat) && "✓ "}{cat}
-                  </button>
-                ))}
-              </div>
-            </div>
+          </p>
 
-            <div className="space-y-2">
-              <Label htmlFor="reason" className="font-semibold">Begründung</Label>
-              <Textarea
-                id="reason"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="z.B. Die Gartenpflegekosten sind im Vergleich zum Vorjahr um 40% gestiegen. Bitte um Nachweis der Einzelpositionen."
-                rows={4}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Tipp: Je konkreter deine Begründung, desto schneller kann die Verwaltung antworten.
-              </p>
+          <div className="space-y-2">
+            <label className="block text-sm font-semibold">Betroffene Kostenart(en) auswählen:</label>
+            <div className="grid grid-cols-2 gap-2">
+              {BETRKV_CATEGORIES.map((cat) => (
+                <button
+                  type="button"
+                  key={cat}
+                  onClick={() => toggleCategory(cat)}
+                  className={`text-left text-xs p-2 rounded-lg border transition-colors ${
+                    selectedCategories.includes(cat)
+                      ? "bg-amber-100 border-amber-400 text-amber-900 font-medium"
+                      : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {selectedCategories.includes(cat) && "✓ "}{cat}
+                </button>
+              ))}
             </div>
+          </div>
 
-            <Button
-              type="submit"
-              className="w-full bg-amber-600 hover:bg-amber-700"
-              disabled={selectedCategories.length === 0 || !reason.trim() || createDispute.isPending}
-            >
-              {createDispute.isPending ? "Wird gesendet..." : "Widerspruch verbindlich einreichen"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+          <div className="space-y-2">
+            <label htmlFor="reason" className="block text-sm font-semibold">Begründung</label>
+            <textarea
+              id="reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="z.B. Die Gartenpflegekosten sind im Vergleich zum Vorjahr um 40% gestiegen. Bitte um Nachweis der Einzelpositionen."
+              rows={4}
+              required
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <p className="text-xs text-gray-500">
+              Tipp: Je konkreter deine Begründung, desto schneller kann die Verwaltung antworten.
+            </p>
+          </div>
+
+          {error && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={selectedCategories.length === 0 || !reason.trim() || createDispute.isPending}
+            className="w-full bg-amber-600 text-white py-3.5 rounded-2xl font-semibold disabled:opacity-50"
+          >
+            {createDispute.isPending ? "Wird gesendet…" : "Widerspruch verbindlich einreichen"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
