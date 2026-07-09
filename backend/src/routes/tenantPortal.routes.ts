@@ -9,7 +9,9 @@ import {
   createMessageSchema,
   signDocumentSchema,
   uploadMetaSchema,
+  utilityQuerySchema,
 } from "../schemas/tenantPortal.schema.js";
+import { createMeterReadingSchema } from "../schemas/meter.schema.js";
 import * as ctrl from "../controllers/tenantPortal.controller.js";
 import { authLimiter } from "../middleware/rateLimiter.js";
 import {
@@ -50,6 +52,16 @@ router.post("/tickets", tenantPhotoMiddleware, validate({ body: createTicketSche
 
 // ─── Finances ─────────────────────────────────────────────────────────────────
 router.get("/finances", ctrl.getFinances);
+
+// ─── Utility Billing ────────────────────────────────────────────────────────────
+router.get("/utility", validate({ query: utilityQuerySchema }), ctrl.getUtility);
+router.get("/meters", ctrl.getMeters);
+router.post(
+  "/meters/:id/readings",
+  validate({ params: tenantPortalIdParamSchema, body: createMeterReadingSchema }),
+  ctrl.addMeterReading
+);
+router.post("/meters/:id/readings/scan", tenantPhotoMiddleware, ctrl.scanMeterReadingPhoto);
 
 // ─── Messages ─────────────────────────────────────────────────────────────────
 router.get("/messages", ctrl.getMessages);

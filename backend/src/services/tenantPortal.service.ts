@@ -1,8 +1,18 @@
 import { prisma } from "../lib/prisma.js";
 import { NotFoundError, BadRequestError } from "../lib/errors.js";
 import { MaintenanceCategoryType, MAINTENANCE_CATEGORIES } from "../schemas/tenantPortal.schema.js";
+import { UtilityBillingService } from "./utility-billing.service.js";
 
 type TenantUser = { id: number; tenantId: number; companyId: number };
+
+async function getActiveContract(tenantUser: TenantUser) {
+  const contract = await prisma.contract.findFirst({
+    where: { tenantId: tenantUser.tenantId, companyId: tenantUser.companyId, status: "AKTIV" },
+    orderBy: { startDate: "desc" },
+  });
+  if (!contract) throw new NotFoundError("Aktiver Vertrag", tenantUser.tenantId);
+  return contract;
+}
 
 // ─── Me ───────────────────────────────────────────────────────────────────────
 
@@ -312,6 +322,57 @@ export async function createMessage(tenantUser: TenantUser, body: string) {
       createdAt: true,
       readAt: true,
     },
+  });
+}
+
+// ─── Utility Billing ────────────────────────────────────────────────────────────
+
+export async function getUtilitySummary(tenantUser: TenantUser, year?: number) {
+  const contract = await getActiveContract(tenantUser);
+  const targetYear = year ?? new Date().getFullYear() - 1;
+  const svc = new UtilityBillingService(tenantUser.companyId);
+  const statement = await svc.generateStatement(contract.propertyId, targetYear);
+  const item = statement.items.find((i) => i.contractId === contract.id);
+  return {
+    year: targetYear,
+    totalCosts: item?.amount ?? 0,
+    balance: item?.balance ?? 0,
+    isRefund: item?.isRefund ?? false,
+    categories: statement.transactions
+      .filter((tx) => tx.betrkvCategory)
+      .map((tx) => ({ category: tx.betrkvCategory, amount: Math.abs(tx.amount) })),
+  };
+}
+
+export async function getOwnMeters(tenantUser: TenantUser) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantUser.tenantId },
+    select: { units: { select: { id: true } } },
+  });
+  const unitIds = tenant?.units.map((u) => u.id) ?? [];
+  return prisma.meter.findMany({
+    where: { companyId: tenantUser.companyId, unitId: { in: unitIds } },
+    include: { readings: { orderBy: { readAt: "desc" }, take: 1 } },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export async function addOwnMeterReading(
+  tenantUser: TenantUser,
+  meterId: number,
+  data: { value: number; readAt: string; note?: string }
+) {
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantUser.tenantId },
+    select: { units: { select: { id: true } } },
+  });
+  const unitIds = tenant?.units.map((u) => u.id) ?? [];
+  const meter = await prisma.meter.findFirst({
+    where: { id: meterId, companyId: tenantUser.companyId, unitId: { in: unitIds } },
+  });
+  if (!meter) throw new NotFoundError("Zähler", meterId);
+  return prisma.meterReading.create({
+    data: { value: data.value, readAt: new Date(data.readAt), note: data.note, meterId, companyId: tenantUser.companyId },
   });
 }
 

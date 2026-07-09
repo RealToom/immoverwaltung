@@ -40,3 +40,7 @@ export const uploadMetaSchema = z.object({
   category: z.string().default("Sonstiges"),
   description: z.string().max(500).optional(),
 });
+
+export const utilityQuerySchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+});

@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
+import fs from "fs";
 import * as svc from "../services/tenantPortal.service.js";
 import { BadRequestError } from "../lib/errors.js";
+import { env } from "../config/env.js";
+import { scanMeterReading } from "../services/receipt.service.js";
 
 // ─── Me ───────────────────────────────────────────────────────────────────────
 
@@ -81,4 +84,45 @@ export async function createMessage(req: Request, res: Response): Promise<void> 
   const { body } = req.body as { body: string };
   const data = await svc.createMessage(req.tenantUser!, body);
   res.status(201).json({ data });
+}
+
+// ─── Utility Billing ───────────────────────────────────────────────────────────
+
+export async function getUtility(req: Request, res: Response): Promise<void> {
+  const year = req.query.year ? Number(req.query.year) : undefined;
+  const data = await svc.getUtilitySummary(req.tenantUser!, year);
+  res.json({ data });
+}
+
+export async function getMeters(req: Request, res: Response): Promise<void> {
+  const data = await svc.getOwnMeters(req.tenantUser!);
+  res.json({ data });
+}
+
+export async function addMeterReading(req: Request, res: Response): Promise<void> {
+  const data = await svc.addOwnMeterReading(
+    req.tenantUser!,
+    Number(req.params.id),
+    req.body as { value: number; readAt: string; note?: string }
+  );
+  res.status(201).json({ data });
+}
+
+export async function scanMeterReadingPhoto(req: Request, res: Response): Promise<void> {
+  const file = req.file;
+  if (!file) {
+    res.status(400).json({ error: "Kein Foto hochgeladen" });
+    return;
+  }
+  if (!env.ANTHROPIC_API_KEY) {
+    fs.unlink(file.path, () => {});
+    res.status(503).json({ error: "KI-Scan ist nicht konfiguriert (ANTHROPIC_API_KEY fehlt)" });
+    return;
+  }
+  try {
+    const data = await scanMeterReading(file.path, file.mimetype);
+    res.json({ data });
+  } finally {
+    fs.unlink(file.path, () => {});
+  }
 }
