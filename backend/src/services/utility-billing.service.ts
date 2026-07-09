@@ -151,14 +151,12 @@ export class UtilityBillingService {
   public async generateOwnerVacancyInvoice(propertyId: number, billingYear: number, totalFixedCosts: number) {
     const startOfYear = new Date(billingYear, 0, 1);
     const endOfYear = new Date(billingYear, 11, 31);
-    
-    // Finde alle Units der Property
+
     const units = await prisma.unit.findMany({
       where: { propertyId, property: { companyId: this.companyId } },
       include: {
         contracts: {
           where: {
-            // Verträge, die ins Jahr fallen
             startDate: { lte: endOfYear },
             OR: [
               { endDate: null },
@@ -170,19 +168,15 @@ export class UtilityBillingService {
     });
 
     let totalVacancyDays = 0;
+    const affectedUnits: string[] = [];
     const daysInYear = isLeapYear(startOfYear) ? 366 : 365;
 
-    // Für jede Unit schauen wir uns die vertragsfreien Tage an
     for (const unit of units) {
-      // Vereinfachter Ansatz: Wir berechnen die Tage, in denen EIN Vertrag aktiv war
-      let coveredDays = 0;
-      // Normalerweise müssen wir Lücken zwischen Verträgen berechnen. 
-      // Hier iterieren wir für MVP über jeden Tag des Jahres
-      let current = new Date(startOfYear);
       let unitVacancyDays = 0;
-      
+      let current = new Date(startOfYear);
+
       while (isBefore(current, endOfYear) || current.getTime() === endOfYear.getTime()) {
-        const hasActiveContract = unit.contracts.some(c => 
+        const hasActiveContract = unit.contracts.some(c =>
           (isBefore(c.startDate, current) || c.startDate.getTime() === current.getTime()) &&
           (!c.endDate || isAfter(c.endDate, current) || c.endDate.getTime() === current.getTime())
         );
@@ -192,25 +186,22 @@ export class UtilityBillingService {
         }
         current = new Date(current.getTime() + 24 * 60 * 60 * 1000);
       }
-      
+
+      if (unitVacancyDays > 0) affectedUnits.push(unit.number);
       totalVacancyDays += unitVacancyDays;
     }
 
     if (totalVacancyDays === 0) return null;
 
-    // Kostenanteil für Leerstand: 
-    // Hier vereinfacht als Durchschnitt auf alle Tage der Immobilie.
-    // In der Realität müsste es anteilig nach Quadratmetern der leeren Units gehen.
     const totalUnitDays = units.length * daysInYear;
     const vacancyRatio = totalVacancyDays / totalUnitDays;
     const ownerCost = totalFixedCosts * vacancyRatio;
 
-    // Erzeuge eine interne Transaktion zur Dokumentation
-    return await prisma.transaction.create({
+    const transaction = await prisma.transaction.create({
       data: {
         date: endOfYear,
         description: `Eigentümer-Abrechnung Leerstand ${billingYear}`,
-        type: "EINNAHME", // Um die Ausgaben-Konten auszugleichen
+        type: "EINNAHME",
         amount: ownerCost,
         category: "Leerstands-Ausgleich",
         allocatable: false,
@@ -218,6 +209,8 @@ export class UtilityBillingService {
         companyId: this.companyId
       }
     });
+
+    return { transaction, vacancyDays: totalVacancyDays, affectedUnits };
   }
 
   /**
@@ -276,6 +269,113 @@ export class UtilityBillingService {
       balance,
       isRefund,
       isAdditionalPayment: !isRefund && balance < 0
+    };
+  }
+
+  /**
+   * Composes pro-rata allocation, CO2-Stufenmodell, and Leerstands-Routing into
+   * a single per-contract statement for a property/year. Recomputed live on every
+   * call — nothing here is persisted as a "finalized" statement.
+   */
+  public async generateStatement(propertyId: number, year: number) {
+    const property = await prisma.property.findFirst({
+      where: { id: propertyId, companyId: this.companyId },
+    });
+    if (!property) throw new AppError(404, "Immobilie nicht gefunden");
+
+    const startDate = new Date(year, 0, 1);
+    const endDate = new Date(year + 1, 0, 1);
+
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        companyId: this.companyId,
+        propertyId,
+        type: "AUSGABE",
+        allocatable: true,
+        date: { gte: startDate, lt: endDate },
+      },
+    });
+
+    let totalCo2LandlordShare = 0;
+    let totalCo2TenantShare = 0;
+    let landlordPercentage = 0;
+    for (const tx of transactions) {
+      if (tx.co2TaxAmount && tx.co2TaxAmount > 0) {
+        const split = await this.applyCO2Stufenmodell(propertyId, tx.co2TaxAmount);
+        totalCo2LandlordShare += split.landlordShare;
+        totalCo2TenantShare += split.tenantShare;
+        landlordPercentage = split.landlordPercentage;
+      }
+    }
+
+    const passport = await prisma.energyPassport.findUnique({ where: { propertyId } });
+
+    const grossCosts = transactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    const totalAllocatable = grossCosts - totalCo2LandlordShare;
+
+    const vacancyResult = await this.generateOwnerVacancyInvoice(propertyId, year, totalAllocatable);
+    const vacancyDeduction = vacancyResult?.transaction.amount ?? 0;
+    const netAllocatable = totalAllocatable - vacancyDeduction;
+
+    const contracts = await prisma.contract.findMany({
+      where: {
+        propertyId,
+        companyId: this.companyId,
+        startDate: { lte: endDate },
+        OR: [{ endDate: null }, { endDate: { gte: startDate } }],
+      },
+      include: {
+        unit: { select: { id: true, number: true, area: true } },
+        tenant: { select: { id: true, name: true } },
+      },
+    });
+
+    const totalArea = contracts.reduce((sum, c) => sum + c.unit.area, 0);
+
+    const items = [];
+    for (const contract of contracts) {
+      const areaShare = totalArea > 0 ? netAllocatable * (contract.unit.area / totalArea) : 0;
+      const proRataShare = this.calculateProRataFixedCosts(areaShare, year, contract.startDate, contract.endDate);
+      const balance = await this.calculateBalance(contract.id, year, proRataShare);
+      items.push({
+        contractId: contract.id,
+        unitId: contract.unit.id,
+        unitNumber: contract.unit.number,
+        tenantName: contract.tenant.name,
+        area: contract.unit.area,
+        amount: Math.round(proRataShare * 100) / 100,
+        balance: Math.round(balance.balance * 100) / 100,
+        isRefund: balance.isRefund,
+      });
+    }
+
+    return {
+      year,
+      propertyId,
+      totalCosts: Math.round(grossCosts * 100) / 100,
+      co2: {
+        energyClass: passport?.energyClass ?? null,
+        co2Emissions: passport?.co2Emissions ?? null,
+        landlordPercentage,
+        tenantShare: Math.round(totalCo2TenantShare * 100) / 100,
+        landlordShare: Math.round(totalCo2LandlordShare * 100) / 100,
+      },
+      vacancy: vacancyResult
+        ? {
+            amount: Math.round(vacancyDeduction * 100) / 100,
+            vacancyDays: vacancyResult.vacancyDays,
+            affectedUnits: vacancyResult.affectedUnits,
+          }
+        : null,
+      items,
+      transactions: transactions.map((tx) => ({
+        id: tx.id,
+        description: tx.description,
+        amount: tx.amount,
+        betrkvCategory: tx.betrkvCategory,
+        maintenanceWarning: tx.maintenanceWarning,
+        co2TaxAmount: tx.co2TaxAmount,
+      })),
     };
   }
 }
