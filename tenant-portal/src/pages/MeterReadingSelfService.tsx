@@ -1,132 +1,217 @@
-import React, { useState, useRef } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Camera, UploadCloud, CheckCircle2, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
+import { useRef, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, Camera, UploadCloud, CheckCircle2, AlertTriangle } from "lucide-react";
+import { useTenantMeters, useSubmitMeterReading, useScanMeterReading } from "@/hooks/api/useTenantMeters";
 
 export default function MeterReadingSelfService() {
-  const [reading, setReading] = useState("");
-  const [imageCaptured, setImageCaptured] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  
-  // In a real app we would access device camera
-  const handleCaptureClick = () => {
-    // Mocking camera capture
-    setTimeout(() => {
-      setImageCaptured(true);
-      toast.success("Foto erfolgreich aufgenommen");
-    }, 500);
-  };
+  const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
+  const { data: meters, isLoading } = useTenantMeters(slug!);
+  const submitReading = useSubmitMeterReading(slug!);
+  const scanReading = useScanMeterReading(slug!);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [meterId, setMeterId] = useState<number | null>(null);
+  const [reading, setReading] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [scanNotice, setScanNotice] = useState<{ type: "success" | "warning"; text: string } | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  const selectedMeter = meters?.find((m) => m.id === meterId) ?? null;
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !meterId) return;
+    setPhoto(file);
+    setScanNotice(null);
+    setError(null);
+    try {
+      const res = await scanReading.mutateAsync({ meterId, photo: file });
+      if (res.data.value != null) {
+        setReading(String(res.data.value));
+        setScanNotice({ type: "success", text: "Zählerstand erkannt — bitte prüfen." });
+      } else {
+        setScanNotice({ type: "warning", text: "Zählerstand konnte nicht automatisch erkannt werden. Bitte manuell eingeben." });
+      }
+    } catch {
+      setScanNotice({ type: "warning", text: "KI-Scan fehlgeschlagen. Bitte Zählerstand manuell eingeben." });
+    }
+  }
+
+  function removePhoto() {
+    setPhoto(null);
+    setScanNotice(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!reading || !imageCaptured) {
-      toast.error("Bitte Zählerstand eingeben und ein Foto machen.");
+    setError(null);
+    if (!meterId || !reading) {
+      setError("Bitte Zähler auswählen und Zählerstand eingeben.");
       return;
     }
-    
-    setIsSubmitting(true);
-    // Mock API call
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      await submitReading.mutateAsync({ meterId, value: Number(reading), readAt: new Date().toISOString() });
       setSubmitted(true);
-      toast.success("Zählerstand erfolgreich übermittelt");
-    }, 1000);
-  };
+    } catch {
+      setError("Übermittlung fehlgeschlagen. Bitte erneut versuchen.");
+    }
+  }
 
   if (submitted) {
     return (
-      <div className="flex flex-col items-center justify-center space-y-4 py-20">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 space-y-4 py-20 px-6">
         <CheckCircle2 className="w-16 h-16 text-green-500" />
         <h2 className="text-xl font-bold">Vielen Dank!</h2>
-        <p className="text-muted-foreground text-center max-w-sm">
+        <p className="text-gray-500 text-center max-w-sm">
           Dein Zählerstand wurde erfolgreich übermittelt und wird für die nächste Nebenkostenabrechnung verwendet.
         </p>
-        <Button variant="outline" onClick={() => { setSubmitted(false); setReading(""); setImageCaptured(false); }} className="mt-4">
+        <button
+          onClick={() => { setSubmitted(false); setReading(""); setPhoto(null); setMeterId(null); setScanNotice(null); setError(null); }}
+          className="mt-4 border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-semibold"
+        >
           Weiteren Zähler erfassen
-        </Button>
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight">Zählerstand melden</h1>
-        <p className="text-sm text-muted-foreground">
-          Stichtagsmeldung für Wasser, Strom oder Heizung.
-        </p>
+    <div className="flex flex-col min-h-screen bg-gray-50 pb-20">
+      <div className="bg-white border-b px-4 py-4 flex items-center gap-3">
+        <button onClick={() => navigate(-1)} className="text-gray-500">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h1 className="text-xl font-semibold">Zählerstand melden</h1>
       </div>
 
-      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-4 flex gap-3 text-sm text-amber-800 dark:text-amber-200">
-        <AlertTriangle className="w-5 h-5 shrink-0" />
-        <p>Wichtiger Hinweis: Ein Foto des Zählers ist für die rechtssichere Nebenkostenabrechnung zwingend erforderlich.</p>
-      </div>
+      <form onSubmit={handleSubmit} className="flex-1 p-4 space-y-4">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3 text-sm text-amber-800">
+          <AlertTriangle className="w-5 h-5 shrink-0" />
+          <p>Wichtiger Hinweis: Ein Foto des Zählers ist für die rechtssichere Nebenkostenabrechnung zwingend erforderlich.</p>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Zählerdaten eingeben</CardTitle>
-          <CardDescription>Zählernummer: 12345678 (Kaltwasser)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="reading">Aktueller Zählerstand (in m³)</Label>
-              <Input
-                id="reading"
-                type="number"
-                step="0.001"
-                placeholder="z.B. 145.5"
-                value={reading}
-                onChange={(e) => setReading(e.target.value)}
-                required
-              />
-            </div>
+        <div className="bg-white border rounded-2xl p-4">
+          <label htmlFor="meter" className="block text-sm font-medium text-gray-700 mb-2">Zähler</label>
+          <select
+            id="meter"
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary bg-white"
+            value={meterId ?? ""}
+            onChange={(e) => setMeterId(Number(e.target.value) || null)}
+            required
+          >
+            <option value="" disabled>
+              {isLoading ? "Lade Zähler…" : meters?.length ? "Zähler wählen" : "Keine Zähler gefunden"}
+            </option>
+            {(meters ?? []).map((m) => (
+              <option key={m.id} value={m.id}>{m.label} ({m.type})</option>
+            ))}
+          </select>
+          {selectedMeter?.readings[0] && (
+            <p className="text-xs text-gray-500 mt-2">
+              Letzter Stand: {selectedMeter.readings[0].value} am {new Date(selectedMeter.readings[0].readAt).toLocaleDateString("de-DE")}
+            </p>
+          )}
+        </div>
 
-            <div className="space-y-2">
-              <Label>Belegfoto (Zwingend erforderlich)</Label>
-              <div 
-                className={`border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center text-center space-y-3 transition-colors ${
-                  imageCaptured ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900' : 'hover:bg-slate-50 dark:hover:bg-slate-900'
-                }`}
-              >
-                {imageCaptured ? (
-                  <>
-                    <CheckCircle2 className="w-10 h-10 text-green-500" />
-                    <div>
-                      <p className="font-medium text-green-700 dark:text-green-400">Foto aufgenommen</p>
-                      <button type="button" onClick={() => setImageCaptured(false)} className="text-xs text-muted-foreground underline mt-1">Neu aufnehmen</button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex gap-4">
-                      <Button type="button" variant="secondary" onClick={handleCaptureClick}>
-                        <Camera className="w-4 h-4 mr-2" />
-                        Kamera starten
-                      </Button>
-                      <Button type="button" variant="outline">
-                        <UploadCloud className="w-4 h-4 mr-2" />
-                        Datei wählen
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Bitte stelle sicher, dass die Zählernummer und der Stand gut lesbar sind.
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
+        <div className="bg-white border rounded-2xl p-4">
+          <label htmlFor="reading" className="block text-sm font-medium text-gray-700 mb-2">Aktueller Zählerstand</label>
+          <input
+            id="reading"
+            type="number"
+            step="0.001"
+            placeholder="z.B. 145.5"
+            value={reading}
+            onChange={(e) => setReading(e.target.value)}
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            required
+          />
+        </div>
 
-            <Button type="submit" className="w-full" disabled={!reading || !imageCaptured || isSubmitting}>
-              {isSubmitting ? "Wird gesendet..." : "Zählerstand verbindlich übermitteln"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+        <div className="bg-white border rounded-2xl p-4">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Belegfoto <span className="text-gray-400 font-normal">(empfohlen, KI liest den Stand automatisch aus)</span>
+          </label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <div
+            className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center gap-3 transition-colors ${
+              photo ? "bg-green-50 border-green-200" : "border-gray-300"
+            }`}
+          >
+            {photo ? (
+              <>
+                <CheckCircle2 className="w-10 h-10 text-green-500" />
+                <div>
+                  <p className="font-medium text-green-700">
+                    Foto aufgenommen{scanReading.isPending ? " — wird analysiert…" : ""}
+                  </p>
+                  <button type="button" onClick={removePhoto} className="text-xs text-gray-500 underline mt-1">
+                    Neu aufnehmen
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    disabled={!meterId}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Camera className="w-4 h-4" />
+                    Foto aufnehmen
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!meterId}
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-1.5 border border-gray-300 rounded-xl px-4 py-2.5 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <UploadCloud className="w-4 h-4" />
+                    Datei wählen
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {meterId ? "Bitte stelle sicher, dass die Zählernummer und der Stand gut lesbar sind." : "Bitte zuerst einen Zähler auswählen."}
+                </p>
+              </>
+            )}
+          </div>
+          {scanNotice && (
+            <p className={`text-sm rounded-lg px-3 py-2 mt-3 ${
+              scanNotice.type === "success"
+                ? "text-green-700 bg-green-50 border border-green-200"
+                : "text-amber-800 bg-amber-50 border border-amber-200"
+            }`}>
+              {scanNotice.text}
+            </p>
+          )}
+        </div>
+
+        {error && (
+          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={!reading || !meterId || submitReading.isPending}
+          className="w-full bg-primary text-primary-foreground py-3.5 rounded-2xl font-semibold disabled:opacity-50"
+        >
+          {submitReading.isPending ? "Wird gesendet…" : "Zählerstand verbindlich übermitteln"}
+        </button>
+      </form>
     </div>
   );
 }
