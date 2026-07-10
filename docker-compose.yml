@@ -87,6 +87,8 @@ services:
       # SSL-Zertifikate einbinden (z.B. via Certbot: /etc/letsencrypt/live/DOMAIN/)
       # Vor dem ersten Start: certbot certonly --standalone -d DOMAIN
       - ${SSL_CERT_PATH:-./ssl}:/etc/nginx/ssl:ro
+      # Webroot fuer Certbot ACME-Challenge (webroot-Methode, siehe DEPLOYMENT.md)
+      - ${CERTBOT_WEBROOT:-./certbot-webroot}:/var/www/certbot:ro
     logging:
       driver: json-file
       options:
