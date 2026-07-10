@@ -1,13 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Request, Response } from "express";
 
-const { mockGenerateStatement } = vi.hoisted(() => ({ mockGenerateStatement: vi.fn() }));
+const { mockGenerateStatement, mockFinalizeStatement } = vi.hoisted(() => ({
+  mockGenerateStatement: vi.fn(),
+  mockFinalizeStatement: vi.fn(),
+}));
 vi.mock("../services/utility-billing.service.js", () => ({
   // Regular function (not arrow) so it can be invoked with `new` — the
   // controller calls `new UtilityBillingService(...)`, and arrow functions
   // cannot be used as constructors.
   UtilityBillingService: vi.fn().mockImplementation(function () {
-    return { generateStatement: mockGenerateStatement };
+    return { generateStatement: mockGenerateStatement, finalizeStatement: mockFinalizeStatement };
   }),
 }));
 
@@ -49,6 +52,17 @@ describe("utility-billing.controller", () => {
 
     expect(mockGenerateStatement).toHaveBeenCalledWith(3, 2026);
     expect(res.json).toHaveBeenCalledWith({ data: { year: 2026, propertyId: 3 } });
+  });
+
+  it("finalizeStatement scopes the service to req.companyId and returns its result", async () => {
+    mockFinalizeStatement.mockResolvedValueOnce({ propertyId: 3, year: 2026, generatedCount: 2, items: [] });
+    const req = { companyId: 1, body: { propertyId: 3, year: 2026 } } as unknown as Request;
+    const res = makeRes();
+
+    await ctrl.finalizeStatement(req, res);
+
+    expect(mockFinalizeStatement).toHaveBeenCalledWith(3, 2026);
+    expect(res.json).toHaveBeenCalledWith({ data: { propertyId: 3, year: 2026, generatedCount: 2, items: [] } });
   });
 
   it("listDisputes forwards the status query param", async () => {

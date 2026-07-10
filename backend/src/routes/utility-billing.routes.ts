@@ -17,6 +17,12 @@ router.post(
   validate({ body: generateStatementSchema }),
   ctrl.generateStatement
 );
+router.post(
+  "/statements/finalize",
+  requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
+  validate({ body: generateStatementSchema }),
+  ctrl.finalizeStatement
+);
 router.get("/disputes", validate({ query: listDisputesQuerySchema }), ctrl.listDisputes);
 router.patch(
   "/disputes/:id",
