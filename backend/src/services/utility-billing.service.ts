@@ -343,20 +343,27 @@ export class UtilityBillingService {
       },
     });
 
-    const totalArea = contracts.reduce((sum, c) => sum + c.unit.area, 0);
+    const contractWeights = contracts.map((contract) => ({
+      contract,
+      occupancyFraction: this.calculateProRataFixedCosts(1, year, contract.startDate, contract.endDate),
+    }));
+    const totalWeight = contractWeights.reduce(
+      (sum, w) => sum + w.contract.unit.area * w.occupancyFraction,
+      0
+    );
 
     const items = [];
-    for (const contract of contracts) {
-      const areaShare = totalArea > 0 ? netAllocatable * (contract.unit.area / totalArea) : 0;
-      const proRataShare = this.calculateProRataFixedCosts(areaShare, year, contract.startDate, contract.endDate);
-      const balance = await this.calculateBalance(contract.id, year, proRataShare);
+    for (const { contract, occupancyFraction } of contractWeights) {
+      const weight = contract.unit.area * occupancyFraction;
+      const share = totalWeight > 0 ? netAllocatable * (weight / totalWeight) : 0;
+      const balance = await this.calculateBalance(contract.id, year, share);
       items.push({
         contractId: contract.id,
         unitId: contract.unit.id,
         unitNumber: contract.unit.number,
         tenantName: contract.tenant.name,
         area: contract.unit.area,
-        amount: Math.round(proRataShare * 100) / 100,
+        amount: Math.round(share * 100) / 100,
         balance: Math.round(balance.balance * 100) / 100,
         isRefund: balance.isRefund,
       });

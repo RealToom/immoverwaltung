@@ -334,6 +334,7 @@ export async function getUtilitySummary(tenantUser: TenantUser, year?: number) {
   const svc = new UtilityBillingService(tenantUser.companyId);
   const statement = await svc.generateStatement(contract.propertyId, targetYear);
   const item = statement.items.find((i) => i.contractId === contract.id);
+  const shareRatio = statement.totalCosts > 0 && item ? item.amount / statement.totalCosts : 0;
   return {
     year: targetYear,
     totalCosts: item?.amount ?? 0,
@@ -341,7 +342,7 @@ export async function getUtilitySummary(tenantUser: TenantUser, year?: number) {
     isRefund: item?.isRefund ?? false,
     categories: statement.transactions
       .filter((tx) => tx.betrkvCategory)
-      .map((tx) => ({ category: tx.betrkvCategory, amount: Math.abs(tx.amount) })),
+      .map((tx) => ({ category: tx.betrkvCategory, amount: Math.round(Math.abs(tx.amount) * shareRatio * 100) / 100 })),
   };
 }
 
