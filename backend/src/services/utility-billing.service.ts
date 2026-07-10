@@ -1,7 +1,7 @@
 import { PrismaClient, Contract, RentPayment, Transaction, Unit } from "@prisma/client";
 import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
-import { differenceInDays, isLeapYear, getDaysInMonth, endOfMonth, isBefore, isAfter, max, min, startOfMonth } from "date-fns";
+import { differenceInDays, isLeapYear, getDaysInMonth, endOfMonth, isBefore, isAfter, max, min, startOfMonth, addDays } from "date-fns";
 
 /**
  * Utility Billing Service - Handles calculations according to German laws (BetrKV, HeizkostenV)
@@ -183,7 +183,7 @@ export class UtilityBillingService {
           (!c.endDate || isAfter(c.endDate, current) || c.endDate.getTime() === current.getTime())
         );
         if (!hasActiveContract) unitVacancyDays++;
-        current = new Date(current.getTime() + 24 * 60 * 60 * 1000);
+        current = addDays(current, 1);
       }
 
       if (unitVacancyDays > 0) affectedUnits.push(unit.number);
