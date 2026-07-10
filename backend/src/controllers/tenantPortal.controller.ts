@@ -4,6 +4,24 @@ import * as svc from "../services/tenantPortal.service.js";
 import { BadRequestError } from "../lib/errors.js";
 import { env } from "../config/env.js";
 import { scanMeterReading } from "../services/receipt.service.js";
+import { decryptFile, getOriginalExt } from "../lib/crypto.js";
+
+const MIME_MAP: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+};
+
+function sanitizeName(raw: string): string {
+  return raw
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
+    .replace(/\.{2,}/g, ".")
+    .trim()
+    .slice(0, 255);
+}
 
 // ─── Me ───────────────────────────────────────────────────────────────────────
 
@@ -32,6 +50,32 @@ export async function signDocument(req: Request, res: Response): Promise<void> {
   };
   const data = await svc.signDocument(req.tenantUser!, documentId, type, signatureData);
   res.json({ data });
+}
+
+export async function downloadDocument(req: Request, res: Response): Promise<void> {
+  const doc = await svc.downloadDocument(req.tenantUser!, Number(req.params.id));
+
+  if (!doc.filePath) {
+    res.status(400).json({ error: "Keine Datei vorhanden" });
+    return;
+  }
+
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+
+  if (doc.isEncrypted) {
+    const decrypted = decryptFile(doc.filePath);
+    const ext = getOriginalExt(doc.filePath);
+    const mime = MIME_MAP[ext] || "application/octet-stream";
+    const safeName = sanitizeName(doc.name);
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Content-Length", decrypted.length);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    res.send(decrypted);
+    return;
+  }
+
+  res.download(doc.filePath, sanitizeName(doc.name));
 }
 
 // ─── Uploads ──────────────────────────────────────────────────────────────────

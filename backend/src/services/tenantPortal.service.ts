@@ -130,6 +130,14 @@ export async function signDocument(
   });
 }
 
+export async function downloadDocument(tenantUser: TenantUser, documentId: number) {
+  const doc = await prisma.document.findFirst({
+    where: { id: documentId, tenantId: tenantUser.tenantId, companyId: tenantUser.companyId },
+  });
+  if (!doc) throw new NotFoundError("Dokument", documentId);
+  return doc;
+}
+
 // ─── Uploads ──────────────────────────────────────────────────────────────────
 
 export async function getUploads(tenantUser: TenantUser) {

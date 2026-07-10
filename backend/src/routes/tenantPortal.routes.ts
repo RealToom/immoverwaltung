@@ -42,6 +42,11 @@ router.post(
   validate({ params: tenantPortalIdParamSchema, body: signDocumentSchema }),
   ctrl.signDocument
 );
+router.get(
+  "/documents/:id/download",
+  validate({ params: tenantPortalIdParamSchema }),
+  ctrl.downloadDocument
+);
 
 // ─── Uploads ──────────────────────────────────────────────────────────────────
 router.get("/uploads", ctrl.getUploads);
