@@ -2,6 +2,12 @@ import { PrismaClient, Contract, RentPayment, Transaction, Unit } from "@prisma/
 import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
 import { differenceInDays, isLeapYear, getDaysInMonth, endOfMonth, isBefore, isAfter, max, min, startOfMonth, addDays } from "date-fns";
+import crypto from "node:crypto";
+import path from "node:path";
+import fs from "node:fs";
+import { env } from "../config/env.js";
+import * as documentService from "./document.service.js";
+import { generateTenantStatementPdf } from "./utility-statement-pdf.service.js";
 
 /**
  * Utility Billing Service - Handles calculations according to German laws (BetrKV, HeizkostenV)
@@ -360,6 +366,7 @@ export class UtilityBillingService {
       items.push({
         contractId: contract.id,
         unitId: contract.unit.id,
+        tenantId: contract.tenantId,
         unitNumber: contract.unit.number,
         tenantName: contract.tenant.name,
         area: contract.unit.area,
@@ -397,5 +404,100 @@ export class UtilityBillingService {
         co2TaxAmount: tx.co2TaxAmount,
       })),
     };
+  }
+
+  /**
+   * Turns a statement into durable artifacts: persists the owner-vacancy
+   * ledger entry (idempotently — replaces any prior entry for this
+   * property/year rather than duplicating it) and generates one PDF per
+   * tenant, stored via document.service.ts. Re-running for the same
+   * property/year replaces the previous documents instead of duplicating them.
+   */
+  public async finalizeStatement(propertyId: number, year: number) {
+    const statement = await this.generateStatement(propertyId, year);
+
+    const startOfYear = new Date(year, 0, 1);
+    const endOfYear = new Date(year, 11, 31);
+
+    // Idempotent: always clear any prior run's vacancy entry first.
+    await prisma.transaction.deleteMany({
+      where: {
+        propertyId,
+        companyId: this.companyId,
+        category: "Leerstands-Ausgleich",
+        date: { gte: startOfYear, lte: endOfYear },
+      },
+    });
+
+    if (statement.vacancy) {
+      await prisma.transaction.create({
+        data: {
+          date: endOfYear,
+          description: `Eigentümer-Abrechnung Leerstand ${year}`,
+          type: "EINNAHME",
+          amount: statement.vacancy.amount,
+          category: "Leerstands-Ausgleich",
+          allocatable: false,
+          propertyId,
+          companyId: this.companyId,
+        },
+      });
+    }
+
+    const company = await prisma.company.findUnique({ where: { id: this.companyId }, select: { name: true } });
+    const property = await prisma.property.findFirst({ where: { id: propertyId, companyId: this.companyId } });
+    if (!property) throw new AppError(404, "Immobilie nicht gefunden");
+
+    const docName = `Nebenkostenabrechnung_${year}_${propertyId}.pdf`;
+    let generatedCount = 0;
+
+    for (const item of statement.items) {
+      const existing = await prisma.document.findFirst({
+        where: { tenantId: item.tenantId, companyId: this.companyId, name: docName },
+      });
+      if (existing) {
+        await documentService.deleteDocument(this.companyId, existing.id);
+      }
+
+      const dir = path.join(env.UPLOAD_DIR, String(this.companyId), "tenants", String(item.tenantId));
+      fs.mkdirSync(dir, { recursive: true });
+      const filePath = path.join(dir, `${crypto.randomUUID()}.pdf`);
+
+      const shareRatio = statement.totalCosts > 0 ? item.amount / statement.totalCosts : 0;
+      const categories = statement.transactions
+        .filter((tx) => tx.betrkvCategory)
+        .map((tx) => ({
+          category: tx.betrkvCategory as string,
+          amount: Math.round(Math.abs(tx.amount) * shareRatio * 100) / 100,
+        }));
+
+      const { filePath: generatedFilePath, fileSizeBytes } = await generateTenantStatementPdf(
+        {
+          companyName: company?.name ?? "",
+          propertyName: property.name,
+          tenantName: item.tenantName,
+          unitNumber: item.unitNumber,
+          year,
+          amount: item.amount,
+          balance: item.balance,
+          isRefund: item.isRefund,
+          categories,
+          co2: statement.co2.landlordShare > 0 ? statement.co2 : null,
+        },
+        filePath
+      );
+
+      await documentService.createDocument(this.companyId, {
+        name: docName,
+        fileType: "PDF",
+        fileSize: `${(fileSizeBytes / 1024).toFixed(1)} KB`,
+        filePath: generatedFilePath,
+        tenantId: item.tenantId,
+        propertyId,
+      });
+      generatedCount++;
+    }
+
+    return { propertyId, year, generatedCount, items: statement.items };
   }
 }
