@@ -13,6 +13,7 @@ export interface UtilityStatementTransaction {
 export interface UtilityStatementItem {
   contractId: number;
   unitId: number;
+  tenantId: number;
   unitNumber: string;
   tenantName: string;
   area: number;
@@ -63,5 +64,22 @@ export function useUpdateDisputeStatus() {
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       api(`/utility-billing/disputes/${id}`, { method: "PATCH", body: { status } }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["utility-billing", "disputes"] }),
+  });
+}
+
+export interface FinalizeStatementResult {
+  propertyId: number;
+  year: number;
+  generatedCount: number;
+  items: UtilityStatementItem[];
+}
+
+export function useFinalizeStatement() {
+  return useMutation({
+    mutationFn: (data: { propertyId: number; year: number }) =>
+      api<{ data: FinalizeStatementResult }>("/utility-billing/statements/finalize", {
+        method: "POST",
+        body: data,
+      }),
   });
 }

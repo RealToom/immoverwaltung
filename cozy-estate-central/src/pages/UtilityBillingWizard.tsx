@@ -3,11 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, ChevronRight, Settings, FileText, Send, AlertTriangle, Leaf, Building2 } from "lucide-react";
+import { CheckCircle2, ChevronRight, Settings, Send, AlertTriangle, Leaf, Building2 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useProperties } from "@/hooks/api/useProperties";
-import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus } from "@/hooks/api/useUtilityBilling";
+import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement } from "@/hooks/api/useUtilityBilling";
 import type { UtilityStatementTransaction } from "@/hooks/api/useUtilityBilling";
 import { useUpdateTransaction } from "@/hooks/api/useFinance";
 
@@ -36,6 +36,8 @@ export default function UtilityBillingWizard() {
   const { data: disputesRes } = useUtilityDisputes("OPEN");
   const disputes = disputesRes?.data ?? [];
   const updateDisputeStatus = useUpdateDisputeStatus();
+  const finalizeStatement = useFinalizeStatement();
+  const [finalizedCount, setFinalizedCount] = useState<number | null>(null);
 
   const handleGenerate = () => {
     if (!propertyId) {
@@ -60,6 +62,21 @@ export default function UtilityBillingWizard() {
         onSuccess: () => {
           if (propertyId) generateStatement.mutate({ propertyId, year });
         },
+      }
+    );
+  };
+
+  const handleFinalize = () => {
+    if (!propertyId) return;
+    finalizeStatement.mutate(
+      { propertyId, year },
+      {
+        onSuccess: (res) => {
+          setFinalizedCount(res.data.generatedCount);
+          toast({ title: "Abrechnungen erstellt", description: `${res.data.generatedCount} Abrechnungen im Mieter-Portal hinterlegt.` });
+        },
+        onError: (err: unknown) =>
+          toast({ title: "Erstellung fehlgeschlagen", description: String(err), variant: "destructive" }),
       }
     );
   };
@@ -295,22 +312,57 @@ export default function UtilityBillingWizard() {
             <CardHeader>
               <CardTitle>Massen-Generierung</CardTitle>
               <CardDescription>
-                Der Export der neuen, erweiterten Abrechnung (CO₂/Leerstand-bereinigt) als PDF ist noch nicht Teil dieses Assistenten — nutzen Sie bis dahin den bestehenden PDF-Export unter Finanzen &gt; Nebenkostenabrechnung.
+                Übersicht der berechneten Beträge pro Mieter. Mit "Abrechnungen erstellen" werden die PDF-Abrechnungen
+                erzeugt und im Mieter-Portal hinterlegt.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {statement && (
-                <div className="border rounded-md p-4 bg-slate-50 dark:bg-slate-900 text-center py-12">
-                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium">Berechnung abgeschlossen</h3>
-                  <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
-                    {statement.items.length} Vertrag/Verträge und {statement.transactions.length} freigegebene Buchungen berücksichtigt.
-                  </p>
+              {!statement || statement.items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Bitte zuerst in Schritt 1 die Kosten berechnen.</p>
+              ) : (
+                <div className="border rounded-md overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 dark:bg-slate-900">
+                      <tr>
+                        <th className="text-left p-3 font-medium">Mieter</th>
+                        <th className="text-left p-3 font-medium">Einheit</th>
+                        <th className="text-right p-3 font-medium">Betrag</th>
+                        <th className="text-right p-3 font-medium">Saldo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {statement.items.map((item) => (
+                        <tr key={item.contractId} className="border-t">
+                          <td className="p-3">{item.tenantName}</td>
+                          <td className="p-3">{item.unitNumber}</td>
+                          <td className="p-3 text-right font-medium">{formatEur(item.amount)}</td>
+                          <td className={`p-3 text-right font-medium ${item.isRefund ? "text-green-600" : "text-red-600"}`}>
+                            {item.isRefund ? "+" : "−"}{formatEur(Math.abs(item.balance))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
+
+              {finalizedCount != null && (
+                <div className="border border-green-200 dark:border-green-900 rounded-md p-4 bg-green-50 dark:bg-green-950/30 text-sm text-green-800 dark:text-green-300">
+                  {finalizedCount} Abrechnungen erstellt und im Mieter-Portal hinterlegt.
+                </div>
+              )}
+
               <div className="flex justify-between mt-6">
                 <Button variant="outline" onClick={() => setActiveTab("validation")}>
                   Zurück
+                </Button>
+                <Button
+                  onClick={handleFinalize}
+                  disabled={!statement || statement.items.length === 0 || finalizeStatement.isPending}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Send className="w-4 h-4 mr-2" />
+                  {finalizeStatement.isPending ? "Erstelle..." : "Abrechnungen erstellen & im Mieter-Portal bereitstellen"}
                 </Button>
               </div>
             </CardContent>
