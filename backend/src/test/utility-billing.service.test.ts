@@ -165,15 +165,14 @@ describe("UtilityBillingService", () => {
       //   Contract 1: 2026-01-01 .. 2026-02-28  -> 59 days
       //   Contract 2: 2026-03-01 .. (no end)    -> 306 days
       // 59 + 306 = 365 (2026 is not a leap year) -> zero vacancy days.
-      // (The split is deliberately placed before Germany's 2026 DST transition on
-      // 2026-03-29 -- calculateVacancyDeduction's day-by-day loop advances "current"
-      // by a fixed 24h in epoch-ms, which drifts against local wall-clock midnight
-      // once a DST transition is crossed; contract 2 has no endDate so its coverage
-      // check short-circuits on `!c.endDate` and is immune to that drift, and
-      // contract 1's exact-equality endDate check only needs to hold for days
-      // before the transition, which Feb 28 satisfies. This is a pre-existing
-      // quirk of calculateVacancyDeduction, unrelated to and out of scope for this
-      // fix -- picking a pre-DST split date avoids it entirely.)
+      // (The split was originally placed before Germany's 2026 DST transition on
+      // 2026-03-29 to sidestep a since-fixed drift bug: calculateVacancyDeduction's
+      // day-by-day loop used to advance "current" by a fixed 24h in epoch-ms, which
+      // drifted against local wall-clock midnight once a DST transition was crossed.
+      // That loop now advances via date-fns's addDays, which is calendar-day-aware
+      // and immune to DST drift, so the exact split date no longer matters for
+      // correctness -- it's left as-is here since changing it isn't required and
+      // the test still passes.)
       // Single AUSGABE transaction of 1200, no CO2.
       //
       // Old (buggy) code: totalArea = 50 + 50 = 100 (the unit's area was summed once per
@@ -227,6 +226,67 @@ describe("UtilityBillingService", () => {
       expect(result.items).toHaveLength(2);
       expect(result.items[0].amount).toBeCloseTo(193.97, 1);
       expect(result.items[1].amount).toBeCloseTo(1006.03, 1);
+
+      const total = result.items.reduce((sum, i) => sum + i.amount, 0);
+      expect(total + (result.vacancy?.amount ?? 0) + result.co2.landlordShare).toBeCloseTo(result.totalCosts, 1);
+    });
+
+    it("nets a real vacancy gap: single contract covers only H1, unit sits empty in H2", async () => {
+      // Property: 1 unit (area 50 m2). ONE contract covers only Jan 1 - Jun 30, 2026
+      // (181 days); Jul 1 - Dec 31 (184 days) has no contract at all -> a genuine gap,
+      // not a second back-to-back contract. 2026 is not a leap year (365 days).
+      // Single AUSGABE transaction of 1200, no CO2 (co2TaxAmount: 0), so
+      // totalAllocatable == grossCosts == 1200.
+      //
+      // Hand-traced via calculateVacancyDeduction/generateStatement (verified with a
+      // throwaway node script exercising the actual date-fns calls):
+      //   calculateVacancyDeduction:
+      //     unit.contracts = [{ start: 2026-01-01, end: 2026-06-30 }]
+      //     day-loop over Jan 1 .. Dec 31: active Jan 1 - Jun 30 (181 days),
+      //     vacant Jul 1 - Dec 31 -> unitVacancyDays = 184 (365 - 181)
+      //     totalVacancyDays = 184, totalUnitDays = 1 unit * 365 = 365
+      //     vacancyRatio = 184/365 = 0.50410958...
+      //     amount = 1200 * (184/365) = 604.931506849... -> rounded 604.93
+      //   generateStatement:
+      //     netAllocatable = 1200 - 604.931506849... = 595.068493151...
+      //     contracts query returns the SAME single contract (Jan 1 - Jun 30)
+      //     occupancyFraction = calculateProRataFixedCosts(1, 2026, Jan1, Jun30)
+      //       = (differenceInDays(Jun30,Jan1)+1) / 365 = 181/365 = 0.495890410958...
+      //     weight = area(50) * occupancyFraction = 24.7945205479...
+      //     totalWeight = weight (only one contract) -> share = netAllocatable * 1
+      //     items[0].amount = round(595.068493151..., 2) = 595.07
+      //   Reconciliation: 604.931506849... + 595.068493151... = 1200.00 == totalCosts
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 30, description: "Betriebskosten", amount: -1200, betrkvCategory: "SONSTIGES", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        {
+          id: 5, number: "EG links", area: 50,
+          contracts: [{ startDate: new Date(2026, 0, 1), endDate: new Date(2026, 5, 30) }],
+        },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        {
+          id: 1, startDate: new Date(2026, 0, 1), endDate: new Date(2026, 5, 30),
+          unit: { id: 5, number: "EG links", area: 50 },
+          tenant: { id: 7, name: "Erster Mieter" },
+        },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 100 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      expect(result.vacancy).not.toBeNull();
+      expect(result.vacancy?.vacancyDays).toBe(184);
+      expect(result.vacancy?.affectedUnits).toEqual(["EG links"]);
+      expect(result.vacancy?.amount).toBeCloseTo(604.93, 2);
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].amount).toBeCloseTo(595.07, 2);
 
       const total = result.items.reduce((sum, i) => sum + i.amount, 0);
       expect(total + (result.vacancy?.amount ?? 0) + result.co2.landlordShare).toBeCloseTo(result.totalCosts, 1);
