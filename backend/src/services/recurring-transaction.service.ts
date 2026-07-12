@@ -74,7 +74,8 @@ export async function processRecurringTransactions(): Promise<number> {
         date: now,
         description: rec.description,
         type: rec.type,
-        amount: rec.amount,
+        // Same sign convention as finance.service.createTransaction
+        amount: rec.type === "AUSGABE" ? -Math.abs(rec.amount) : Math.abs(rec.amount),
         category: rec.category,
         allocatable: rec.allocatable,
         propertyId: rec.propertyId,

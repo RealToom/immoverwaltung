@@ -217,9 +217,14 @@ export async function createTransaction(
   companyId: number,
   data: { date: Date; description: string; type: TransactionType; amount: number; category?: string; propertyId?: number | null; bankAccountId?: number | null; }
 ) {
+  // Sign convention: AUSGABE is stored negative, EINNAHME positive —
+  // aggregations (dashboard, DATEV, ROI) rely on a uniform sign per type.
+  const signedAmount = data.type === "AUSGABE" ? -Math.abs(data.amount) : Math.abs(data.amount);
+
   const transaction = await prisma.transaction.create({
     data: {
       ...data,
+      amount: signedAmount,
       companyId,
       propertyId: data.propertyId ?? null,
       bankAccountId: data.bankAccountId ?? null,
