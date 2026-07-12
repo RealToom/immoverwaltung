@@ -1232,6 +1232,12 @@ Jeweils: GET /, GET /:id, POST /, PATCH /:id, DELETE /:id
 | 2026-02-19 | Benutzerverwaltung: /api/users CRUD + reset-password + unlock, Users.tsx (ADMIN-only) |
 | 2026-02-20 | Production-Readiness: docker-compose (ENCRYPTION_KEY Pflicht, Log-Rotation, Resource-Limits), CI/CD GitHub Actions, scripts/backup.sh, sendTempPasswordEmail(), DEPLOYMENT.md Checkliste |
 | 2026-02-20 | Security-Hardening Runde 3: SameSite=Strict, Magic-Bytes (file-type), AuditLog-DB (N2/N4/N6), Passwort-Ändern Feature |
+| 2026-07-12 | Nebenkostenabrechnung überarbeitet (nach E2E-Test): HeizkostenV-Split (70% Verbrauch via Wärme-/Gaszähler, 30% Grundkosten, Fallback nach Fläche mit § 12-Warnung), neue BetrKV-Kategorien HEIZUNG/WARMWASSER, Leerstandsabzug flächengewichtet statt pro Unit |
+| 2026-07-12 | Abrechnungs-PDF rechtssicher (§ 556 BGB): Gesamtkosten je Kategorie, Verteilerschlüssel (m²/Tage), Vorauszahlungen + Saldo-Herleitung, deutsche Kategorie-Labels, summentreue Rundung (lib/betrkv.ts, Largest-Remainder) |
+| 2026-07-12 | Mieter-Portal: Ex-Mieter können Abrechnung des Vertragsjahres einsehen + Widerspruch einlegen (12-Monats-Frist § 556 BGB); Widerspruch speichert Abrechnungsjahr; Status vereinheitlicht OFFEN/IN_BEARBEITUNG/GELOEST/ABGELEHNT; filePath-Leak aus Dokumentliste entfernt |
+| 2026-07-12 | Transaktions-Vorzeichen normalisiert: AUSGABE immer negativ, EINNAHME positiv (createTransaction, RecurringTransactions, Datenmigration für Bestandsdaten) |
+| 2026-07-12 | Nebenkosten-Assistent: nicht-umlagefähige Ausgaben direkt übernehmbar, deutsche BetrKV-Labels, PDF-Download-Links nach Finalisierung, Heizkosten-Karte, Vorauszahlungs-Spalte |
+| 2026-07-12 | Seed erweitert: umlagefähige Betriebskosten (BetrKV+CO2), utilityPrepayment auf Verträgen, 2 Energieausweise, 4 Wärmezähler mit Jahresablesungen — Nebenkosten-Feature out-of-the-box demonstrierbar |
 
 ---
 
