@@ -3,12 +3,14 @@ import { tenantApi } from "@/lib/api";
 
 export interface TenantUtilityCategory {
   category: string;
+  label: string;
   amount: number;
 }
 
 export interface TenantUtilitySummary {
   year: number;
   totalCosts: number;
+  totalPrepaid: number;
   balance: number;
   isRefund: boolean;
   categories: TenantUtilityCategory[];

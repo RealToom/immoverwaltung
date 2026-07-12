@@ -4,7 +4,7 @@ import { tenantApi } from "@/lib/api";
 export function useCreateDispute(slug: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { reason: string; amount?: number }) =>
+    mutationFn: (data: { reason: string; amount?: number; year?: number }) =>
       tenantApi(slug, "/billing-disputes", { method: "POST", body: data }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tenant", slug, "disputes"] }),
   });

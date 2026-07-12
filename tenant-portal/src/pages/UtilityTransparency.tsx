@@ -37,7 +37,9 @@ export default function UtilityTransparency() {
                   <p className={`text-3xl font-bold ${data.balance < 0 ? "text-red-600" : "text-green-600"}`}>
                     {formatEur(Math.abs(data.balance))}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">Gesamtkosten: {formatEur(data.totalCosts)}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Kostenanteil: {formatEur(data.totalCosts)} — Vorauszahlungen: {formatEur(data.totalPrepaid)}
+                  </p>
                 </div>
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center ${data.balance < 0 ? "bg-red-100" : "bg-green-100"}`}>
                   <CreditCard className={`w-6 h-6 ${data.balance < 0 ? "text-red-600" : "text-green-600"}`} />
@@ -57,7 +59,7 @@ export default function UtilityTransparency() {
                 <div className="space-y-2">
                   {data.categories.map((c, i) => (
                     <div key={i} className="flex justify-between items-center py-2 border-b last:border-0 text-sm">
-                      <span>{c.category}</span>
+                      <span>{c.label ?? c.category}</span>
                       <span className="font-medium">{formatEur(c.amount)}</span>
                     </div>
                   ))}

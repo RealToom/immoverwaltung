@@ -1,13 +1,13 @@
 import { prisma } from "../lib/prisma.js";
 import { NotFoundError } from "../lib/errors.js";
 
-export const DISPUTE_STATUSES = ["OPEN", "IN_BEARBEITUNG", "GELOEST", "ABGELEHNT"] as const;
+export const DISPUTE_STATUSES = ["OFFEN", "IN_BEARBEITUNG", "GELOEST", "ABGELEHNT"] as const;
 export type DisputeStatus = (typeof DISPUTE_STATUSES)[number];
 
 export async function createDispute(
   companyId: number,
   contractId: number,
-  data: { reason: string; amount?: number }
+  data: { reason: string; amount?: number; year?: number }
 ) {
   return prisma.billingDispute.create({
     data: {
@@ -15,7 +15,8 @@ export async function createDispute(
       companyId,
       reason: data.reason,
       amount: data.amount ?? null,
-      status: "OPEN",
+      year: data.year ?? null,
+      status: "OFFEN",
     },
   });
 }
@@ -28,9 +29,9 @@ export async function listDisputesByCompany(companyId: number, status?: string) 
   });
 }
 
-export async function listDisputesByContract(companyId: number, contractId: number) {
+export async function listDisputesByContracts(companyId: number, contractIds: number[]) {
   return prisma.billingDispute.findMany({
-    where: { companyId, contractId },
+    where: { companyId, contractId: { in: contractIds } },
     orderBy: { createdAt: "desc" },
   });
 }

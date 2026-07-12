@@ -5,7 +5,7 @@ import { useTenantUtility } from "@/hooks/api/useTenantUtility";
 import { useCreateDispute } from "@/hooks/api/useTenantDisputes";
 
 const BETRKV_CATEGORIES = [
-  "Grundsteuer", "Wasserversorgung", "Entwässerung", "Aufzug",
+  "Grundsteuer", "Wasserversorgung", "Entwässerung", "Heizung", "Warmwasser", "Aufzug",
   "Straßenreinigung & Müll", "Gebäudereinigung", "Gartenpflege",
   "Beleuchtung", "Schornsteinreinigung", "Versicherungen", "Hauswart",
   "Gemeinschaftsantenne", "Waschraum", "Sonstige Kosten",
@@ -43,6 +43,7 @@ export default function BillingDisputeForm() {
       await createDispute.mutateAsync({
         reason: fullReason,
         amount: utility ? Math.abs(utility.balance) : undefined,
+        year: utility?.year,
       });
       setSubmitted(true);
     } catch {

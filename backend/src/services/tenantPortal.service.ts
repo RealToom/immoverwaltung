@@ -3,6 +3,7 @@ import { NotFoundError, BadRequestError } from "../lib/errors.js";
 import { MaintenanceCategoryType, MAINTENANCE_CATEGORIES } from "../schemas/tenantPortal.schema.js";
 import { UtilityBillingService } from "./utility-billing.service.js";
 import * as disputeSvc from "./billing-dispute.service.js";
+import { buildTenantCategoryLines } from "../lib/betrkv.js";
 
 type TenantUser = { id: number; tenantId: number; companyId: number };
 
@@ -12,6 +13,30 @@ async function getActiveContract(tenantUser: TenantUser) {
     orderBy: { startDate: "desc" },
   });
   if (!contract) throw new NotFoundError("Aktiver Vertrag", tenantUser.tenantId);
+  return contract;
+}
+
+/**
+ * Finds the tenant's contract for a billing year — deliberately NOT limited
+ * to AKTIV: ex-tenants receive their final utility statement after move-out
+ * and keep the 12-month objection window of § 556 Abs. 3 BGB. Without a year,
+ * falls back to the most recent contract.
+ */
+async function getContractForYear(tenantUser: TenantUser, year?: number) {
+  const contract = await prisma.contract.findFirst({
+    where: {
+      tenantId: tenantUser.tenantId,
+      companyId: tenantUser.companyId,
+      ...(year != null
+        ? {
+            startDate: { lte: new Date(year, 11, 31) },
+            OR: [{ endDate: null }, { endDate: { gte: new Date(year, 0, 1) } }],
+          }
+        : {}),
+    },
+    orderBy: { startDate: "desc" },
+  });
+  if (!contract) throw new NotFoundError("Vertrag", tenantUser.tenantId);
   return contract;
 }
 
@@ -81,6 +106,7 @@ export async function updateMe(
 // ─── Documents ────────────────────────────────────────────────────────────────
 
 export async function getDocuments(tenantUser: TenantUser) {
+  // Note: no filePath here — internal storage paths must not leak to tenants.
   return prisma.document.findMany({
     where: { tenantId: tenantUser.tenantId, companyId: tenantUser.companyId },
     select: {
@@ -88,7 +114,6 @@ export async function getDocuments(tenantUser: TenantUser) {
       name: true,
       fileType: true,
       fileSize: true,
-      filePath: true,
       requiresSignature: true,
       signatureType: true,
       signedAt: true,
@@ -337,20 +362,25 @@ export async function createMessage(tenantUser: TenantUser, body: string) {
 // ─── Utility Billing ────────────────────────────────────────────────────────────
 
 export async function getUtilitySummary(tenantUser: TenantUser, year?: number) {
-  const contract = await getActiveContract(tenantUser);
   const targetYear = year ?? new Date().getFullYear() - 1;
+  const contract = await getContractForYear(tenantUser, targetYear);
   const svc = new UtilityBillingService(tenantUser.companyId);
   const statement = await svc.generateStatement(contract.propertyId, targetYear);
   const item = statement.items.find((i) => i.contractId === contract.id);
-  const shareRatio = statement.totalCosts > 0 && item ? item.amount / statement.totalCosts : 0;
+  const categories = item
+    ? buildTenantCategoryLines(statement.transactions, item.amount, item.heatingAmount).map((line) => ({
+        category: line.category,
+        label: line.label,
+        amount: line.tenantShare,
+      }))
+    : [];
   return {
     year: targetYear,
     totalCosts: item?.amount ?? 0,
+    totalPrepaid: item?.totalPrepaid ?? 0,
     balance: item?.balance ?? 0,
     isRefund: item?.isRefund ?? false,
-    categories: statement.transactions
-      .filter((tx) => tx.betrkvCategory)
-      .map((tx) => ({ category: tx.betrkvCategory, amount: Math.round(Math.abs(tx.amount) * shareRatio * 100) / 100 })),
+    categories,
   };
 }
 
@@ -388,14 +418,24 @@ export async function addOwnMeterReading(
 
 // ─── Billing Disputes ─────────────────────────────────────────────────────────
 
-export async function createDispute(tenantUser: TenantUser, data: { reason: string; amount?: number }) {
-  const contract = await getActiveContract(tenantUser);
+export async function createDispute(
+  tenantUser: TenantUser,
+  data: { reason: string; amount?: number; year?: number }
+) {
+  const contract = await getContractForYear(tenantUser, data.year);
   return disputeSvc.createDispute(tenantUser.companyId, contract.id, data);
 }
 
 export async function getDisputes(tenantUser: TenantUser) {
-  const contract = await getActiveContract(tenantUser);
-  return disputeSvc.listDisputesByContract(tenantUser.companyId, contract.id);
+  // All disputes across the tenant's contracts (incl. ended ones).
+  const contracts = await prisma.contract.findMany({
+    where: { tenantId: tenantUser.tenantId, companyId: tenantUser.companyId },
+    select: { id: true },
+  });
+  return disputeSvc.listDisputesByContracts(
+    tenantUser.companyId,
+    contracts.map((c) => c.id)
+  );
 }
 
 // ─── Admin functions ───────────────────────────────────────────────────────────

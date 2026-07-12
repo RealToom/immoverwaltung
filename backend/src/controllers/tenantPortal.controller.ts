@@ -174,7 +174,7 @@ export async function scanMeterReadingPhoto(req: Request, res: Response): Promis
 // ─── Billing Disputes ─────────────────────────────────────────────────────────
 
 export async function createDispute(req: Request, res: Response): Promise<void> {
-  const data = await svc.createDispute(req.tenantUser!, req.body as { reason: string; amount?: number });
+  const data = await svc.createDispute(req.tenantUser!, req.body as { reason: string; amount?: number; year?: number });
   res.status(201).json({ data });
 }
 

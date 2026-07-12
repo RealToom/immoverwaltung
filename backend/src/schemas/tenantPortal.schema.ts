@@ -48,4 +48,5 @@ export const utilityQuerySchema = z.object({
 export const createDisputeSchema = z.object({
   reason: z.string().min(10, "Begründung muss mindestens 10 Zeichen lang sein").max(1000),
   amount: z.number().positive().optional(),
+  year: z.number().int().min(2000).max(2100).optional(),
 });

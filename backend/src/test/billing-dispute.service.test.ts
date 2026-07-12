@@ -18,19 +18,19 @@ import * as disputeSvc from "../services/billing-dispute.service.js";
 describe("billing-dispute.service", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("createDispute always starts a dispute as OPEN", async () => {
-    mockCreate.mockResolvedValueOnce({ id: 1, status: "OPEN" });
-    await disputeSvc.createDispute(1, 42, { reason: "Zu teuer", amount: 50 });
+  it("createDispute always starts a dispute as OFFEN and stores the billing year", async () => {
+    mockCreate.mockResolvedValueOnce({ id: 1, status: "OFFEN" });
+    await disputeSvc.createDispute(1, 42, { reason: "Zu teuer", amount: 50, year: 2025 });
     expect(mockCreate).toHaveBeenCalledWith({
-      data: { contractId: 42, companyId: 1, reason: "Zu teuer", amount: 50, status: "OPEN" },
+      data: { contractId: 42, companyId: 1, reason: "Zu teuer", amount: 50, year: 2025, status: "OFFEN" },
     });
   });
 
   it("listDisputesByCompany filters by status when given", async () => {
     mockFindMany.mockResolvedValueOnce([]);
-    await disputeSvc.listDisputesByCompany(1, "OPEN");
+    await disputeSvc.listDisputesByCompany(1, "OFFEN");
     expect(mockFindMany).toHaveBeenCalledWith({
-      where: { companyId: 1, status: "OPEN" },
+      where: { companyId: 1, status: "OFFEN" },
       include: { contract: { include: { tenant: { select: { id: true, name: true } } } } },
       orderBy: { createdAt: "desc" },
     });
