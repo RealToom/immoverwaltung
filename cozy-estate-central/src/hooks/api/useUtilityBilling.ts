@@ -10,6 +10,14 @@ export interface UtilityStatementTransaction {
   co2TaxAmount: number | null;
 }
 
+export interface UnallocatedTransaction {
+  id: number;
+  date: string;
+  description: string;
+  amount: number;
+  category: string;
+}
+
 export interface UtilityStatementItem {
   contractId: number;
   unitId: number;
@@ -17,7 +25,10 @@ export interface UtilityStatementItem {
   unitNumber: string;
   tenantName: string;
   area: number;
+  occupancyDays: number;
   amount: number;
+  heatingAmount: number;
+  totalPrepaid: number;
   balance: number;
   isRefund: boolean;
 }
@@ -25,11 +36,21 @@ export interface UtilityStatementItem {
 export interface UtilityStatement {
   year: number;
   propertyId: number;
+  daysInYear: number;
+  totalArea: number;
   totalCosts: number;
   co2: { energyClass: string | null; co2Emissions: number | null; landlordPercentage: number; tenantShare: number; landlordShare: number };
+  heating: {
+    totalCosts: number;
+    consumptionBased: boolean;
+    consumptionSharePercent: number | null;
+    ownerShare: number;
+    warning?: string;
+  } | null;
   vacancy: { amount: number; vacancyDays: number; affectedUnits: string[] } | null;
   items: UtilityStatementItem[];
   transactions: UtilityStatementTransaction[];
+  unallocatedTransactions: UnallocatedTransaction[];
 }
 
 export function useGenerateUtilityStatement() {
@@ -46,6 +67,7 @@ export interface UtilityDispute {
   id: number;
   reason: string;
   status: string;
+  year: number | null;
   amount: number | null;
   createdAt: string;
   contract: { tenant: { id: number; name: string } };
@@ -67,11 +89,15 @@ export function useUpdateDisputeStatus() {
   });
 }
 
+export interface FinalizedStatementItem extends UtilityStatementItem {
+  documentId: number | null;
+}
+
 export interface FinalizeStatementResult {
   propertyId: number;
   year: number;
   generatedCount: number;
-  items: UtilityStatementItem[];
+  items: FinalizedStatementItem[];
 }
 
 export function useFinalizeStatement() {

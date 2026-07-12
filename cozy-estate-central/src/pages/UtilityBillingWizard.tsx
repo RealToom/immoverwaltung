@@ -3,20 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, ChevronRight, Settings, Send, AlertTriangle, Leaf, Building2 } from "lucide-react";
+import { CheckCircle2, ChevronRight, Settings, Send, AlertTriangle, Leaf, Building2, Flame, Download, Plus, X } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useProperties } from "@/hooks/api/useProperties";
 import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement } from "@/hooks/api/useUtilityBilling";
-import type { UtilityStatementTransaction } from "@/hooks/api/useUtilityBilling";
+import type { UtilityStatementTransaction, FinalizedStatementItem } from "@/hooks/api/useUtilityBilling";
 import { useUpdateTransaction } from "@/hooks/api/useFinance";
+import { useDownloadDocument } from "@/hooks/api/useDocuments";
+import { BETRKV_LABELS, mapBetrkvCategory, mapDisputeStatus } from "@/lib/mappings";
 
-const BETRKV_CATEGORIES = [
-  "GRUNDSTEUER", "WASSERVERSORGUNG", "ENTWAESSERUNG", "AUFZUG",
-  "STRASSENREINIGUNG_MUELL", "GEBAEUDE_REINIGUNG", "GARTENPFLEGE",
-  "BELEUCHTUNG", "SCHORNSTEINREINIGUNG", "VERSICHERUNGEN", "HAUSWART",
-  "GEMEINSCHAFTS_ANTENNE", "WASCHRAUM", "SONSTIGE_KOSTEN",
-];
+const BETRKV_CATEGORIES = Object.keys(BETRKV_LABELS);
 
 function formatEur(n: number) {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(n);
@@ -33,17 +30,23 @@ export default function UtilityBillingWizard() {
   const generateStatement = useGenerateUtilityStatement();
   const updateTransaction = useUpdateTransaction();
   const statement = generateStatement.data?.data ?? null;
-  const { data: disputesRes } = useUtilityDisputes("OPEN");
+  const { data: disputesRes } = useUtilityDisputes("OFFEN");
   const disputes = disputesRes?.data ?? [];
   const updateDisputeStatus = useUpdateDisputeStatus();
   const finalizeStatement = useFinalizeStatement();
-  const [finalizedCount, setFinalizedCount] = useState<number | null>(null);
+  const downloadDocument = useDownloadDocument();
+  const [finalizedItems, setFinalizedItems] = useState<FinalizedStatementItem[] | null>(null);
+
+  const regenerate = () => {
+    if (propertyId) generateStatement.mutate({ propertyId, year });
+  };
 
   const handleGenerate = () => {
     if (!propertyId) {
       toast({ title: "Bitte zuerst eine Immobilie auswählen", variant: "destructive" });
       return;
     }
+    setFinalizedItems(null);
     generateStatement.mutate(
       { propertyId, year },
       {
@@ -55,15 +58,13 @@ export default function UtilityBillingWizard() {
   };
 
   const handleTagUpdate = (tx: UtilityStatementTransaction, field: "betrkvCategory" | "co2TaxAmount", value: string) => {
+    if (field === "co2TaxAmount" && (Number(value) || 0) === (tx.co2TaxAmount ?? 0)) return;
     const data = field === "co2TaxAmount" ? { co2TaxAmount: Number(value) || 0 } : { betrkvCategory: value };
-    updateTransaction.mutate(
-      { id: tx.id, data },
-      {
-        onSuccess: () => {
-          if (propertyId) generateStatement.mutate({ propertyId, year });
-        },
-      }
-    );
+    updateTransaction.mutate({ id: tx.id, data }, { onSuccess: regenerate });
+  };
+
+  const handleAllocatableToggle = (txId: number, allocatable: boolean) => {
+    updateTransaction.mutate({ id: txId, data: { allocatable } }, { onSuccess: regenerate });
   };
 
   const handleFinalize = () => {
@@ -72,7 +73,7 @@ export default function UtilityBillingWizard() {
       { propertyId, year },
       {
         onSuccess: (res) => {
-          setFinalizedCount(res.data.generatedCount);
+          setFinalizedItems(res.data.items);
           toast({ title: "Abrechnungen erstellt", description: `${res.data.generatedCount} Abrechnungen im Mieter-Portal hinterlegt.` });
         },
         onError: (err: unknown) =>
@@ -81,7 +82,16 @@ export default function UtilityBillingWizard() {
     );
   };
 
+  const handleDownload = (item: FinalizedStatementItem) => {
+    if (!item.documentId) return;
+    downloadDocument.mutate({
+      docId: item.documentId,
+      docName: `Nebenkostenabrechnung_${year}_${item.tenantName.replace(/\s+/g, "_")}.pdf`,
+    });
+  };
+
   const warningCount = statement?.transactions.filter((t) => t.maintenanceWarning).length ?? 0;
+  const unallocated = statement?.unallocatedTransactions ?? [];
 
   return (
     <div className="container mx-auto py-8">
@@ -102,7 +112,7 @@ export default function UtilityBillingWizard() {
           </TabsTrigger>
           <TabsTrigger value="validation" className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4" />
-            2. Validierung
+            2. Kosten prüfen
             {warningCount > 0 && (
               <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-[10px]">
                 {warningCount}
@@ -198,6 +208,39 @@ export default function UtilityBillingWizard() {
                   </CardContent>
                 </Card>
 
+                {statement.heating && (
+                  <Card className={statement.heating.consumptionBased ? "border-blue-200 dark:border-blue-900" : "border-amber-200 dark:border-amber-900"}>
+                    <CardHeader className="pb-3">
+                      <CardTitle className={`flex items-center gap-2 ${statement.heating.consumptionBased ? "text-blue-700 dark:text-blue-400" : "text-amber-700 dark:text-amber-400"}`}>
+                        <Flame className="w-5 h-5" />
+                        Heizkostenverteilung (HeizkostenV)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                      <p>
+                        Heiz-/Warmwasserkosten: <strong>{formatEur(statement.heating.totalCosts)}</strong>
+                      </p>
+                      {statement.heating.consumptionBased ? (
+                        <p className="text-blue-800 dark:text-blue-300">
+                          Verteilung: <strong>{statement.heating.consumptionSharePercent} % nach gemessenem Verbrauch</strong> (Wärme-/Gaszähler),{" "}
+                          {100 - (statement.heating.consumptionSharePercent ?? 70)} % als Grundkosten nach Wohnfläche — konform zu § 7 HeizkostenV.
+                          {statement.heating.ownerShare > 0 && (
+                            <> Auf Leerstand entfallende Grundkosten: {formatEur(statement.heating.ownerShare)} (Eigentümer).</>
+                          )}
+                        </p>
+                      ) : (
+                        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-amber-900 dark:text-amber-200">
+                          <p className="font-semibold">⚠ Keine Verbrauchsdaten — Verteilung nach Wohnfläche</p>
+                          <p className="mt-1">{statement.heating.warning}</p>
+                          <p className="mt-1 text-xs">
+                            Tipp: Legen Sie pro Einheit einen Wärme- oder Gaszähler mit mindestens zwei Ablesungen im Abrechnungsjahr an.
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
                 {statement.vacancy && (
                   <Card className="border-amber-200 dark:border-amber-900">
                     <CardHeader className="pb-3">
@@ -212,7 +255,7 @@ export default function UtilityBillingWizard() {
                           <strong>{statement.vacancy.affectedUnits.join(", ")}</strong> war insgesamt <strong>{statement.vacancy.vacancyDays} Tage</strong> im Abrechnungszeitraum unvermietet.
                         </p>
                         <p className="mt-2">
-                          Die anteiligen Fixkosten von <strong>{formatEur(statement.vacancy.amount)}</strong> werden automatisch dem Eigentümer zugeordnet und <em>nicht</em> auf die übrigen Mieter umgelegt.
+                          Die anteiligen Fixkosten von <strong>{formatEur(statement.vacancy.amount)}</strong> (flächengewichtet) werden automatisch dem Eigentümer zugeordnet und <em>nicht</em> auf die übrigen Mieter umgelegt.
                         </p>
                       </div>
                     </CardContent>
@@ -221,7 +264,7 @@ export default function UtilityBillingWizard() {
 
                 <div className="flex justify-end mt-6">
                   <Button onClick={() => setActiveTab("validation")}>
-                    Weiter zur Kosten-Validierung
+                    Weiter zur Kosten-Prüfung
                     <ChevronRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
@@ -230,80 +273,125 @@ export default function UtilityBillingWizard() {
           </div>
         </TabsContent>
 
-        {/* ─── Tab 2: Validierung ─── */}
+        {/* ─── Tab 2: Kosten prüfen ─── */}
         <TabsContent value="validation">
-          <Card>
-            <CardHeader>
-              <CardTitle>Validierung der Belege & Kosten</CardTitle>
-              <CardDescription>
-                Überprüfen Sie die vorklassifizierten Buchungen (KI/PSD2). Nur freigegebene Kosten fließen in die Abrechnung ein.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {!statement || statement.transactions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Bitte zuerst in Schritt 1 die Kosten berechnen.</p>
-              ) : (
-                statement.transactions.map((tx) => (
-                  <div key={tx.id} className="space-y-0">
-                    <div className={`flex justify-between items-center p-3 rounded-lg border ${tx.maintenanceWarning ? "border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"}`}>
-                      <div className="flex items-center gap-3 flex-1">
-                        <div>
-                          <span className="font-medium">{tx.description}</span>
-                          <div className="flex gap-2 mt-1 items-center">
-                            <Select value={tx.betrkvCategory ?? undefined} onValueChange={(v) => handleTagUpdate(tx, "betrkvCategory", v)}>
-                              <SelectTrigger className="h-7 text-xs w-[220px]">
-                                <SelectValue placeholder="BetrKV-Kategorie" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {BETRKV_CATEGORIES.map((c) => (
-                                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <input
-                              type="number"
-                              step="0.01"
-                              placeholder="CO₂-Steuer €"
-                              defaultValue={tx.co2TaxAmount ?? ""}
-                              onBlur={(e) => handleTagUpdate(tx, "co2TaxAmount", e.target.value)}
-                              className="h-7 w-28 text-xs rounded border border-input px-2"
-                            />
-                            {tx.co2TaxAmount != null && tx.co2TaxAmount > 0 && (
-                              <Badge className="text-xs bg-green-100 text-green-800 border-green-300">
-                                <Leaf className="w-3 h-3 mr-1" />
-                                CO₂: {formatEur(tx.co2TaxAmount)}
-                              </Badge>
-                            )}
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Umlagefähige Kosten</CardTitle>
+                <CardDescription>
+                  Diese Buchungen fließen in die Abrechnung ein. Ordnen Sie jeder Position eine BetrKV-Kategorie zu
+                  und erfassen Sie ggf. den enthaltenen CO₂-Steueranteil.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {!statement || statement.transactions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {statement ? "Keine umlagefähigen Buchungen für dieses Jahr." : "Bitte zuerst in Schritt 1 die Kosten berechnen."}
+                  </p>
+                ) : (
+                  statement.transactions.map((tx) => (
+                    <div key={tx.id} className="space-y-0">
+                      <div className={`flex justify-between items-center p-3 rounded-lg border ${tx.maintenanceWarning ? "border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"}`}>
+                        <div className="flex items-center gap-3 flex-1">
+                          <div>
+                            <span className="font-medium">{tx.description}</span>
+                            <div className="flex gap-2 mt-1 items-center">
+                              <Select value={tx.betrkvCategory ?? undefined} onValueChange={(v) => handleTagUpdate(tx, "betrkvCategory", v)}>
+                                <SelectTrigger className="h-7 text-xs w-[220px]">
+                                  <SelectValue placeholder="BetrKV-Kategorie" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {BETRKV_CATEGORIES.map((c) => (
+                                    <SelectItem key={c} value={c}>{mapBetrkvCategory(c)}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <input
+                                type="number"
+                                step="0.01"
+                                placeholder="CO₂-Steuer €"
+                                defaultValue={tx.co2TaxAmount ?? ""}
+                                onBlur={(e) => handleTagUpdate(tx, "co2TaxAmount", e.target.value)}
+                                className="h-7 w-28 text-xs rounded border border-input px-2"
+                              />
+                              {tx.co2TaxAmount != null && tx.co2TaxAmount > 0 && (
+                                <Badge className="text-xs bg-green-100 text-green-800 border-green-300">
+                                  <Leaf className="w-3 h-3 mr-1" />
+                                  CO₂: {formatEur(tx.co2TaxAmount)}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="font-bold text-right">{formatEur(tx.amount)}</div>
-                    </div>
-
-                    {tx.maintenanceWarning && (
-                      <div className="flex items-start gap-3 p-3 mx-2 -mt-1 bg-amber-100 dark:bg-amber-950/40 border border-t-0 border-amber-300 dark:border-amber-800 rounded-b-lg text-sm text-amber-900 dark:text-amber-200">
-                        <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
-                        <div>
-                          <p className="font-semibold">⚠ KI-Warnung: Nicht-umlagefähige Reparaturkosten erkannt</p>
-                          <p className="mt-1">{tx.maintenanceWarning}</p>
+                        <div className="flex items-center gap-2">
+                          <div className="font-bold text-right">{formatEur(Math.abs(tx.amount))}</div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-xs text-muted-foreground"
+                            title="Aus der Abrechnung entfernen (nicht umlagefähig)"
+                            onClick={() => handleAllocatableToggle(tx.id, false)}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
                         </div>
                       </div>
-                    )}
-                  </div>
-                ))
-              )}
 
-              <div className="flex justify-between mt-6">
-                <Button variant="outline" onClick={() => setActiveTab("config")}>
-                  Zurück
-                </Button>
-                <Button onClick={() => setActiveTab("generation")}>
-                  Weiter zur Generierung
-                  <ChevronRight className="w-4 h-4 ml-2" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                      {tx.maintenanceWarning && (
+                        <div className="flex items-start gap-3 p-3 mx-2 -mt-1 bg-amber-100 dark:bg-amber-950/40 border border-t-0 border-amber-300 dark:border-amber-800 rounded-b-lg text-sm text-amber-900 dark:text-amber-200">
+                          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
+                          <div>
+                            <p className="font-semibold">⚠ KI-Warnung: Nicht-umlagefähige Reparaturkosten erkannt</p>
+                            <p className="mt-1">{tx.maintenanceWarning}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            {statement && unallocated.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Weitere Ausgaben dieses Jahres (nicht umlagefähig markiert)</CardTitle>
+                  <CardDescription>
+                    Prüfen Sie, ob Positionen fehlen — mit einem Klick übernehmen Sie sie in die Abrechnung.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {unallocated.map((tx) => (
+                    <div key={tx.id} className="flex justify-between items-center p-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-600 text-sm">
+                      <div>
+                        <span className="font-medium">{tx.description}</span>
+                        {tx.category && <span className="text-muted-foreground ml-2">({tx.category})</span>}
+                        <span className="text-muted-foreground ml-2">{new Date(tx.date).toLocaleDateString("de-DE")}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{formatEur(Math.abs(tx.amount))}</span>
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleAllocatableToggle(tx.id, true)}>
+                          <Plus className="w-3.5 h-3.5 mr-1" />
+                          Umlagefähig
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="flex justify-between mt-6">
+              <Button variant="outline" onClick={() => setActiveTab("config")}>
+                Zurück
+              </Button>
+              <Button onClick={() => setActiveTab("generation")}>
+                Weiter zur Generierung
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </div>
         </TabsContent>
 
         {/* ─── Tab 3: Generierung ─── */}
@@ -326,19 +414,34 @@ export default function UtilityBillingWizard() {
                       <tr>
                         <th className="text-left p-3 font-medium">Mieter</th>
                         <th className="text-left p-3 font-medium">Einheit</th>
-                        <th className="text-right p-3 font-medium">Betrag</th>
+                        <th className="text-right p-3 font-medium">Kostenanteil</th>
+                        <th className="text-right p-3 font-medium">Vorauszahlungen</th>
                         <th className="text-right p-3 font-medium">Saldo</th>
+                        {finalizedItems && <th className="text-right p-3 font-medium">PDF</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {statement.items.map((item) => (
+                      {(finalizedItems ?? statement.items).map((item) => (
                         <tr key={item.contractId} className="border-t">
                           <td className="p-3">{item.tenantName}</td>
                           <td className="p-3">{item.unitNumber}</td>
                           <td className="p-3 text-right font-medium">{formatEur(item.amount)}</td>
+                          <td className="p-3 text-right">{formatEur(item.totalPrepaid)}</td>
                           <td className={`p-3 text-right font-medium ${item.isRefund ? "text-green-600" : "text-red-600"}`}>
                             {item.isRefund ? "+" : "−"}{formatEur(Math.abs(item.balance))}
                           </td>
+                          {finalizedItems && (
+                            <td className="p-3 text-right">
+                              {"documentId" in item && item.documentId ? (
+                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleDownload(item as FinalizedStatementItem)}>
+                                  <Download className="w-3.5 h-3.5 mr-1" />
+                                  PDF
+                                </Button>
+                              ) : (
+                                "–"
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -346,9 +449,9 @@ export default function UtilityBillingWizard() {
                 </div>
               )}
 
-              {finalizedCount != null && (
+              {finalizedItems && (
                 <div className="border border-green-200 dark:border-green-900 rounded-md p-4 bg-green-50 dark:bg-green-950/30 text-sm text-green-800 dark:text-green-300">
-                  {finalizedCount} Abrechnungen erstellt und im Mieter-Portal hinterlegt.
+                  {finalizedItems.length} Abrechnungen erstellt und im Mieter-Portal hinterlegt.
                 </div>
               )}
 
@@ -378,7 +481,7 @@ export default function UtilityBillingWizard() {
                 Offene Abrechnungs-Widersprüche
               </CardTitle>
               <CardDescription>
-                Mieter haben über das Mieter-Portal „Zahlung unter Vorbehalt" gewählt. Bitte prüfen und beantworten.
+                Über das Mieter-Portal eingereichte Einwendungen gegen die Abrechnung. Bitte prüfen und beantworten.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -393,11 +496,14 @@ export default function UtilityBillingWizard() {
                     <div key={d.id} className="border rounded-lg p-4 bg-white dark:bg-slate-800 space-y-2">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-semibold">{d.contract.tenant.name}</p>
+                          <p className="font-semibold">
+                            {d.contract.tenant.name}
+                            {d.year != null && <span className="text-muted-foreground font-normal"> — Abrechnung {d.year}</span>}
+                          </p>
                           <p className="text-sm text-muted-foreground mt-1">{d.reason}</p>
                         </div>
                         <div className="text-right">
-                          <Badge variant="outline" className="border-amber-500 text-amber-600">{d.status}</Badge>
+                          <Badge variant="outline" className="border-amber-500 text-amber-600">{mapDisputeStatus(d.status)}</Badge>
                           {d.amount != null && <p className="text-sm font-bold mt-1">{formatEur(d.amount)}</p>}
                         </div>
                       </div>
@@ -406,6 +512,14 @@ export default function UtilityBillingWizard() {
                           Eingereicht am {new Date(d.createdAt).toLocaleDateString("de-DE")}
                         </span>
                         <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            onClick={() => updateDisputeStatus.mutate({ id: d.id, status: "IN_BEARBEITUNG" })}
+                          >
+                            In Bearbeitung
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"

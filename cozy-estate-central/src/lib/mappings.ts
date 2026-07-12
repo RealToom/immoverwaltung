@@ -174,3 +174,33 @@ const transactionTypeMap: Record<string, string> = {
 export const mapTransactionType = (s: string) => transactionTypeMap[s] ?? s;
 export const toBackendTransactionType = (s: string) =>
   s === "einnahme" ? "EINNAHME" : s === "ausgabe" ? "AUSGABE" : s.toUpperCase();
+
+// ─── BetrKV-Kategorien (Nebenkostenabrechnung) ──────────────
+export const BETRKV_LABELS: Record<string, string> = {
+  GRUNDSTEUER: "Grundsteuer",
+  WASSERVERSORGUNG: "Wasserversorgung",
+  ENTWAESSERUNG: "Entwässerung",
+  HEIZUNG: "Heizung",
+  WARMWASSER: "Warmwasser",
+  AUFZUG: "Aufzug",
+  STRASSENREINIGUNG_MUELL: "Straßenreinigung & Müll",
+  GEBAEUDE_REINIGUNG: "Gebäudereinigung",
+  GARTENPFLEGE: "Gartenpflege",
+  BELEUCHTUNG: "Beleuchtung",
+  SCHORNSTEINREINIGUNG: "Schornsteinreinigung",
+  VERSICHERUNGEN: "Versicherungen",
+  HAUSWART: "Hauswart",
+  GEMEINSCHAFTS_ANTENNE: "Gemeinschaftsantenne / Kabel",
+  WASCHRAUM: "Waschraum",
+  SONSTIGE_KOSTEN: "Sonstige Betriebskosten",
+};
+export const mapBetrkvCategory = (s: string) => BETRKV_LABELS[s] ?? s;
+
+// ─── Dispute-Status (Widersprüche) ──────────────────────────
+export const DISPUTE_STATUS_LABELS: Record<string, string> = {
+  OFFEN: "Offen",
+  IN_BEARBEITUNG: "In Bearbeitung",
+  GELOEST: "Gelöst",
+  ABGELEHNT: "Abgelehnt",
+};
+export const mapDisputeStatus = (s: string) => DISPUTE_STATUS_LABELS[s] ?? s;
