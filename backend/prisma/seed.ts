@@ -247,6 +247,8 @@ async function main() {
           endDate: c.endDate ? parseDate(c.endDate) : null,
           noticePeriod: c.noticePeriod,
           monthlyRent: c.monthlyRent,
+          // Nebenkostenvorauszahlung: ~12% der Kaltmiete, auf 5 EUR gerundet
+          utilityPrepayment: Math.round((c.monthlyRent * 0.12) / 5) * 5,
           deposit: c.deposit,
           status: c.status,
           nextReminder: c.nextReminder ? parseDate(c.nextReminder) : null,
@@ -459,6 +461,89 @@ async function main() {
     )
   );
   console.log(`Transactions: ${transactions.length} created`);
+
+  // ─── Nebenkosten-Demodaten (Abrechnungsjahr = Vorjahr) ──────
+  // Umlagefähige Betriebskosten mit BetrKV-Kategorie für die Wohn-Properties
+  // 0 (Stadtpark-Residenz o. ä.) und 1 (Sonnenhof), damit der
+  // Nebenkosten-Assistent out-of-the-box demonstrierbar ist.
+  const billingYear = new Date().getFullYear() - 1;
+  const utilityCostData: {
+    propIdx: number; description: string; amount: number;
+    betrkvCategory: string; co2TaxAmount?: number;
+  }[] = [
+    { propIdx: 0, description: `Grundsteuer ${billingYear}`, amount: 2400, betrkvCategory: "GRUNDSTEUER" },
+    { propIdx: 0, description: `Wasser/Abwasser ${billingYear}`, amount: 1850, betrkvCategory: "WASSERVERSORGUNG" },
+    { propIdx: 0, description: `Heizkosten Gas ${billingYear}`, amount: 7200, betrkvCategory: "HEIZUNG", co2TaxAmount: 540 },
+    { propIdx: 0, description: `Gebäudeversicherung ${billingYear}`, amount: 1300, betrkvCategory: "VERSICHERUNGEN" },
+    { propIdx: 0, description: `Hauswart ${billingYear}`, amount: 2100, betrkvCategory: "HAUSWART" },
+    { propIdx: 1, description: `Grundsteuer ${billingYear}`, amount: 1200, betrkvCategory: "GRUNDSTEUER" },
+    { propIdx: 1, description: `Wasser/Abwasser ${billingYear}`, amount: 850, betrkvCategory: "WASSERVERSORGUNG" },
+    { propIdx: 1, description: `Heizkosten Gas ${billingYear}`, amount: 4200, betrkvCategory: "HEIZUNG", co2TaxAmount: 320 },
+    { propIdx: 1, description: `Gartenpflege ${billingYear}`, amount: 480, betrkvCategory: "GARTENPFLEGE" },
+  ];
+  for (const cost of utilityCostData) {
+    await prisma.transaction.create({
+      data: {
+        date: new Date(billingYear, 5, 15),
+        description: cost.description,
+        type: "AUSGABE",
+        amount: -cost.amount,
+        category: "Nebenkosten",
+        allocatable: true,
+        betrkvCategory: cost.betrkvCategory as never,
+        co2TaxAmount: cost.co2TaxAmount ?? 0,
+        propertyId: properties[cost.propIdx].id,
+        companyId: company.id,
+      },
+    });
+  }
+  console.log(`Utility cost transactions: ${utilityCostData.length} created`);
+
+  // Energieausweise (für CO2-Stufenmodell)
+  for (const passport of [
+    { propIdx: 0, energyClass: "D", co2Emissions: 24 },
+    { propIdx: 1, energyClass: "F", co2Emissions: 34 },
+  ]) {
+    await prisma.energyPassport.create({
+      data: {
+        propertyId: properties[passport.propIdx].id,
+        companyId: company.id,
+        certificateType: "VERBRAUCH",
+        energyClass: passport.energyClass,
+        co2Emissions: passport.co2Emissions,
+        issuedAt: new Date(billingYear - 1, 0, 1),
+        validUntil: new Date(billingYear + 9, 0, 1),
+      },
+    });
+  }
+  console.log("Energy passports: 2 created");
+
+  // Wärmezähler mit Jahresablesungen für Property 1 → verbrauchsbasierte
+  // Heizkostenverteilung nach HeizkostenV im Assistenten demonstrierbar.
+  const heatUnits = ["EG-1", "EG-2", "1-OG-1", "1-OG-2"];
+  let meterIdx = 0;
+  for (const unitNumber of heatUnits) {
+    const unit = unitLookup(1, unitNumber);
+    const startValue = 1000 + meterIdx * 500;
+    const consumption = [650, 480, 720, 590][meterIdx];
+    const meter = await prisma.meter.create({
+      data: {
+        label: `Wärmezähler ${unitNumber}`,
+        type: "WAERME",
+        unitId: unit.id,
+        propertyId: properties[1].id,
+        companyId: company.id,
+      },
+    });
+    await prisma.meterReading.createMany({
+      data: [
+        { meterId: meter.id, companyId: company.id, value: startValue, readAt: new Date(billingYear, 0, 2) },
+        { meterId: meter.id, companyId: company.id, value: startValue + consumption, readAt: new Date(billingYear, 11, 30) },
+      ],
+    });
+    meterIdx++;
+  }
+  console.log(`Heat meters: ${heatUnits.length} created (with yearly readings)`);
 
   console.log("\nSeed completed successfully!");
   console.log("Login: admin@immoverwalt.de / Admin123!");
