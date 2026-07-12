@@ -1,16 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Request, Response } from "express";
 
-const { mockGenerateStatement, mockFinalizeStatement } = vi.hoisted(() => ({
+const { mockGenerateStatement, mockFinalizeStatement, mockListUnallocated } = vi.hoisted(() => ({
   mockGenerateStatement: vi.fn(),
   mockFinalizeStatement: vi.fn(),
+  mockListUnallocated: vi.fn(),
 }));
 vi.mock("../services/utility-billing.service.js", () => ({
   // Regular function (not arrow) so it can be invoked with `new` — the
   // controller calls `new UtilityBillingService(...)`, and arrow functions
   // cannot be used as constructors.
   UtilityBillingService: vi.fn().mockImplementation(function () {
-    return { generateStatement: mockGenerateStatement, finalizeStatement: mockFinalizeStatement };
+    return {
+      generateStatement: mockGenerateStatement,
+      finalizeStatement: mockFinalizeStatement,
+      listUnallocatedTransactions: mockListUnallocated,
+    };
   }),
 }));
 
@@ -43,15 +48,23 @@ describe("utility-billing.controller", () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403 }));
   });
 
-  it("generateStatement scopes the service to req.companyId and returns its result", async () => {
+  it("generateStatement scopes the service to req.companyId and merges unallocated transactions into the result", async () => {
     mockGenerateStatement.mockResolvedValueOnce({ year: 2026, propertyId: 3 });
+    mockListUnallocated.mockResolvedValueOnce([{ id: 9, description: "Reparatur", amount: -100, category: "" }]);
     const req = { companyId: 1, body: { propertyId: 3, year: 2026 } } as unknown as Request;
     const res = makeRes();
 
     await ctrl.generateStatement(req, res);
 
     expect(mockGenerateStatement).toHaveBeenCalledWith(3, 2026);
-    expect(res.json).toHaveBeenCalledWith({ data: { year: 2026, propertyId: 3 } });
+    expect(mockListUnallocated).toHaveBeenCalledWith(3, 2026);
+    expect(res.json).toHaveBeenCalledWith({
+      data: {
+        year: 2026,
+        propertyId: 3,
+        unallocatedTransactions: [{ id: 9, description: "Reparatur", amount: -100, category: "" }],
+      },
+    });
   });
 
   it("finalizeStatement scopes the service to req.companyId and returns its result", async () => {

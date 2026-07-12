@@ -835,6 +835,8 @@ enum BetrkvCategory {
   GRUNDSTEUER
   WASSERVERSORGUNG
   ENTWAESSERUNG
+  HEIZUNG
+  WARMWASSER
   AUFZUG
   STRASSENREINIGUNG_MUELL
   GEBAEUDE_REINIGUNG
@@ -1149,7 +1151,8 @@ model BillingDispute {
   contractId  Int      @map("contract_id")
   companyId   Int      @map("company_id")
   reason      String
-  status      String   @default("OPEN")
+  status      String   @default("OFFEN")
+  year        Int?
   amount      Float?
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")

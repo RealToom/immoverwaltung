@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const {
   mockEnergyPassportFindUnique, mockContractFindUnique, mockRentPaymentFindMany,
   mockPropertyFindFirst, mockTransactionFindMany, mockUnitFindMany, mockContractFindMany,
+  mockMeterFindMany,
 } = vi.hoisted(() => ({
   mockEnergyPassportFindUnique: vi.fn(),
   mockContractFindUnique: vi.fn(),
@@ -12,6 +13,7 @@ const {
   mockTransactionFindMany: vi.fn(),
   mockUnitFindMany: vi.fn(),
   mockContractFindMany: vi.fn(),
+  mockMeterFindMany: vi.fn(),
 }));
 
 vi.mock("../lib/prisma.js", () => ({
@@ -22,6 +24,7 @@ vi.mock("../lib/prisma.js", () => ({
     property: { findFirst: mockPropertyFindFirst },
     transaction: { findMany: mockTransactionFindMany },
     unit: { findMany: mockUnitFindMany },
+    meter: { findMany: mockMeterFindMany },
   },
 }));
 
@@ -112,6 +115,35 @@ describe("UtilityBillingService", () => {
       mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 2, monthlyRent: 800, utilityPrepayment: 100 });
       const svc = new UtilityBillingService(1);
       await expect(svc.calculateBalance(1, 2026, 1000)).rejects.toThrow("Vertrag nicht gefunden");
+    });
+  });
+
+  describe("calculateVacancyDeduction", () => {
+    it("weights vacancy by area, not by unit count", async () => {
+      // Unit A: 90 m2, occupied the whole year. Unit B: 10 m2, vacant the whole year.
+      // Area-weighted: deduction = 1000 * (10*365)/(100*365) = 100.
+      // (Old unit-weighted logic would give 1000 * 365/730 = 500.)
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "A", area: 90, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+        { id: 2, number: "B", area: 10, contracts: [] },
+      ]);
+      const svc = new UtilityBillingService(1);
+      const result = await svc.calculateVacancyDeduction(1, 2026, 1000);
+      expect(result).not.toBeNull();
+      expect(result?.vacancyDays).toBe(365);
+      expect(result?.affectedUnits).toEqual(["B"]);
+      expect(result?.amount).toBeCloseTo(100, 2);
+    });
+
+    it("falls back to unit-day weighting when all unit areas are 0", async () => {
+      // Two parking spots without area; one vacant all year -> half the pool.
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "SP-1", area: 0, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+        { id: 2, number: "SP-2", area: 0, contracts: [] },
+      ]);
+      const svc = new UtilityBillingService(1);
+      const result = await svc.calculateVacancyDeduction(1, 2026, 1000);
+      expect(result?.amount).toBeCloseTo(500, 2);
     });
   });
 
@@ -290,6 +322,74 @@ describe("UtilityBillingService", () => {
 
       const total = result.items.reduce((sum, i) => sum + i.amount, 0);
       expect(total + (result.vacancy?.amount ?? 0) + result.co2.landlordShare).toBeCloseTo(result.totalCosts, 1);
+    });
+
+    it("splits HEIZUNG costs 70% by metered consumption / 30% base per HeizkostenV", async () => {
+      // Two 50 m2 units, both with full-year contracts. One HEIZUNG transaction
+      // of 1000. Heat meters: unit 1 consumed 300 units, unit 2 consumed 100.
+      //   basePool = 300 -> by area: 150 / 150
+      //   consPool = 700 -> by consumption: 700*(300/400)=525 / 700*(100/400)=175
+      //   items: 675 / 325
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 40, description: "Heizkosten Gas", amount: -1000, betrkvCategory: "HEIZUNG", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "EG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+        { id: 2, number: "OG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, startDate: new Date(2025, 0, 1), endDate: null, unit: { id: 1, number: "EG", area: 50 }, tenant: { id: 7, name: "Mieter EG" } },
+        { id: 2, startDate: new Date(2025, 0, 1), endDate: null, unit: { id: 2, number: "OG", area: 50 }, tenant: { id: 8, name: "Mieter OG" } },
+      ]);
+      mockMeterFindMany.mockResolvedValueOnce([
+        { id: 1, unitId: 1, type: "WAERME", readings: [{ value: 100, readAt: new Date(2026, 0, 2) }, { value: 400, readAt: new Date(2026, 11, 30) }] },
+        { id: 2, unitId: 2, type: "WAERME", readings: [{ value: 0, readAt: new Date(2026, 0, 2) }, { value: 100, readAt: new Date(2026, 11, 30) }] },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 2, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      expect(result.heating).not.toBeNull();
+      expect(result.heating?.consumptionBased).toBe(true);
+      expect(result.heating?.warning).toBeUndefined();
+      expect(result.items[0].amount).toBeCloseTo(675, 1);
+      expect(result.items[1].amount).toBeCloseTo(325, 1);
+      expect(result.items[0].heatingAmount).toBeCloseTo(675, 1);
+    });
+
+    it("falls back to area allocation with a § 12 HeizkostenV warning when no heat meters exist", async () => {
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 41, description: "Heizkosten Gas", amount: -1000, betrkvCategory: "HEIZUNG", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "EG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+        { id: 2, number: "OG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, startDate: new Date(2025, 0, 1), endDate: null, unit: { id: 1, number: "EG", area: 50 }, tenant: { id: 7, name: "Mieter EG" } },
+        { id: 2, startDate: new Date(2025, 0, 1), endDate: null, unit: { id: 2, number: "OG", area: 50 }, tenant: { id: 8, name: "Mieter OG" } },
+      ]);
+      mockMeterFindMany.mockResolvedValueOnce([]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 2, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      expect(result.heating?.consumptionBased).toBe(false);
+      expect(result.heating?.warning).toMatch(/HeizkostenV/);
+      expect(result.items[0].amount).toBeCloseTo(500, 1);
+      expect(result.items[1].amount).toBeCloseTo(500, 1);
     });
   });
 });

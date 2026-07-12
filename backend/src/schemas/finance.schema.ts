@@ -26,8 +26,8 @@ export const updateTransactionSchema = z.object({
   allocatable: z.boolean().optional(),
   category: z.string().max(200).optional(),
   betrkvCategory: z.enum([
-    "GRUNDSTEUER", "WASSERVERSORGUNG", "ENTWAESSERUNG", "AUFZUG",
-    "STRASSENREINIGUNG_MUELL", "GEBAEUDE_REINIGUNG", "GARTENPFLEGE",
+    "GRUNDSTEUER", "WASSERVERSORGUNG", "ENTWAESSERUNG", "HEIZUNG", "WARMWASSER",
+    "AUFZUG", "STRASSENREINIGUNG_MUELL", "GEBAEUDE_REINIGUNG", "GARTENPFLEGE",
     "BELEUCHTUNG", "SCHORNSTEINREINIGUNG", "VERSICHERUNGEN", "HAUSWART",
     "GEMEINSCHAFTS_ANTENNE", "WASCHRAUM", "SONSTIGE_KOSTEN",
   ]).nullable().optional(),

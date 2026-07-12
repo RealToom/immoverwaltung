@@ -128,19 +128,36 @@ describe("UtilityBillingService.finalizeStatement", () => {
     expect(mockTransactionCreate).not.toHaveBeenCalled();
     expect(mockDeleteDocument).not.toHaveBeenCalled();
     expect(mockCreateDocument).toHaveBeenCalledWith(1, {
-      name: "Nebenkostenabrechnung_2025_1.pdf",
+      name: "Nebenkostenabrechnung_2025_Residenz_Am_Park.pdf",
       fileType: "PDF",
       fileSize: "4.0 KB",
       filePath: "/fake/path.pdf",
       tenantId: 7,
       propertyId: 1,
     });
+
+    // The PDF must receive the formal § 556 BGB content: prepayments,
+    // distribution key, and property-level totals per category.
+    const pdfInput = mockGenerateTenantStatementPdf.mock.calls[0][0];
+    expect(pdfInput.totalPrepaid).toBe(1200);
+    expect(pdfInput.area).toBe(50);
+    expect(pdfInput.totalArea).toBe(50);
+    expect(pdfInput.occupancyDays).toBe(365);
+    expect(pdfInput.daysInYear).toBe(365);
+    expect(pdfInput.totalCosts).toBe(1200);
+    expect(pdfInput.categories).toEqual([
+      { category: "GRUNDSTEUER", label: "Grundsteuer", propertyTotal: 1200, tenantShare: 1200 },
+    ]);
+
     expect(result).toEqual({
       propertyId: 1,
       year: 2025,
       generatedCount: 1,
       items: expect.any(Array),
     });
+    // The finalize response links each item to its generated document so the
+    // admin UI can offer direct downloads.
+    expect(result.items[0].documentId).toBe(99);
   });
 
   it("deletes an existing document for the same tenant/year before creating the replacement", async () => {

@@ -6,8 +6,11 @@ import type { DisputeStatus } from "../services/billing-dispute.service.js";
 export async function generateStatement(req: Request, res: Response): Promise<void> {
   const { propertyId, year } = req.body as { propertyId: number; year: number };
   const svc = new UtilityBillingService(req.companyId!);
-  const data = await svc.generateStatement(propertyId, year);
-  res.json({ data });
+  const [statement, unallocatedTransactions] = await Promise.all([
+    svc.generateStatement(propertyId, year),
+    svc.listUnallocatedTransactions(propertyId, year),
+  ]);
+  res.json({ data: { ...statement, unallocatedTransactions } });
 }
 
 export async function finalizeStatement(req: Request, res: Response): Promise<void> {

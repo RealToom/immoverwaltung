@@ -1,10 +1,6 @@
 import fs from "node:fs";
 import { createPdfFile } from "../lib/pdf.js";
-
-export interface TenantStatementCategoryLine {
-  category: string;
-  amount: number;
-}
+import { TenantCategoryLine } from "../lib/betrkv.js";
 
 export interface TenantStatementPdfInput {
   companyName: string;
@@ -12,21 +8,40 @@ export interface TenantStatementPdfInput {
   tenantName: string;
   unitNumber: string;
   year: number;
+  /** Tenant's total allocated cost share. */
   amount: number;
+  /** totalPrepaid - amount (positive = refund). */
   balance: number;
   isRefund: boolean;
-  categories: TenantStatementCategoryLine[];
+  /** Prepayments (Nebenkostenvorauszahlungen) credited to this tenant. */
+  totalPrepaid: number;
+  /** Distribution key data (§ 556 BGB formal requirements). */
+  area: number;
+  totalArea: number;
+  occupancyDays: number;
+  daysInYear: number;
+  /** Property-level gross allocatable costs. */
+  totalCosts: number;
+  categories: TenantCategoryLine[];
   co2: { landlordPercentage: number; landlordShare: number; tenantShare: number; energyClass: string | null } | null;
+  heating: { consumptionBased: boolean; consumptionSharePercent?: number | null; warning?: string } | null;
+  vacancyDeduction: number;
 }
 
 function formatEur(n: number): string {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(n);
 }
 
+function formatArea(n: number): string {
+  return new Intl.NumberFormat("de-DE", { maximumFractionDigits: 2 }).format(n);
+}
+
 /**
- * Renders one tenant's finalized utility statement as a PDF and writes it
- * to outputPath. Pure rendering — no Prisma access, no I/O beyond the file
- * write itself, so it's testable without mocking anything but the filesystem.
+ * Renders one tenant's finalized utility statement as a PDF and writes it to
+ * outputPath. Contains the formal minimum content required by § 556 Abs. 3
+ * BGB case law: total costs per category, the distribution key, the
+ * derivation of the tenant's share, and the deduction of prepayments.
+ * Pure rendering — no Prisma access, no I/O beyond the file write itself.
  */
 export async function generateTenantStatementPdf(
   input: TenantStatementPdfInput,
@@ -35,22 +50,55 @@ export async function generateTenantStatementPdf(
   const { doc, done } = createPdfFile(outputPath);
 
   doc.fontSize(18).font("Helvetica-Bold").text("Nebenkostenabrechnung", { align: "center" });
-  doc.fontSize(11).font("Helvetica").text(`Abrechnungszeitraum: ${input.year}`, { align: "center" });
+  doc.fontSize(11).font("Helvetica").text(
+    `Abrechnungszeitraum: 01.01.${input.year} – 31.12.${input.year}`,
+    { align: "center" }
+  );
   doc.moveDown(1.5);
 
-  doc.fontSize(11).text(`Vermieter: ${input.companyName}`);
+  doc.fontSize(11).text(`Vermieter/Verwalter: ${input.companyName}`);
   doc.text(`Mieter: ${input.tenantName}`);
   doc.text(`Einheit: ${input.unitNumber}, ${input.propertyName}`);
   doc.moveDown();
 
-  doc.fontSize(13).font("Helvetica-Bold").text("Kostenaufstellung nach Kategorie");
+  doc.fontSize(13).font("Helvetica-Bold").text("Verteilerschlüssel");
+  doc.font("Helvetica").fontSize(10).moveDown(0.5);
+  doc.text(
+    `Wohnfläche: ${formatArea(input.area)} m² von ${formatArea(input.totalArea)} m² Gesamtfläche. ` +
+      `Nutzungszeitraum: ${input.occupancyDays} von ${input.daysInYear} Tagen.`
+  );
+  if (input.heating?.consumptionBased) {
+    const consPercent = input.heating.consumptionSharePercent ?? 70;
+    doc.text(
+      `Heiz-/Warmwasserkosten: ${consPercent} % nach gemessenem Verbrauch, ` +
+        `${100 - consPercent} % als Grundkosten nach Wohnfläche (§ 7 HeizkostenV).`
+    );
+  }
+  doc.text("Übrige Betriebskosten: nach Wohnfläche, zeitanteilig für den Nutzungszeitraum.");
+  doc.moveDown();
+
+  doc.fontSize(13).font("Helvetica-Bold").text("Kostenaufstellung");
   doc.font("Helvetica").fontSize(10).moveDown(0.5);
   if (input.categories.length === 0) {
     doc.text("Keine kategorisierten Kosten vorhanden.");
   } else {
     for (const c of input.categories) {
-      doc.text(`${c.category}: ${formatEur(c.amount)}`);
+      doc.text(
+        `${c.label}  —  Gesamtkosten: ${formatEur(c.propertyTotal)}, Ihr Anteil: ${formatEur(c.tenantShare)}`
+      );
     }
+    doc.moveDown(0.5);
+    doc.font("Helvetica-Bold").text(
+      `Gesamtkosten der Liegenschaft: ${formatEur(input.totalCosts)} — Ihr Kostenanteil: ${formatEur(input.amount)}`
+    );
+    doc.font("Helvetica");
+  }
+  if (input.vacancyDeduction > 0) {
+    doc.moveDown(0.5);
+    doc.text(
+      `Auf Leerstand entfallende Kosten von ${formatEur(input.vacancyDeduction)} trägt der Eigentümer; ` +
+        "sie wurden nicht auf die Mieter umgelegt."
+    );
   }
   doc.moveDown();
 
@@ -64,24 +112,30 @@ export async function generateTenantStatementPdf(
     doc.moveDown();
   }
 
+  if (input.heating?.warning) {
+    doc.fontSize(10).font("Helvetica-Bold").fillColor("#8a6d00").text("Hinweis zur Heizkostenverteilung");
+    doc.font("Helvetica").text(input.heating.warning);
+    doc.fillColor("#000000").moveDown();
+  }
+
   doc.fontSize(13).font("Helvetica-Bold").text("Ergebnis");
   doc.font("Helvetica").fontSize(11).moveDown(0.5);
   doc.text(`Ihr Kostenanteil: ${formatEur(input.amount)}`);
-  doc.text(
+  doc.text(`Geleistete Vorauszahlungen: ${formatEur(input.totalPrepaid)}`);
+  doc.font("Helvetica-Bold").text(
     input.isRefund
-      ? `Guthaben: ${formatEur(Math.abs(input.balance))}`
+      ? `Ihr Guthaben: ${formatEur(Math.abs(input.balance))}`
       : `Nachzahlung: ${formatEur(Math.abs(input.balance))}`
   );
-  doc.moveDown(2);
+  doc.font("Helvetica").moveDown(2);
 
   doc
     .fontSize(8)
-    .font("Helvetica")
     .fillColor("#555555")
     .text(
       "Hinweis: Gemäß § 556 Abs. 3 BGB können Einwendungen gegen diese Abrechnung innerhalb von 12 Monaten nach " +
-        'Zugang schriftlich erhoben werden. Ein Widerspruch kann bequem über das Mieter-Portal (Menüpunkt "Abrechnung ' +
-        'prüfen") eingereicht werden.',
+        "Zugang schriftlich erhoben werden. Die Einsicht in die Abrechnungsbelege wird auf Wunsch gewährt. Ein " +
+        'Widerspruch kann bequem über das Mieter-Portal (Menüpunkt "Abrechnung prüfen") eingereicht werden.',
       { align: "left" }
     );
 
