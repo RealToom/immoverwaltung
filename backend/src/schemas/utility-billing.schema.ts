@@ -10,6 +10,11 @@ export const listDisputesQuerySchema = z.object({
   status: z.enum(DISPUTE_STATUSES).optional(),
 });
 
+export const listStatementsQuerySchema = z.object({
+  propertyId: z.coerce.number().int().positive().optional(),
+  year: z.coerce.number().int().min(2000).max(2100).optional(),
+});
+
 export const updateDisputeStatusSchema = z.object({
   status: z.enum(DISPUTE_STATUSES),
 });

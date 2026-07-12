@@ -5,6 +5,7 @@ import { idParamSchema } from "../schemas/common.schema.js";
 import {
   generateStatementSchema,
   listDisputesQuerySchema,
+  listStatementsQuerySchema,
   updateDisputeStatusSchema,
 } from "../schemas/utility-billing.schema.js";
 import * as ctrl from "../controllers/utility-billing.controller.js";
@@ -23,6 +24,8 @@ router.post(
   validate({ body: generateStatementSchema }),
   ctrl.finalizeStatement
 );
+router.get("/statements", validate({ query: listStatementsQuerySchema }), ctrl.listStatements);
+router.get("/statements/:id", validate({ params: idParamSchema }), ctrl.getStatement);
 router.get("/disputes", validate({ query: listDisputesQuerySchema }), ctrl.listDisputes);
 router.patch(
   "/disputes/:id",

@@ -67,6 +67,7 @@ model Company {
   tenantUploads           TenantUpload[]
   trustedDevices          TrustedDevice[]
   notifications           Notification[]
+  utilityStatements       UtilityStatement[]
 
   @@map("companies")
 }
@@ -199,8 +200,11 @@ model Property {
   emailMessages          EmailMessage[] @relation("EmailMessageProperty")
   suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedProperty")
   calendarEvents         CalendarEvent[]
+  utilityStatements      UtilityStatement[]
 
   costConfiguration    Json?       @map("cost_configuration") // Format: { "GRUNDSTEUER": "WOHNFLAECHE", "HAUSWART": "WOHNEINHEIT" }
+  /** Beginn des Abrechnungszeitraums (Monat 1-12, default Kalenderjahr) */
+  billingPeriodStartMonth Int      @default(1) @map("billing_period_start_month")
 
   @@map("properties")
 }
@@ -283,6 +287,8 @@ model Contract {
   noticePeriod Int            @map("notice_period")
   monthlyRent  Float          @map("monthly_rent")
   utilityPrepayment Float     @default(0) @map("utility_prepayment")
+  /** Anzahl Bewohner (fuer Verteilerschluessel PERSONEN) */
+  occupantsCount Int          @default(1) @map("occupants_count")
   deposit      Float          @default(0)
   status       ContractStatus @default(ENTWURF)
   nextReminder DateTime?      @map("next_reminder")
@@ -413,6 +419,7 @@ model Document {
   tenant             Tenant?     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   company            Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
   signedByTenantUser TenantUser? @relation("DocumentSignedBy", fields: [signedByTenantUserId], references: [id], onDelete: SetNull)
+  transactionsAsReceipt Transaction[] @relation("TransactionReceipt")
 
   @@map("documents")
 }
@@ -428,19 +435,90 @@ model Transaction {
   allocatable   Boolean         @default(false)
   betrkvCategory BetrkvCategory? @map("betrkv_category")
   co2TaxAmount  Float?          @default(0) @map("co2_tax_amount")
+  laborCostAmount Float?        @default(0) @map("labor_cost_amount") // § 35a EStG: enthaltener Lohnanteil
   maintenanceWarning String?    @map("maintenance_warning")
   propertyId    Int?            @map("property_id")
   bankAccountId Int?            @map("bank_account_id") // Optional: Verknuepfung mit echtem Bankkonto
+  receiptDocumentId Int?        @map("receipt_document_id") // Beleg fuer Belegeinsicht (§ 259 BGB)
   companyId     Int             @map("company_id")
   createdAt     DateTime        @default(now()) @map("created_at")
   updatedAt     DateTime        @updatedAt @map("updated_at")
 
   property        Property?       @relation(fields: [propertyId], references: [id])
   bankAccount     BankAccount?    @relation(fields: [bankAccountId], references: [id])
+  receiptDocument Document?       @relation("TransactionReceipt", fields: [receiptDocumentId], references: [id], onDelete: SetNull)
   company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   bankTransaction BankTransaction?
 
   @@map("transactions")
+}
+
+// ─── UtilityStatement (Finalisierte Nebenkostenabrechnung, Snapshot) ─────────
+enum UtilityStatementStatus {
+  FINALISIERT
+  KORRIGIERT // durch eine spaetere Korrekturabrechnung ersetzt
+}
+
+model UtilityStatement {
+  id           Int                    @id @default(autoincrement())
+  propertyId   Int                    @map("property_id")
+  companyId    Int                    @map("company_id")
+  year         Int
+  periodStart  DateTime               @map("period_start")
+  periodEnd    DateTime               @map("period_end")
+  /** Zustellfrist § 556 Abs. 3 BGB: periodEnd + 12 Monate */
+  deliveryDeadline DateTime           @map("delivery_deadline")
+  status       UtilityStatementStatus @default(FINALISIERT)
+  totalCosts   Float                  @map("total_costs")
+  /** Vollstaendiger Statement-Payload zum Zeitpunkt der Finalisierung */
+  data         Json
+  finalizedAt  DateTime               @default(now()) @map("finalized_at")
+  /** Verweis auf die Korrekturabrechnung, die diese ersetzt hat */
+  supersededById Int?                 @map("superseded_by_id")
+
+  property     Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supersededBy UtilityStatement?      @relation("StatementCorrection", fields: [supersededById], references: [id], onDelete: SetNull)
+  corrections  UtilityStatement[]     @relation("StatementCorrection")
+  items        UtilityStatementItem[]
+
+  @@index([companyId, propertyId, year])
+  @@map("utility_statements")
+}
+
+enum SettlementStatus {
+  OFFEN
+  BEZAHLT
+  VERRECHNET
+}
+
+model UtilityStatementItem {
+  id           Int              @id @default(autoincrement())
+  statementId  Int              @map("statement_id")
+  companyId    Int              @map("company_id")
+  contractId   Int              @map("contract_id")
+  tenantId     Int              @map("tenant_id")
+  unitId       Int              @map("unit_id")
+  tenantName   String           @map("tenant_name")
+  unitNumber   String           @map("unit_number")
+  amount       Float
+  heatingAmount Float           @default(0) @map("heating_amount")
+  totalPrepaid Float            @default(0) @map("total_prepaid")
+  balance      Float
+  isRefund     Boolean          @map("is_refund")
+  documentId   Int?             @map("document_id")
+  /** § 560 Abs. 4: vorgeschlagene neue monatliche Vorauszahlung */
+  suggestedPrepayment Float?    @map("suggested_prepayment")
+  /** Zustellung: E-Mail-Versand bzw. erster Portal-Abruf */
+  deliveredAt  DateTime?        @map("delivered_at")
+  viewedAt     DateTime?        @map("viewed_at")
+  settlementStatus SettlementStatus @default(OFFEN) @map("settlement_status")
+  settledAt    DateTime?        @map("settled_at")
+
+  statement    UtilityStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, tenantId])
+  @@map("utility_statement_items")
 }
 
 // ─── BankAccount (Bankkonten) ───────────────────────────────
@@ -620,6 +698,7 @@ model Meter {
 enum MeterType {
   STROM
   WASSER
+  WARMWASSER
   GAS
   WAERME
   SONSTIGES

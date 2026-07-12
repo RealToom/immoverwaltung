@@ -678,6 +678,72 @@ export class UtilityBillingService {
       generatedCount++;
     }
 
-    return { propertyId, year, generatedCount, items: itemsWithDocuments };
+    // Persist an immutable snapshot: the numbers the tenants received must
+    // never drift when transactions change later. Re-finalizing supersedes
+    // the previous snapshot (Korrekturabrechnung) instead of mutating it.
+    const statementRecord = await prisma.utilityStatement.create({
+      data: {
+        propertyId,
+        companyId: this.companyId,
+        year,
+        periodStart: startOfYear,
+        periodEnd: endOfYear,
+        // § 556 Abs. 3 BGB: Zugang beim Mieter binnen 12 Monaten nach Periodenende
+        deliveryDeadline: new Date(endOfYear.getFullYear() + 1, endOfYear.getMonth(), endOfYear.getDate()),
+        totalCosts: statement.totalCosts,
+        data: statement as unknown as object,
+        items: {
+          create: itemsWithDocuments.map((item) => ({
+            companyId: this.companyId,
+            contractId: item.contractId,
+            tenantId: item.tenantId,
+            unitId: item.unitId,
+            tenantName: item.tenantName,
+            unitNumber: item.unitNumber,
+            amount: item.amount,
+            heatingAmount: item.heatingAmount,
+            totalPrepaid: item.totalPrepaid,
+            balance: item.balance,
+            isRefund: item.isRefund,
+            documentId: item.documentId,
+            // § 560 Abs. 4 BGB: angemessene neue Vorauszahlung = 1/12 des Kostenanteils
+            suggestedPrepayment: Math.round((item.amount / 12) * 100) / 100,
+          })),
+        },
+      },
+    });
+
+    await prisma.utilityStatement.updateMany({
+      where: { propertyId, companyId: this.companyId, year, status: "FINALISIERT", id: { not: statementRecord.id } },
+      data: { status: "KORRIGIERT", supersededById: statementRecord.id },
+    });
+
+    return { propertyId, year, generatedCount, statementId: statementRecord.id, items: itemsWithDocuments };
+  }
+
+  /** Lists persisted statement snapshots (newest first). */
+  public async listStatements(propertyId?: number, year?: number) {
+    return prisma.utilityStatement.findMany({
+      where: {
+        companyId: this.companyId,
+        ...(propertyId ? { propertyId } : {}),
+        ...(year ? { year } : {}),
+      },
+      include: {
+        items: true,
+        property: { select: { id: true, name: true } },
+      },
+      orderBy: { finalizedAt: "desc" },
+    });
+  }
+
+  /** Fetches one persisted statement snapshot incl. frozen payload. */
+  public async getStatement(id: number) {
+    const statement = await prisma.utilityStatement.findFirst({
+      where: { id, companyId: this.companyId },
+      include: { items: true, property: { select: { id: true, name: true } } },
+    });
+    if (!statement) throw new AppError(404, "Abrechnung nicht gefunden");
+    return statement;
   }
 }

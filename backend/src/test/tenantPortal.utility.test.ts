@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const { mockTenantFindUnique, mockMeterFindMany, mockMeterFindFirst, mockMeterReadingCreate, mockContractFindFirst } = vi.hoisted(() => ({
+const {
+  mockTenantFindUnique, mockMeterFindMany, mockMeterFindFirst, mockMeterReadingCreate,
+  mockContractFindFirst, mockStatementFindFirst, mockStatementItemUpdate,
+} = vi.hoisted(() => ({
   mockTenantFindUnique: vi.fn(),
   mockMeterFindMany: vi.fn(),
   mockMeterFindFirst: vi.fn(),
   mockMeterReadingCreate: vi.fn(),
   mockContractFindFirst: vi.fn(),
+  mockStatementFindFirst: vi.fn(),
+  mockStatementItemUpdate: vi.fn(),
 }));
 
 vi.mock("../lib/prisma.js", () => ({
@@ -14,10 +19,12 @@ vi.mock("../lib/prisma.js", () => ({
     meter: { findMany: mockMeterFindMany, findFirst: mockMeterFindFirst },
     meterReading: { create: mockMeterReadingCreate },
     contract: { findFirst: mockContractFindFirst },
+    utilityStatement: { findFirst: mockStatementFindFirst },
+    utilityStatementItem: { update: mockStatementItemUpdate },
   },
 }));
 
-import { getOwnMeters, addOwnMeterReading } from "../services/tenantPortal.service.js";
+import { getOwnMeters, addOwnMeterReading, getUtilitySummary } from "../services/tenantPortal.service.js";
 
 const tenantUser = { id: 1, tenantId: 10, companyId: 1 };
 
@@ -46,5 +53,39 @@ describe("tenantPortal.service utility/meters", () => {
     ).rejects.toThrow("nicht gefunden");
 
     expect(mockMeterReadingCreate).not.toHaveBeenCalled();
+  });
+
+  it("getUtilitySummary serves the frozen snapshot when a finalized statement exists (and stamps viewedAt)", async () => {
+    mockContractFindFirst.mockResolvedValueOnce({ id: 77, propertyId: 3 });
+    mockStatementFindFirst.mockResolvedValueOnce({
+      id: 500,
+      status: "FINALISIERT",
+      data: {
+        transactions: [{ amount: -1200, betrkvCategory: "GRUNDSTEUER" }],
+      },
+      items: [
+        {
+          id: 9001, contractId: 77, amount: 600, heatingAmount: 0,
+          totalPrepaid: 500, balance: -100, isRefund: false,
+          suggestedPrepayment: 50, viewedAt: null,
+        },
+      ],
+    });
+    mockStatementItemUpdate.mockResolvedValueOnce({});
+
+    const result = await getUtilitySummary(tenantUser, 2025);
+
+    expect(result.finalized).toBe(true);
+    expect(result.totalCosts).toBe(600);
+    expect(result.totalPrepaid).toBe(500);
+    expect(result.balance).toBe(-100);
+    expect(result.categories).toEqual([
+      { category: "GRUNDSTEUER", label: "Grundsteuer", amount: 600 },
+    ]);
+    // first portal view is recorded for the § 556 delivery trail
+    expect(mockStatementItemUpdate).toHaveBeenCalledWith({
+      where: { id: 9001 },
+      data: { viewedAt: expect.any(Date) },
+    });
   });
 });

@@ -364,6 +364,45 @@ export async function createMessage(tenantUser: TenantUser, body: string) {
 export async function getUtilitySummary(tenantUser: TenantUser, year?: number) {
   const targetYear = year ?? new Date().getFullYear() - 1;
   const contract = await getContractForYear(tenantUser, targetYear);
+
+  // A finalized statement is immutable: serve the frozen snapshot so the
+  // portal always matches the PDF the tenant received — even if transactions
+  // changed afterwards.
+  const snapshot = await prisma.utilityStatement.findFirst({
+    where: {
+      companyId: tenantUser.companyId,
+      propertyId: contract.propertyId,
+      year: targetYear,
+      status: "FINALISIERT",
+    },
+    include: { items: { where: { contractId: contract.id } } },
+  });
+  const snapshotItem = snapshot?.items[0];
+  if (snapshot && snapshotItem) {
+    if (!snapshotItem.viewedAt) {
+      await prisma.utilityStatementItem.update({
+        where: { id: snapshotItem.id },
+        data: { viewedAt: new Date() },
+      });
+    }
+    const data = snapshot.data as { transactions: { amount: number; betrkvCategory: string | null }[] };
+    const categories = buildTenantCategoryLines(
+      data.transactions ?? [],
+      snapshotItem.amount,
+      snapshotItem.heatingAmount
+    ).map((line) => ({ category: line.category, label: line.label, amount: line.tenantShare }));
+    return {
+      year: targetYear,
+      finalized: true,
+      totalCosts: snapshotItem.amount,
+      totalPrepaid: snapshotItem.totalPrepaid,
+      balance: snapshotItem.balance,
+      isRefund: snapshotItem.isRefund,
+      suggestedPrepayment: snapshotItem.suggestedPrepayment,
+      categories,
+    };
+  }
+
   const svc = new UtilityBillingService(tenantUser.companyId);
   const statement = await svc.generateStatement(contract.propertyId, targetYear);
   const item = statement.items.find((i) => i.contractId === contract.id);
@@ -376,10 +415,12 @@ export async function getUtilitySummary(tenantUser: TenantUser, year?: number) {
     : [];
   return {
     year: targetYear,
+    finalized: false,
     totalCosts: item?.amount ?? 0,
     totalPrepaid: item?.totalPrepaid ?? 0,
     balance: item?.balance ?? 0,
     isRefund: item?.isRefund ?? false,
+    suggestedPrepayment: null,
     categories,
   };
 }

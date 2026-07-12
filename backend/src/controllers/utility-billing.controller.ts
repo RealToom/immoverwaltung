@@ -20,6 +20,20 @@ export async function finalizeStatement(req: Request, res: Response): Promise<vo
   res.json({ data });
 }
 
+export async function listStatements(req: Request, res: Response): Promise<void> {
+  const propertyId = req.query.propertyId ? Number(req.query.propertyId) : undefined;
+  const year = req.query.year ? Number(req.query.year) : undefined;
+  const svc = new UtilityBillingService(req.companyId!);
+  const data = await svc.listStatements(propertyId, year);
+  res.json({ data });
+}
+
+export async function getStatement(req: Request, res: Response): Promise<void> {
+  const svc = new UtilityBillingService(req.companyId!);
+  const data = await svc.getStatement(Number(req.params.id));
+  res.json({ data });
+}
+
 export async function listDisputes(req: Request, res: Response): Promise<void> {
   const status = req.query.status as string | undefined;
   const data = await disputeSvc.listDisputesByCompany(req.companyId!, status);
