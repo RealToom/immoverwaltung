@@ -539,6 +539,47 @@ describe("UtilityBillingService", () => {
     });
   });
 
+  describe("Plausibilitätsprüfung (runPlausibilityChecks)", () => {
+    it("flags categories that jumped >25% vs the previous year and reports €/m²/month", async () => {
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      // current year
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { amount: -1500, betrkvCategory: "HEIZUNG" },
+        { amount: -1200, betrkvCategory: "GRUNDSTEUER" },
+      ]);
+      // previous year
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { amount: -1000, betrkvCategory: "HEIZUNG" },
+        { amount: -1150, betrkvCategory: "GRUNDSTEUER" },
+      ]);
+      mockUnitFindMany.mockResolvedValueOnce([{ area: 60 }, { area: 40 }]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.runPlausibilityChecks(1, 2025);
+
+      expect(result.hasPreviousData).toBe(true);
+      // HEIZUNG +50% is flagged; GRUNDSTEUER +4.3% is not.
+      expect(result.categoryWarnings).toHaveLength(1);
+      expect(result.categoryWarnings[0].category).toBe("HEIZUNG");
+      expect(result.categoryWarnings[0].changePercent).toBeCloseTo(50, 0);
+      // total 2700 / 100 m² / 12 = 2.25 €/m²/month
+      expect(result.costPerSqmPerMonth).toBeCloseTo(2.25, 2);
+    });
+
+    it("returns no comparison warnings when there is no prior-year data", async () => {
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockTransactionFindMany.mockResolvedValueOnce([{ amount: -1200, betrkvCategory: "GRUNDSTEUER" }]);
+      mockTransactionFindMany.mockResolvedValueOnce([]);
+      mockUnitFindMany.mockResolvedValueOnce([{ area: 100 }]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.runPlausibilityChecks(1, 2025);
+
+      expect(result.hasPreviousData).toBe(false);
+      expect(result.categoryWarnings).toHaveLength(0);
+    });
+  });
+
   describe("Vorwegabzug Gewerbe (§ 556a BGB)", () => {
     it("quantifies the commercial share and leaves the residential share proportional", async () => {
       // One residential (WOHNRAUM) + one commercial (GEWERBE) unit, 50 m² each.

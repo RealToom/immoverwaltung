@@ -30,3 +30,8 @@ export const prepaymentAdjustmentSchema = z.object({
 export const settlementStatusSchema = z.object({
   settlementStatus: z.enum(["OFFEN", "BEZAHLT", "VERRECHNET"]),
 });
+
+export const plausibilityQuerySchema = z.object({
+  propertyId: z.coerce.number().int().positive(),
+  year: z.coerce.number().int().min(2000).max(2100),
+});

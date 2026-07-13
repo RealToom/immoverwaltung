@@ -7,7 +7,7 @@ import { CheckCircle2, ChevronRight, Settings, Send, AlertTriangle, Leaf, Buildi
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useProperties } from "@/hooks/api/useProperties";
-import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement, useStatementDeadlines, useSetDistributionKeys, useApplyPrepaymentAdjustment, useUpdateSettlementStatus } from "@/hooks/api/useUtilityBilling";
+import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement, useStatementDeadlines, useSetDistributionKeys, useApplyPrepaymentAdjustment, useUpdateSettlementStatus, usePlausibilityChecks } from "@/hooks/api/useUtilityBilling";
 import type { UtilityStatementTransaction, FinalizedStatementItem } from "@/hooks/api/useUtilityBilling";
 import { useUpdateTransaction } from "@/hooks/api/useFinance";
 import { useDownloadDocument } from "@/hooks/api/useDocuments";
@@ -128,6 +128,9 @@ export default function UtilityBillingWizard() {
       docName: `Nebenkostenabrechnung_${year}_${item.tenantName.replace(/\s+/g, "_")}.pdf`,
     });
   };
+
+  const { data: plausibilityRes } = usePlausibilityChecks(propertyId, year, !!statement);
+  const plausibility = plausibilityRes?.data;
 
   const warningCount = statement?.transactions.filter((t) => t.maintenanceWarning).length ?? 0;
   const unallocated = statement?.unallocatedTransactions ?? [];
@@ -414,6 +417,41 @@ export default function UtilityBillingWizard() {
         {/* ─── Tab 2: Kosten prüfen ─── */}
         <TabsContent value="validation">
           <div className="space-y-4">
+            {plausibility && (plausibility.categoryWarnings.length > 0 || plausibility.benchmarkHint) && (
+              <Card className="border-amber-200 dark:border-amber-900">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                    <AlertTriangle className="w-5 h-5" />
+                    Plausibilitätsprüfung
+                  </CardTitle>
+                  <CardDescription>
+                    Automatischer Abgleich mit dem Vorjahr ({plausibility.previousYear})
+                    {plausibility.costPerSqmPerMonth != null && (
+                      <> — Betriebskosten: <strong>{plausibility.costPerSqmPerMonth.toFixed(2)} €/m²/Monat</strong></>
+                    )}
+                    .
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {plausibility.benchmarkHint && (
+                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-amber-900 dark:text-amber-200">
+                      {plausibility.benchmarkHint}
+                    </div>
+                  )}
+                  {plausibility.categoryWarnings.map((w) => (
+                    <div key={w.category} className="flex justify-between items-center p-2 rounded border border-amber-200 dark:border-amber-900">
+                      <span>
+                        <strong>{mapBetrkvCategory(w.category)}</strong>: {formatEur(w.previous)} → {formatEur(w.current)}
+                      </span>
+                      <Badge variant="outline" className={w.changePercent > 0 ? "border-red-500 text-red-600" : "border-green-600 text-green-600"}>
+                        {w.changePercent > 0 ? "+" : ""}{w.changePercent} %
+                      </Badge>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle>Umlagefähige Kosten</CardTitle>

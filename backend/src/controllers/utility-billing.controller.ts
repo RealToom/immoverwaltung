@@ -41,6 +41,14 @@ export async function updateSettlementStatus(req: Request, res: Response): Promi
   res.json({ data });
 }
 
+export async function getPlausibilityChecks(req: Request, res: Response): Promise<void> {
+  const propertyId = Number(req.query.propertyId);
+  const year = Number(req.query.year);
+  const svc = new UtilityBillingService(req.companyId!);
+  const data = await svc.runPlausibilityChecks(propertyId, year);
+  res.json({ data });
+}
+
 export async function getStatementDeadlines(req: Request, res: Response): Promise<void> {
   const svc = new UtilityBillingService(req.companyId!);
   const data = await svc.getStatementDeadlines();

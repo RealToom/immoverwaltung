@@ -7,6 +7,7 @@ import {
   generateStatementSchema,
   listDisputesQuerySchema,
   listStatementsQuerySchema,
+  plausibilityQuerySchema,
   prepaymentAdjustmentSchema,
   settlementStatusSchema,
   updateDisputeStatusSchema,
@@ -45,6 +46,7 @@ router.patch(
   validate({ params: idParamSchema, body: settlementStatusSchema }),
   ctrl.updateSettlementStatus
 );
+router.get("/plausibility", validate({ query: plausibilityQuerySchema }), ctrl.getPlausibilityChecks);
 router.get("/statements/deadlines", ctrl.getStatementDeadlines);
 router.get("/statements", validate({ query: listStatementsQuerySchema }), ctrl.listStatements);
 router.get("/statements/:id", validate({ params: idParamSchema }), ctrl.getStatement);

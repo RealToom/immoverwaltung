@@ -1039,6 +1039,88 @@ export class UtilityBillingService {
     });
   }
 
+  /**
+   * Plausibility checks for the wizard: flags allocatable cost categories that
+   * changed by more than 25% against the previous billing period, and reports
+   * the property's operating cost per m² and month against a benchmark band
+   * (Betriebskostenspiegel ≈ 1,50–3,00 €/m²/Monat).
+   */
+  public async runPlausibilityChecks(propertyId: number, year: number) {
+    const property = await prisma.property.findFirst({
+      where: { id: propertyId, companyId: this.companyId },
+    });
+    if (!property) throw new AppError(404, "Immobilie nicht gefunden");
+
+    const startMonth = (property as { billingPeriodStartMonth?: number }).billingPeriodStartMonth;
+    const sumByCategory = async (y: number) => {
+      const { periodStart, periodEnd } = this.resolvePeriod(y, startMonth);
+      const txs = await prisma.transaction.findMany({
+        where: {
+          companyId: this.companyId,
+          propertyId,
+          type: "AUSGABE",
+          allocatable: true,
+          date: { gte: periodStart, lt: addDays(periodEnd, 1) },
+        },
+        select: { amount: true, betrkvCategory: true },
+      });
+      const map = new Map<string, number>();
+      let total = 0;
+      for (const tx of txs) {
+        const cat = tx.betrkvCategory ?? "OHNE_KATEGORIE";
+        const amount = Math.abs(tx.amount);
+        map.set(cat, (map.get(cat) ?? 0) + amount);
+        total += amount;
+      }
+      return { map, total };
+    };
+
+    const current = await sumByCategory(year);
+    const previous = await sumByCategory(year - 1);
+
+    const categoryWarnings: { category: string; current: number; previous: number; changePercent: number }[] = [];
+    for (const [category, amount] of current.map) {
+      const prevAmount = previous.map.get(category) ?? 0;
+      if (prevAmount > 0) {
+        const changePercent = ((amount - prevAmount) / prevAmount) * 100;
+        if (Math.abs(changePercent) > 25) {
+          categoryWarnings.push({
+            category,
+            current: Math.round(amount * 100) / 100,
+            previous: Math.round(prevAmount * 100) / 100,
+            changePercent: Math.round(changePercent * 10) / 10,
+          });
+        }
+      }
+    }
+    categoryWarnings.sort((a, b) => Math.abs(b.changePercent) - Math.abs(a.changePercent));
+
+    const units = await prisma.unit.findMany({
+      where: { propertyId, property: { companyId: this.companyId } },
+      select: { area: true },
+    });
+    const totalArea = units.reduce((sum, u) => sum + u.area, 0);
+    const costPerSqmPerMonth = totalArea > 0 ? Math.round((current.total / totalArea / 12) * 100) / 100 : null;
+
+    let benchmarkHint: string | null = null;
+    if (costPerSqmPerMonth != null) {
+      if (costPerSqmPerMonth > 4) {
+        benchmarkHint = `Die Betriebskosten liegen mit ${costPerSqmPerMonth.toFixed(2)} €/m²/Monat deutlich über dem üblichen Bereich (ca. 1,50–3,00 €/m²/Monat). Bitte die Positionen prüfen.`;
+      } else if (costPerSqmPerMonth > 0 && costPerSqmPerMonth < 0.8) {
+        benchmarkHint = `Die Betriebskosten liegen mit ${costPerSqmPerMonth.toFixed(2)} €/m²/Monat auffällig niedrig — möglicherweise fehlen umlagefähige Positionen.`;
+      }
+    }
+
+    return {
+      year,
+      previousYear: year - 1,
+      hasPreviousData: previous.total > 0,
+      costPerSqmPerMonth,
+      categoryWarnings,
+      benchmarkHint,
+    };
+  }
+
   /** Lists persisted statement snapshots (newest first). */
   public async listStatements(propertyId?: number, year?: number) {
     return prisma.utilityStatement.findMany({

@@ -99,6 +99,24 @@ export function useStatementDeadlines() {
   });
 }
 
+export interface PlausibilityCheck {
+  year: number;
+  previousYear: number;
+  hasPreviousData: boolean;
+  costPerSqmPerMonth: number | null;
+  categoryWarnings: { category: string; current: number; previous: number; changePercent: number }[];
+  benchmarkHint: string | null;
+}
+
+export function usePlausibilityChecks(propertyId: number | null, year: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["utility-billing", "plausibility", propertyId, year],
+    queryFn: () =>
+      api<{ data: PlausibilityCheck }>("/utility-billing/plausibility", { params: { propertyId, year } }),
+    enabled: enabled && !!propertyId,
+  });
+}
+
 export function useGenerateUtilityStatement() {
   return useMutation({
     mutationFn: (data: { propertyId: number; year: number }) =>
