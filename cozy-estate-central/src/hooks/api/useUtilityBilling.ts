@@ -31,6 +31,7 @@ export interface UtilityStatementItem {
   totalPrepaid: number;
   balance: number;
   isRefund: boolean;
+  laborCostShare: number;
 }
 
 export interface UtilityStatement {
@@ -39,6 +40,7 @@ export interface UtilityStatement {
   daysInYear: number;
   totalArea: number;
   totalCosts: number;
+  totalLaborCosts: number;
   co2: { energyClass: string | null; co2Emissions: number | null; landlordPercentage: number; tenantShare: number; landlordShare: number };
   heating: {
     totalCosts: number;

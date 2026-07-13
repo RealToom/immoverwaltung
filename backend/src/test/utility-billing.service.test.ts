@@ -586,4 +586,35 @@ describe("UtilityBillingService", () => {
       expect(result.vorwegabzug).toBeNull();
     });
   });
+
+  describe("§ 35a EStG-Bescheinigung (Lohnkosten)", () => {
+    it("certifies each tenant's proportional deductible labor-cost share", async () => {
+      // HAUSREINIGUNG 1000 with 600 labor portion, two equal tenants → each
+      // pays 500 and can deduct 600 * 500/1000 = 300 under § 35a EStG.
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 70, description: "Treppenreinigung", amount: -1000, betrkvCategory: "HAUSREINIGUNG", maintenanceWarning: null, co2TaxAmount: 0, laborCostAmount: 600 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "EG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+        { id: 2, number: "OG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, type: "WOHNRAUM", startDate: new Date(2025, 0, 1), endDate: null, occupantsCount: 1, unit: { id: 1, number: "EG", area: 50 }, tenant: { id: 7, name: "A" } },
+        { id: 2, type: "WOHNRAUM", startDate: new Date(2025, 0, 1), endDate: null, occupantsCount: 1, unit: { id: 2, number: "OG", area: 50 }, tenant: { id: 8, name: "B" } },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 2, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      expect(result.totalLaborCosts).toBeCloseTo(600, 1);
+      expect(result.items[0].laborCostShare).toBeCloseTo(300, 1);
+      expect(result.items[1].laborCostShare).toBeCloseTo(300, 1);
+    });
+  });
 });

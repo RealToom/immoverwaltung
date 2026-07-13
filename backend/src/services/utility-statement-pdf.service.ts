@@ -35,6 +35,8 @@ export interface TenantStatementPdfInput {
   vacancyDeduction: number;
   /** § 556a BGB: note shown when the property contains commercial units. */
   vorwegabzugNote?: string | null;
+  /** § 35a EStG: the tenant's deductible labor-cost share (Lohnkosten). */
+  laborCostShare?: number;
 }
 
 const DISTRIBUTION_KEY_LABELS: Record<string, string> = {
@@ -156,7 +158,21 @@ export async function generateTenantStatementPdf(
       ? `Ihr Guthaben: ${formatEur(Math.abs(input.balance))}`
       : `Nachzahlung: ${formatEur(Math.abs(input.balance))}`
   );
-  doc.font("Helvetica").moveDown(2);
+  doc.font("Helvetica").moveDown();
+
+  if (input.laborCostShare && input.laborCostShare > 0) {
+    doc.fontSize(13).font("Helvetica-Bold").text("Bescheinigung nach § 35a EStG");
+    doc.font("Helvetica").fontSize(10).moveDown(0.5);
+    doc.text(
+      `In Ihrem Kostenanteil enthaltene Lohn-/Arbeitskosten für haushaltsnahe Dienst- und ` +
+        `Handwerkerleistungen: ${formatEur(input.laborCostShare)}. Hiervon können Sie 20 % ` +
+        `(${formatEur(Math.round(input.laborCostShare * 0.2 * 100) / 100)}) gemäß § 35a EStG von Ihrer ` +
+        `Einkommensteuer absetzen.`
+    );
+    doc.moveDown(2);
+  } else {
+    doc.moveDown();
+  }
 
   doc
     .fontSize(8)

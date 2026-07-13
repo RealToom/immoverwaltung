@@ -530,6 +530,9 @@ export default function UtilityBillingWizard() {
                         <th className="text-left p-3 font-medium">Einheit</th>
                         <th className="text-right p-3 font-medium">Kostenanteil</th>
                         <th className="text-right p-3 font-medium">Vorauszahlungen</th>
+                        {(statement?.totalLaborCosts ?? 0) > 0 && (
+                          <th className="text-right p-3 font-medium" title="§ 35a EStG absetzbare Lohnkosten">§ 35a</th>
+                        )}
                         <th className="text-right p-3 font-medium">Saldo</th>
                         {finalizedItems && <th className="text-right p-3 font-medium">PDF</th>}
                       </tr>
@@ -541,6 +544,9 @@ export default function UtilityBillingWizard() {
                           <td className="p-3">{item.unitNumber}</td>
                           <td className="p-3 text-right font-medium">{formatEur(item.amount)}</td>
                           <td className="p-3 text-right">{formatEur(item.totalPrepaid)}</td>
+                          {(statement?.totalLaborCosts ?? 0) > 0 && (
+                            <td className="p-3 text-right text-muted-foreground">{formatEur(item.laborCostShare)}</td>
+                          )}
                           <td className={`p-3 text-right font-medium ${item.isRefund ? "text-green-600" : "text-red-600"}`}>
                             {item.isRefund ? "+" : "−"}{formatEur(Math.abs(item.balance))}
                           </td>

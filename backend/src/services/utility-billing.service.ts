@@ -618,7 +618,19 @@ export class UtilityBillingService {
         totalPrepaid: Math.round(balance.totalPrepaid * 100) / 100,
         balance: Math.round(balance.balance * 100) / 100,
         isRefund: balance.isRefund,
+        // § 35a EStG deductible labor share (filled in below).
+        laborCostShare: 0,
       });
+    }
+
+    // § 35a EStG: certify each tenant's proportional share of the labor
+    // (Lohn-)costs contained in the allocatable expenses (20% deductible).
+    const totalLaborCosts = transactions.reduce((sum, tx) => sum + (tx.laborCostAmount ?? 0), 0);
+    const allocatedTotal = items.reduce((sum, i) => sum + i.amount, 0);
+    if (totalLaborCosts > 0 && allocatedTotal > 0) {
+      for (const item of items) {
+        item.laborCostShare = Math.round(totalLaborCosts * (item.amount / allocatedTotal) * 100) / 100;
+      }
     }
 
     // § 556a BGB Vorwegabzug: commercial (GEWERBE) units carry their own
@@ -649,6 +661,7 @@ export class UtilityBillingService {
       daysInYear,
       totalArea,
       totalCosts: Math.round(grossCosts * 100) / 100,
+      totalLaborCosts: Math.round(totalLaborCosts * 100) / 100,
       distributionKeys,
       vorwegabzug,
       co2: {
@@ -798,6 +811,7 @@ export class UtilityBillingService {
               }
             : null,
           vacancyDeduction: statement.vacancy?.amount ?? 0,
+          laborCostShare: item.laborCostShare,
         },
         filePath
       );
