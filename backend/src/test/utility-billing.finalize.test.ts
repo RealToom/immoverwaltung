@@ -94,7 +94,7 @@ function mockNoVacancyFullYearScenario() {
 describe("UtilityBillingService.finalizeStatement", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockStatementCreate.mockResolvedValue({ id: 500 });
+    mockStatementCreate.mockResolvedValue({ id: 500, items: [{ id: 5001, contractId: 42, settlementStatus: "OFFEN" }] });
     mockStatementUpdateMany.mockResolvedValue({ count: 0 });
     mockTenantUserFindFirst.mockResolvedValue(null);
     mockStatementItemUpdateMany.mockResolvedValue({ count: 1 });

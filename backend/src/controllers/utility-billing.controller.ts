@@ -34,6 +34,13 @@ export async function applyPrepaymentAdjustment(req: Request, res: Response): Pr
   res.json({ data });
 }
 
+export async function updateSettlementStatus(req: Request, res: Response): Promise<void> {
+  const { settlementStatus } = req.body as { settlementStatus: "OFFEN" | "BEZAHLT" | "VERRECHNET" };
+  const svc = new UtilityBillingService(req.companyId!);
+  const data = await svc.updateSettlementStatus(Number(req.params.id), settlementStatus);
+  res.json({ data });
+}
+
 export async function getStatementDeadlines(req: Request, res: Response): Promise<void> {
   const svc = new UtilityBillingService(req.companyId!);
   const data = await svc.getStatementDeadlines();

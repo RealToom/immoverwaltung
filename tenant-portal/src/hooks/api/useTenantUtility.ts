@@ -13,6 +13,8 @@ export interface TenantUtilitySummary {
   totalPrepaid: number;
   balance: number;
   isRefund: boolean;
+  settlementStatus: string | null;
+  settledAt: string | null;
   categories: TenantUtilityCategory[];
 }
 

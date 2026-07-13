@@ -863,7 +863,14 @@ export class UtilityBillingService {
           })),
         },
       },
+      include: { items: { select: { id: true, contractId: true, settlementStatus: true } } },
     });
+
+    // Link each result item to its persisted snapshot item so the admin UI can
+    // manage payment settlement (Nachzahlung/Guthaben) per tenant.
+    const itemIdByContract = new Map<number, { id: number; settlementStatus: string }>(
+      (statementRecord.items ?? []).map((it) => [it.contractId, { id: it.id, settlementStatus: it.settlementStatus }])
+    );
 
     await prisma.utilityStatement.updateMany({
       where: { propertyId, companyId: this.companyId, year, status: "FINALISIERT", id: { not: statementRecord.id } },
@@ -894,7 +901,16 @@ export class UtilityBillingService {
       });
     }
 
-    return { propertyId, year, generatedCount, statementId: statementRecord.id, items: itemsWithDocuments };
+    const resultItems = itemsWithDocuments.map((item) => {
+      const link = itemIdByContract.get(item.contractId);
+      return {
+        ...item,
+        statementItemId: link?.id ?? null,
+        settlementStatus: link?.settlementStatus ?? "OFFEN",
+      };
+    });
+
+    return { propertyId, year, generatedCount, statementId: statementRecord.id, items: resultItems };
   }
 
   /**
@@ -988,6 +1004,25 @@ export class UtilityBillingService {
       where: { id: contractId },
       data: { utilityPrepayment },
       select: { id: true, utilityPrepayment: true },
+    });
+  }
+
+  /**
+   * Payment settlement of a statement item (Nachzahlung/Guthaben): mark it
+   * BEZAHLT/VERRECHNET (stamps settledAt) or reset to OFFEN.
+   */
+  public async updateSettlementStatus(
+    itemId: number,
+    settlementStatus: "OFFEN" | "BEZAHLT" | "VERRECHNET"
+  ) {
+    const item = await prisma.utilityStatementItem.findFirst({
+      where: { id: itemId, companyId: this.companyId },
+    });
+    if (!item) throw new AppError(404, "Abrechnungsposten nicht gefunden");
+    return prisma.utilityStatementItem.update({
+      where: { id: itemId },
+      data: { settlementStatus, settledAt: settlementStatus === "OFFEN" ? null : new Date() },
+      select: { id: true, settlementStatus: true, settledAt: true },
     });
   }
 

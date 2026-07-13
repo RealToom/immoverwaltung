@@ -399,6 +399,8 @@ export async function getUtilitySummary(tenantUser: TenantUser, year?: number) {
       balance: snapshotItem.balance,
       isRefund: snapshotItem.isRefund,
       suggestedPrepayment: snapshotItem.suggestedPrepayment,
+      settlementStatus: snapshotItem.settlementStatus,
+      settledAt: snapshotItem.settledAt,
       categories,
     };
   }
@@ -421,6 +423,8 @@ export async function getUtilitySummary(tenantUser: TenantUser, year?: number) {
     balance: item?.balance ?? 0,
     isRefund: item?.isRefund ?? false,
     suggestedPrepayment: null,
+    settlementStatus: null,
+    settledAt: null,
     categories,
   };
 }

@@ -26,3 +26,7 @@ export const distributionKeysSchema = z.object({
 export const prepaymentAdjustmentSchema = z.object({
   utilityPrepayment: z.number().min(0).max(100000),
 });
+
+export const settlementStatusSchema = z.object({
+  settlementStatus: z.enum(["OFFEN", "BEZAHLT", "VERRECHNET"]),
+});

@@ -135,6 +135,18 @@ export function useUpdateDisputeStatus() {
 
 export interface FinalizedStatementItem extends UtilityStatementItem {
   documentId: number | null;
+  statementItemId: number | null;
+  settlementStatus: string;
+}
+
+export function useUpdateSettlementStatus() {
+  return useMutation({
+    mutationFn: ({ itemId, settlementStatus }: { itemId: number; settlementStatus: string }) =>
+      api(`/utility-billing/statements/items/${itemId}/settlement`, {
+        method: "PATCH",
+        body: { settlementStatus },
+      }),
+  });
 }
 
 export interface FinalizeStatementResult {

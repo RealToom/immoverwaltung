@@ -42,6 +42,12 @@ export default function UtilityTransparency() {
                   <p className="text-xs text-gray-500 mt-1">
                     Kostenanteil: {formatEur(data.totalCosts)} — Vorauszahlungen: {formatEur(data.totalPrepaid)}
                   </p>
+                  {data.settlementStatus && data.settlementStatus !== "OFFEN" && (
+                    <span className="inline-block mt-2 text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                      {data.settlementStatus === "VERRECHNET" ? "Verrechnet" : "Bezahlt"}
+                      {data.settledAt ? ` am ${new Date(data.settledAt).toLocaleDateString("de-DE")}` : ""}
+                    </span>
+                  )}
                 </div>
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center ${data.balance < 0 ? "bg-red-100" : "bg-green-100"}`}>
                   <CreditCard className={`w-6 h-6 ${data.balance < 0 ? "text-red-600" : "text-green-600"}`} />

@@ -7,11 +7,11 @@ import { CheckCircle2, ChevronRight, Settings, Send, AlertTriangle, Leaf, Buildi
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useProperties } from "@/hooks/api/useProperties";
-import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement, useStatementDeadlines, useSetDistributionKeys, useApplyPrepaymentAdjustment } from "@/hooks/api/useUtilityBilling";
+import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement, useStatementDeadlines, useSetDistributionKeys, useApplyPrepaymentAdjustment, useUpdateSettlementStatus } from "@/hooks/api/useUtilityBilling";
 import type { UtilityStatementTransaction, FinalizedStatementItem } from "@/hooks/api/useUtilityBilling";
 import { useUpdateTransaction } from "@/hooks/api/useFinance";
 import { useDownloadDocument } from "@/hooks/api/useDocuments";
-import { BETRKV_LABELS, mapBetrkvCategory, mapDisputeStatus, DISTRIBUTION_KEY_LABELS } from "@/lib/mappings";
+import { BETRKV_LABELS, mapBetrkvCategory, mapDisputeStatus, DISTRIBUTION_KEY_LABELS, mapSettlementStatus } from "@/lib/mappings";
 
 const BETRKV_CATEGORIES = Object.keys(BETRKV_LABELS);
 
@@ -39,6 +39,25 @@ export default function UtilityBillingWizard() {
   const deadlines = deadlinesRes?.data ?? [];
   const setDistributionKeys = useSetDistributionKeys();
   const applyPrepayment = useApplyPrepaymentAdjustment();
+  const updateSettlement = useUpdateSettlementStatus();
+
+  const handleSettle = (item: FinalizedStatementItem, status: string) => {
+    if (!item.statementItemId) return;
+    updateSettlement.mutate(
+      { itemId: item.statementItemId, settlementStatus: status },
+      {
+        onSuccess: () => {
+          setFinalizedItems((prev) =>
+            prev
+              ? prev.map((i) => (i.statementItemId === item.statementItemId ? { ...i, settlementStatus: status } : i))
+              : prev
+          );
+          toast({ title: "Zahlungsstatus aktualisiert", description: `${item.tenantName}: ${mapSettlementStatus(status)}` });
+        },
+        onError: (err: unknown) => toast({ title: "Aktualisierung fehlgeschlagen", description: String(err), variant: "destructive" }),
+      }
+    );
+  };
 
   const handleApplyPrepayment = (contractId: number, amount: number) => {
     applyPrepayment.mutate(
@@ -546,6 +565,7 @@ export default function UtilityBillingWizard() {
                         )}
                         <th className="text-right p-3 font-medium">Saldo</th>
                         <th className="text-right p-3 font-medium" title="§ 560 Abs. 4 BGB: 1/12 des Kostenanteils">Neue VZ</th>
+                        {finalizedItems && <th className="text-right p-3 font-medium">Zahlung</th>}
                         {finalizedItems && <th className="text-right p-3 font-medium">PDF</th>}
                       </tr>
                     </thead>
@@ -577,6 +597,35 @@ export default function UtilityBillingWizard() {
                               </Button>
                             </div>
                           </td>
+                          {finalizedItems && (
+                            <td className="p-3 text-right">
+                              {"settlementStatus" in item && (
+                                <div className="flex items-center justify-end gap-2">
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      (item as FinalizedStatementItem).settlementStatus === "OFFEN"
+                                        ? "border-amber-500 text-amber-600"
+                                        : "border-green-500 text-green-600"
+                                    }
+                                  >
+                                    {mapSettlementStatus((item as FinalizedStatementItem).settlementStatus)}
+                                  </Badge>
+                                  {(item as FinalizedStatementItem).settlementStatus === "OFFEN" && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      disabled={updateSettlement.isPending}
+                                      onClick={() => handleSettle(item as FinalizedStatementItem, "BEZAHLT")}
+                                    >
+                                      Bezahlt
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          )}
                           {finalizedItems && (
                             <td className="p-3 text-right">
                               {"documentId" in item && item.documentId ? (

@@ -212,3 +212,11 @@ export const DISTRIBUTION_KEY_LABELS: Record<string, string> = {
   WOHNEINHEIT: "Wohneinheit",
 };
 export const mapDistributionKey = (s: string) => DISTRIBUTION_KEY_LABELS[s] ?? s;
+
+// ─── Zahlungsstatus (Nachzahlung/Guthaben) ──────────────────
+export const SETTLEMENT_STATUS_LABELS: Record<string, string> = {
+  OFFEN: "Offen",
+  BEZAHLT: "Bezahlt",
+  VERRECHNET: "Verrechnet",
+};
+export const mapSettlementStatus = (s: string) => SETTLEMENT_STATUS_LABELS[s] ?? s;
