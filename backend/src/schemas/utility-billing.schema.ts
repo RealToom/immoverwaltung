@@ -22,3 +22,7 @@ export const updateDisputeStatusSchema = z.object({
 export const distributionKeysSchema = z.object({
   costConfiguration: z.record(z.string(), z.enum(["WOHNFLAECHE", "PERSONEN", "WOHNEINHEIT"])),
 });
+
+export const prepaymentAdjustmentSchema = z.object({
+  utilityPrepayment: z.number().min(0).max(100000),
+});

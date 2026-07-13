@@ -27,6 +27,13 @@ export async function setDistributionKeys(req: Request, res: Response): Promise<
   res.json({ data });
 }
 
+export async function applyPrepaymentAdjustment(req: Request, res: Response): Promise<void> {
+  const { utilityPrepayment } = req.body as { utilityPrepayment: number };
+  const svc = new UtilityBillingService(req.companyId!);
+  const data = await svc.applyPrepaymentAdjustment(Number(req.params.id), utilityPrepayment);
+  res.json({ data });
+}
+
 export async function getStatementDeadlines(req: Request, res: Response): Promise<void> {
   const svc = new UtilityBillingService(req.companyId!);
   const data = await svc.getStatementDeadlines();

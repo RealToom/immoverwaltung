@@ -618,6 +618,8 @@ export class UtilityBillingService {
         totalPrepaid: Math.round(balance.totalPrepaid * 100) / 100,
         balance: Math.round(balance.balance * 100) / 100,
         isRefund: balance.isRefund,
+        // § 560 Abs. 4 BGB: angemessene neue Vorauszahlung = 1/12 des Kostenanteils.
+        suggestedPrepayment: Math.round((share / 12) * 100) / 100,
         // § 35a EStG deductible labor share (filled in below).
         laborCostShare: 0,
       });
@@ -970,6 +972,22 @@ export class UtilityBillingService {
       where: { id: propertyId },
       data: { costConfiguration },
       select: { id: true, costConfiguration: true },
+    });
+  }
+
+  /**
+   * § 560 Abs. 4 BGB: applies an adjusted monthly utility prepayment to a
+   * contract (one-click from the wizard's suggested value).
+   */
+  public async applyPrepaymentAdjustment(contractId: number, utilityPrepayment: number) {
+    const contract = await prisma.contract.findFirst({
+      where: { id: contractId, companyId: this.companyId },
+    });
+    if (!contract) throw new AppError(404, "Vertrag nicht gefunden");
+    return prisma.contract.update({
+      where: { id: contractId },
+      data: { utilityPrepayment },
+      select: { id: true, utilityPrepayment: true },
     });
   }
 

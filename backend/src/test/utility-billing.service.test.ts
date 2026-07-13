@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const {
   mockEnergyPassportFindUnique, mockContractFindUnique, mockRentPaymentFindMany,
   mockPropertyFindFirst, mockTransactionFindMany, mockUnitFindMany, mockContractFindMany,
-  mockMeterFindMany,
+  mockMeterFindMany, mockContractFindFirst, mockContractUpdate,
 } = vi.hoisted(() => ({
   mockEnergyPassportFindUnique: vi.fn(),
   mockContractFindUnique: vi.fn(),
@@ -14,12 +14,19 @@ const {
   mockUnitFindMany: vi.fn(),
   mockContractFindMany: vi.fn(),
   mockMeterFindMany: vi.fn(),
+  mockContractFindFirst: vi.fn(),
+  mockContractUpdate: vi.fn(),
 }));
 
 vi.mock("../lib/prisma.js", () => ({
   prisma: {
     energyPassport: { findUnique: mockEnergyPassportFindUnique },
-    contract: { findUnique: mockContractFindUnique, findMany: mockContractFindMany },
+    contract: {
+      findUnique: mockContractFindUnique,
+      findMany: mockContractFindMany,
+      findFirst: mockContractFindFirst,
+      update: mockContractUpdate,
+    },
     rentPayment: { findMany: mockRentPaymentFindMany },
     property: { findFirst: mockPropertyFindFirst },
     transaction: { findMany: mockTransactionFindMany },
@@ -615,6 +622,46 @@ describe("UtilityBillingService", () => {
       expect(result.totalLaborCosts).toBeCloseTo(600, 1);
       expect(result.items[0].laborCostShare).toBeCloseTo(300, 1);
       expect(result.items[1].laborCostShare).toBeCloseTo(300, 1);
+    });
+  });
+
+  describe("Vorauszahlungs-Anpassung (§ 560 Abs. 4 BGB)", () => {
+    it("suggests a new monthly prepayment of 1/12 of the settled costs on each item", async () => {
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 80, description: "Betriebskosten", amount: -1200, betrkvCategory: "SONSTIGES", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "EG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, type: "WOHNRAUM", startDate: new Date(2025, 0, 1), endDate: null, occupantsCount: 1, unit: { id: 1, number: "EG", area: 50 }, tenant: { id: 7, name: "Mieter" } },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      // 1200 / 12 = 100
+      expect(result.items[0].suggestedPrepayment).toBeCloseTo(100, 2);
+    });
+
+    it("applyPrepaymentAdjustment writes the new prepayment onto the contract", async () => {
+      mockContractFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockContractUpdate.mockResolvedValueOnce({ id: 1, utilityPrepayment: 100 });
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.applyPrepaymentAdjustment(1, 100);
+
+      expect(mockContractFindFirst).toHaveBeenCalledWith({ where: { id: 1, companyId: 1 } });
+      expect(mockContractUpdate).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { utilityPrepayment: 100 },
+        select: { id: true, utilityPrepayment: true },
+      });
+      expect(result.utilityPrepayment).toBe(100);
     });
   });
 });

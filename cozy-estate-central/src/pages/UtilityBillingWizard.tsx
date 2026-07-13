@@ -7,7 +7,7 @@ import { CheckCircle2, ChevronRight, Settings, Send, AlertTriangle, Leaf, Buildi
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useProperties } from "@/hooks/api/useProperties";
-import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement, useStatementDeadlines, useSetDistributionKeys } from "@/hooks/api/useUtilityBilling";
+import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement, useStatementDeadlines, useSetDistributionKeys, useApplyPrepaymentAdjustment } from "@/hooks/api/useUtilityBilling";
 import type { UtilityStatementTransaction, FinalizedStatementItem } from "@/hooks/api/useUtilityBilling";
 import { useUpdateTransaction } from "@/hooks/api/useFinance";
 import { useDownloadDocument } from "@/hooks/api/useDocuments";
@@ -38,6 +38,17 @@ export default function UtilityBillingWizard() {
   const { data: deadlinesRes } = useStatementDeadlines();
   const deadlines = deadlinesRes?.data ?? [];
   const setDistributionKeys = useSetDistributionKeys();
+  const applyPrepayment = useApplyPrepaymentAdjustment();
+
+  const handleApplyPrepayment = (contractId: number, amount: number) => {
+    applyPrepayment.mutate(
+      { contractId, utilityPrepayment: amount },
+      {
+        onSuccess: () => toast({ title: "Vorauszahlung angepasst", description: `Neue monatliche Vorauszahlung: ${formatEur(amount)} (§ 560 Abs. 4 BGB).` }),
+        onError: (err: unknown) => toast({ title: "Anpassung fehlgeschlagen", description: String(err), variant: "destructive" }),
+      }
+    );
+  };
   const [finalizedItems, setFinalizedItems] = useState<FinalizedStatementItem[] | null>(null);
 
   const regenerate = () => {
@@ -534,6 +545,7 @@ export default function UtilityBillingWizard() {
                           <th className="text-right p-3 font-medium" title="§ 35a EStG absetzbare Lohnkosten">§ 35a</th>
                         )}
                         <th className="text-right p-3 font-medium">Saldo</th>
+                        <th className="text-right p-3 font-medium" title="§ 560 Abs. 4 BGB: 1/12 des Kostenanteils">Neue VZ</th>
                         {finalizedItems && <th className="text-right p-3 font-medium">PDF</th>}
                       </tr>
                     </thead>
@@ -549,6 +561,21 @@ export default function UtilityBillingWizard() {
                           )}
                           <td className={`p-3 text-right font-medium ${item.isRefund ? "text-green-600" : "text-red-600"}`}>
                             {item.isRefund ? "+" : "−"}{formatEur(Math.abs(item.balance))}
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-muted-foreground">{formatEur(item.suggestedPrepayment)}</span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs"
+                                title="Neue Vorauszahlung in den Vertrag übernehmen"
+                                disabled={applyPrepayment.isPending}
+                                onClick={() => handleApplyPrepayment(item.contractId, item.suggestedPrepayment)}
+                              >
+                                Übernehmen
+                              </Button>
+                            </div>
                           </td>
                           {finalizedItems && (
                             <td className="p-3 text-right">

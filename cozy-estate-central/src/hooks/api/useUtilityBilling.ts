@@ -32,6 +32,17 @@ export interface UtilityStatementItem {
   balance: number;
   isRefund: boolean;
   laborCostShare: number;
+  suggestedPrepayment: number;
+}
+
+export function useApplyPrepaymentAdjustment() {
+  return useMutation({
+    mutationFn: ({ contractId, utilityPrepayment }: { contractId: number; utilityPrepayment: number }) =>
+      api(`/utility-billing/contracts/${contractId}/prepayment`, {
+        method: "PATCH",
+        body: { utilityPrepayment },
+      }),
+  });
 }
 
 export interface UtilityStatement {

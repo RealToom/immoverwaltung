@@ -7,6 +7,7 @@ import {
   generateStatementSchema,
   listDisputesQuerySchema,
   listStatementsQuerySchema,
+  prepaymentAdjustmentSchema,
   updateDisputeStatusSchema,
 } from "../schemas/utility-billing.schema.js";
 import * as ctrl from "../controllers/utility-billing.controller.js";
@@ -30,6 +31,12 @@ router.patch(
   requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
   validate({ params: idParamSchema, body: distributionKeysSchema }),
   ctrl.setDistributionKeys
+);
+router.patch(
+  "/contracts/:id/prepayment",
+  requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
+  validate({ params: idParamSchema, body: prepaymentAdjustmentSchema }),
+  ctrl.applyPrepaymentAdjustment
 );
 router.get("/statements/deadlines", ctrl.getStatementDeadlines);
 router.get("/statements", validate({ query: listStatementsQuerySchema }), ctrl.listStatements);
