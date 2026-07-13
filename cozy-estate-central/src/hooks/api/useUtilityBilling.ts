@@ -52,6 +52,7 @@ export interface UtilityStatement {
   } | null;
   vacancy: { amount: number; vacancyDays: number; affectedUnits: string[] } | null;
   distributionKeys: Record<string, string>;
+  vorwegabzug: { commercialUnits: string[]; commercialCosts: number; sharePercent: number; note: string } | null;
   items: UtilityStatementItem[];
   transactions: UtilityStatementTransaction[];
   unallocatedTransactions: UnallocatedTransaction[];

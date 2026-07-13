@@ -343,6 +343,24 @@ export default function UtilityBillingWizard() {
                   </Card>
                 )}
 
+                {statement.vorwegabzug && (
+                  <Card className="border-indigo-200 dark:border-indigo-900">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-indigo-700 dark:text-indigo-400">
+                        <Building2 className="w-5 h-5" />
+                        Vorwegabzug Gewerbe (§ 556a BGB)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                      <p>
+                        Gewerbeeinheiten (<strong>{statement.vorwegabzug.commercialUnits.join(", ")}</strong>) tragen{" "}
+                        <strong>{formatEur(statement.vorwegabzug.commercialCosts)}</strong> ({statement.vorwegabzug.sharePercent} % der Gesamtkosten).
+                        Dieser Anteil wird vorweg abgezogen — Wohnraummieter tragen nur den Wohnanteil.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="flex justify-end mt-6">
                   <Button onClick={() => setActiveTab("validation")}>
                     Weiter zur Kosten-Prüfung

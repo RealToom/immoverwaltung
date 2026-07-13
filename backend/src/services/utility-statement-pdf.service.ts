@@ -33,6 +33,8 @@ export interface TenantStatementPdfInput {
     estimationNotice?: string;
   } | null;
   vacancyDeduction: number;
+  /** § 556a BGB: note shown when the property contains commercial units. */
+  vorwegabzugNote?: string | null;
 }
 
 const DISTRIBUTION_KEY_LABELS: Record<string, string> = {
@@ -137,6 +139,12 @@ export async function generateTenantStatementPdf(
     doc.fontSize(10).font("Helvetica-Bold").fillColor("#8a6d00").text("Hinweis zur Verbrauchsschätzung");
     doc.font("Helvetica").text(input.heating.estimationNotice);
     doc.fillColor("#000000").moveDown();
+  }
+
+  if (input.vorwegabzugNote) {
+    doc.fontSize(10).font("Helvetica-Bold").text("Vorwegabzug Gewerbe (§ 556a BGB)");
+    doc.font("Helvetica").text(input.vorwegabzugNote);
+    doc.moveDown();
   }
 
   doc.fontSize(13).font("Helvetica-Bold").text("Ergebnis");

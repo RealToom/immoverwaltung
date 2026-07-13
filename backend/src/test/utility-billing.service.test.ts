@@ -531,4 +531,59 @@ describe("UtilityBillingService", () => {
       expect(result.items[1].amount).toBeCloseTo(100, 1);
     });
   });
+
+  describe("Vorwegabzug Gewerbe (§ 556a BGB)", () => {
+    it("quantifies the commercial share and leaves the residential share proportional", async () => {
+      // One residential (WOHNRAUM) + one commercial (GEWERBE) unit, 50 m² each.
+      // 1000 SONSTIGES by area → 500 residential / 500 commercial (vorweg).
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 60, description: "Betriebskosten", amount: -1000, betrkvCategory: "SONSTIGES", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "EG Wohnung", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+        { id: 2, number: "EG Laden", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, type: "WOHNRAUM", startDate: new Date(2025, 0, 1), endDate: null, occupantsCount: 1, unit: { id: 1, number: "EG Wohnung", area: 50 }, tenant: { id: 7, name: "Wohnmieter" } },
+        { id: 2, type: "GEWERBE", startDate: new Date(2025, 0, 1), endDate: null, occupantsCount: 1, unit: { id: 2, number: "EG Laden", area: 50 }, tenant: { id: 8, name: "Ladenbetreiber" } },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 2, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      expect(result.vorwegabzug).not.toBeNull();
+      expect(result.vorwegabzug?.commercialCosts).toBeCloseTo(500, 1);
+      expect(result.vorwegabzug?.sharePercent).toBeCloseTo(50, 1);
+      expect(result.vorwegabzug?.commercialUnits).toEqual(["EG Laden"]);
+      // Residential tenant is unaffected by the commercial cost driver.
+      expect(result.items[0].amount).toBeCloseTo(500, 1);
+    });
+
+    it("returns no Vorwegabzug when there are no commercial contracts", async () => {
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 61, description: "Betriebskosten", amount: -1000, betrkvCategory: "SONSTIGES", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "EG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, type: "WOHNRAUM", startDate: new Date(2025, 0, 1), endDate: null, occupantsCount: 1, unit: { id: 1, number: "EG", area: 50 }, tenant: { id: 7, name: "Mieter" } },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      expect(result.vorwegabzug).toBeNull();
+    });
+  });
 });

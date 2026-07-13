@@ -621,6 +621,28 @@ export class UtilityBillingService {
       });
     }
 
+    // § 556a BGB Vorwegabzug: commercial (GEWERBE) units carry their own
+    // proportional share; residential tenants are not burdened by commercial
+    // cost drivers. The area/consumption distribution already assigns each
+    // commercial contract its share — this surfaces the deducted amount.
+    const commercialIds = new Set(
+      contracts.filter((c) => c.type === "GEWERBE").map((c) => c.id)
+    );
+    const commercialItems = items.filter((i) => commercialIds.has(i.contractId));
+    const commercialCosts = commercialItems.reduce((sum, i) => sum + i.amount, 0);
+    const vorwegabzug =
+      commercialItems.length > 0
+        ? {
+            commercialUnits: commercialItems.map((i) => i.unitNumber),
+            commercialCosts: Math.round(commercialCosts * 100) / 100,
+            sharePercent:
+              grossCosts > 0 ? Math.round((commercialCosts / grossCosts) * 1000) / 10 : 0,
+            note:
+              "§ 556a BGB: Die auf Gewerbeeinheiten entfallenden Betriebskosten wurden nach Fläche/Verbrauch " +
+              "vorweg abgezogen und den gewerblichen Nutzern direkt zugeordnet. Wohnraummieter tragen nur den Wohnanteil.",
+          }
+        : null;
+
     return {
       year,
       propertyId,
@@ -628,6 +650,7 @@ export class UtilityBillingService {
       totalArea,
       totalCosts: Math.round(grossCosts * 100) / 100,
       distributionKeys,
+      vorwegabzug,
       co2: {
         energyClass: passport?.energyClass ?? null,
         co2Emissions: passport?.co2Emissions ?? null,
@@ -759,6 +782,12 @@ export class UtilityBillingService {
           totalCosts: statement.totalCosts,
           categories,
           distributionKeys: statement.distributionKeys,
+          // Show the § 556a note to residential tenants (not to the commercial
+          // unit itself, which is the one whose share was deducted vorweg).
+          vorwegabzugNote:
+            statement.vorwegabzug && !statement.vorwegabzug.commercialUnits.includes(item.unitNumber)
+              ? statement.vorwegabzug.note
+              : null,
           co2: statement.co2.landlordShare > 0 ? statement.co2 : null,
           heating: statement.heating
             ? {
