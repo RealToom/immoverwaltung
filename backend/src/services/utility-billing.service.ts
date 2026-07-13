@@ -8,7 +8,9 @@ import fs from "node:fs";
 import { env } from "../config/env.js";
 import * as documentService from "./document.service.js";
 import { generateTenantStatementPdf } from "./utility-statement-pdf.service.js";
+import { sendUtilityStatementEmail } from "./email.service.js";
 import { buildTenantCategoryLines } from "../lib/betrkv.js";
+import { logger } from "../lib/logger.js";
 
 /**
  * Utility Billing Service - Handles calculations according to German laws (BetrKV, HeizkostenV)
@@ -718,7 +720,93 @@ export class UtilityBillingService {
       data: { status: "KORRIGIERT", supersededById: statementRecord.id },
     });
 
+    // § 556 Zustellung: Mieter mit Portal-Konto elektronisch benachrichtigen und
+    // den Zustellzeitpunkt auf dem Snapshot-Item festhalten (Fristnachweis).
+    for (const item of itemsWithDocuments) {
+      const tenantUser = await prisma.tenantUser.findFirst({
+        where: { tenantId: item.tenantId, companyId: this.companyId },
+        select: { email: true },
+      });
+      if (!tenantUser) continue;
+
+      await sendUtilityStatementEmail(this.companyId, {
+        to: tenantUser.email,
+        tenantName: item.tenantName,
+        propertyName: property.name,
+        year,
+        balance: item.balance,
+        isRefund: item.isRefund,
+      }).catch((err) => logger.error({ err }, "Zustellung der Nebenkostenabrechnung per E-Mail fehlgeschlagen"));
+
+      await prisma.utilityStatementItem.updateMany({
+        where: { statementId: statementRecord.id, tenantId: item.tenantId },
+        data: { deliveredAt: new Date() },
+      });
+    }
+
     return { propertyId, year, generatedCount, statementId: statementRecord.id, items: itemsWithDocuments };
+  }
+
+  /**
+   * § 556 Abs. 3 BGB Fristverfolgung: für jede Immobilie der letzten beiden
+   * Abrechnungsjahre die noch nicht finalisierten Perioden mit anfallenden
+   * Kosten, inkl. Zustellfrist (Periodenende + 12 Monate) und Resttagen.
+   */
+  public async getStatementDeadlines() {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const candidateYears = [currentYear - 2, currentYear - 1];
+
+    const [properties, finalized, costTx] = await Promise.all([
+      prisma.property.findMany({
+        where: { companyId: this.companyId },
+        select: { id: true, name: true },
+      }),
+      prisma.utilityStatement.findMany({
+        where: { companyId: this.companyId, status: "FINALISIERT" },
+        select: { propertyId: true, year: true },
+      }),
+      prisma.transaction.findMany({
+        where: {
+          companyId: this.companyId,
+          type: "AUSGABE",
+          allocatable: true,
+          date: { gte: new Date(candidateYears[0], 0, 1), lt: new Date(currentYear, 0, 1) },
+        },
+        select: { propertyId: true, date: true },
+      }),
+    ]);
+
+    const finalizedSet = new Set(finalized.map((s) => `${s.propertyId}-${s.year}`));
+    const costSet = new Set(costTx.map((t) => `${t.propertyId}-${t.date.getFullYear()}`));
+
+    const deadlines: {
+      propertyId: number;
+      propertyName: string;
+      year: number;
+      deadline: Date;
+      daysRemaining: number;
+      overdue: boolean;
+    }[] = [];
+
+    for (const property of properties) {
+      for (const year of candidateYears) {
+        const key = `${property.id}-${year}`;
+        if (finalizedSet.has(key) || !costSet.has(key)) continue;
+        const deadline = new Date(year + 1, 11, 31);
+        const daysRemaining = Math.ceil((deadline.getTime() - today.getTime()) / 86_400_000);
+        deadlines.push({
+          propertyId: property.id,
+          propertyName: property.name,
+          year,
+          deadline,
+          daysRemaining,
+          overdue: daysRemaining < 0,
+        });
+      }
+    }
+
+    return deadlines.sort((a, b) => a.daysRemaining - b.daysRemaining);
   }
 
   /** Lists persisted statement snapshots (newest first). */

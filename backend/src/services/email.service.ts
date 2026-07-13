@@ -136,6 +136,32 @@ export async function notifyRentPayment(
   await Promise.allSettled(recipients.map((to) => sendMailForCompany(companyId, to, subject, html)));
 }
 
+export async function sendUtilityStatementEmail(
+  companyId: number,
+  data: { to: string; tenantName: string; propertyName: string; year: number; balance: number; isRefund: boolean }
+): Promise<void> {
+  if (!isEmailEnabled) return;
+
+  const amount = Math.abs(data.balance).toLocaleString("de-DE", { style: "currency", currency: "EUR" });
+  const resultLine = data.isRefund
+    ? `Sie erhalten ein <strong>Guthaben von ${amount}</strong>.`
+    : `Es ergibt sich eine <strong>Nachzahlung von ${amount}</strong>.`;
+
+  const subject = `Ihre Nebenkostenabrechnung ${data.year} - ${escHtml(data.propertyName)}`;
+  const html = htmlWrapper("Nebenkostenabrechnung " + data.year, `
+    <p>Hallo ${escHtml(data.tenantName)},</p>
+    <p>Ihre Betriebskostenabrechnung für das Jahr ${data.year} zur Immobilie
+       <strong>${escHtml(data.propertyName)}</strong> steht in Ihrem Mieterportal bereit.</p>
+    <p>${resultLine}</p>
+    <p style="font-size: 13px; color: #6b7280;">
+      Die vollständige Abrechnung inkl. Verteilerschlüssel und Belegen finden Sie im Portal.
+      Einwendungen können Sie gemäß § 556 Abs. 3 BGB innerhalb von 12 Monaten geltend machen.
+    </p>
+  `);
+
+  await sendMailForCompany(companyId, data.to, subject, html);
+}
+
 export async function sendWelcomeEmail(
   to: string,
   name: string,

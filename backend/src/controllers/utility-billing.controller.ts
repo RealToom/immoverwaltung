@@ -20,6 +20,12 @@ export async function finalizeStatement(req: Request, res: Response): Promise<vo
   res.json({ data });
 }
 
+export async function getStatementDeadlines(req: Request, res: Response): Promise<void> {
+  const svc = new UtilityBillingService(req.companyId!);
+  const data = await svc.getStatementDeadlines();
+  res.json({ data });
+}
+
 export async function listStatements(req: Request, res: Response): Promise<void> {
   const propertyId = req.query.propertyId ? Number(req.query.propertyId) : undefined;
   const year = req.query.year ? Number(req.query.year) : undefined;

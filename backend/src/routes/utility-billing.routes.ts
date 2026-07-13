@@ -24,6 +24,7 @@ router.post(
   validate({ body: generateStatementSchema }),
   ctrl.finalizeStatement
 );
+router.get("/statements/deadlines", ctrl.getStatementDeadlines);
 router.get("/statements", validate({ query: listStatementsQuerySchema }), ctrl.listStatements);
 router.get("/statements/:id", validate({ params: idParamSchema }), ctrl.getStatement);
 router.get("/disputes", validate({ query: listDisputesQuerySchema }), ctrl.listDisputes);

@@ -53,6 +53,22 @@ export interface UtilityStatement {
   unallocatedTransactions: UnallocatedTransaction[];
 }
 
+export interface StatementDeadline {
+  propertyId: number;
+  propertyName: string;
+  year: number;
+  deadline: string;
+  daysRemaining: number;
+  overdue: boolean;
+}
+
+export function useStatementDeadlines() {
+  return useQuery({
+    queryKey: ["utility-billing", "deadlines"],
+    queryFn: () => api<{ data: StatementDeadline[] }>("/utility-billing/statements/deadlines"),
+  });
+}
+
 export function useGenerateUtilityStatement() {
   return useMutation({
     mutationFn: (data: { propertyId: number; year: number }) =>

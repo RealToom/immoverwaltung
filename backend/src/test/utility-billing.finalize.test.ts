@@ -4,7 +4,7 @@ const {
   mockPropertyFindFirst, mockTransactionFindMany, mockEnergyPassportFindUnique,
   mockUnitFindMany, mockContractFindMany, mockContractFindUnique, mockRentPaymentFindMany,
   mockTransactionDeleteMany, mockTransactionCreate, mockDocumentFindFirst, mockCompanyFindUnique,
-  mockStatementCreate, mockStatementUpdateMany,
+  mockStatementCreate, mockStatementUpdateMany, mockTenantUserFindFirst, mockStatementItemUpdateMany,
 } = vi.hoisted(() => ({
   mockPropertyFindFirst: vi.fn(),
   mockTransactionFindMany: vi.fn(),
@@ -19,6 +19,8 @@ const {
   mockCompanyFindUnique: vi.fn(),
   mockStatementCreate: vi.fn(),
   mockStatementUpdateMany: vi.fn(),
+  mockTenantUserFindFirst: vi.fn(),
+  mockStatementItemUpdateMany: vi.fn(),
 }));
 
 vi.mock("../lib/prisma.js", () => ({
@@ -31,8 +33,17 @@ vi.mock("../lib/prisma.js", () => ({
     rentPayment: { findMany: mockRentPaymentFindMany },
     document: { findFirst: mockDocumentFindFirst },
     company: { findUnique: mockCompanyFindUnique },
+    tenantUser: { findFirst: mockTenantUserFindFirst },
     utilityStatement: { create: mockStatementCreate, updateMany: mockStatementUpdateMany },
+    utilityStatementItem: { updateMany: mockStatementItemUpdateMany },
   },
+}));
+
+const { mockSendUtilityStatementEmail } = vi.hoisted(() => ({
+  mockSendUtilityStatementEmail: vi.fn(),
+}));
+vi.mock("../services/email.service.js", () => ({
+  sendUtilityStatementEmail: mockSendUtilityStatementEmail,
 }));
 
 const { mockCreateDocument, mockDeleteDocument } = vi.hoisted(() => ({
@@ -85,6 +96,9 @@ describe("UtilityBillingService.finalizeStatement", () => {
     vi.clearAllMocks();
     mockStatementCreate.mockResolvedValue({ id: 500 });
     mockStatementUpdateMany.mockResolvedValue({ count: 0 });
+    mockTenantUserFindFirst.mockResolvedValue(null);
+    mockStatementItemUpdateMany.mockResolvedValue({ count: 1 });
+    mockSendUtilityStatementEmail.mockResolvedValue(undefined);
   });
 
   it("includes tenantId on generateStatement's items", async () => {
@@ -205,6 +219,50 @@ describe("UtilityBillingService.finalizeStatement", () => {
       where: { propertyId: 1, companyId: 1, year: 2025, status: "FINALISIERT", id: { not: 500 } },
       data: { status: "KORRIGIERT", supersededById: 500 },
     });
+  });
+
+  it("emails the tenant's portal account and stamps deliveredAt (§ 556 Zustellung)", async () => {
+    mockNoVacancyFullYearScenario();
+    mockDocumentFindFirst.mockResolvedValueOnce(null);
+    mockGenerateTenantStatementPdf.mockResolvedValueOnce({ filePath: "/fake/path.pdf", fileSizeBytes: 4096 });
+    mockCreateDocument.mockResolvedValueOnce({ id: 99 });
+    // The tenant has a portal account → electronic delivery is possible.
+    mockTenantUserFindFirst.mockResolvedValueOnce({ email: "mieter@example.de" });
+
+    const svc = new UtilityBillingService(1);
+    await svc.finalizeStatement(1, 2025);
+
+    expect(mockTenantUserFindFirst).toHaveBeenCalledWith({
+      where: { tenantId: 7, companyId: 1 },
+      select: { email: true },
+    });
+    expect(mockSendUtilityStatementEmail).toHaveBeenCalledWith(1, {
+      to: "mieter@example.de",
+      tenantName: "Mustermann",
+      propertyName: "Residenz Am Park",
+      year: 2025,
+      balance: expect.any(Number),
+      isRefund: expect.any(Boolean),
+    });
+    // Zustellzeitpunkt wird auf dem Snapshot-Item festgehalten (Fristnachweis).
+    expect(mockStatementItemUpdateMany).toHaveBeenCalledWith({
+      where: { statementId: 500, tenantId: 7 },
+      data: { deliveredAt: expect.any(Date) },
+    });
+  });
+
+  it("does not stamp deliveredAt when the tenant has no portal account", async () => {
+    mockNoVacancyFullYearScenario();
+    mockDocumentFindFirst.mockResolvedValueOnce(null);
+    mockGenerateTenantStatementPdf.mockResolvedValueOnce({ filePath: "/fake/path.pdf", fileSizeBytes: 4096 });
+    mockCreateDocument.mockResolvedValueOnce({ id: 99 });
+    mockTenantUserFindFirst.mockResolvedValueOnce(null);
+
+    const svc = new UtilityBillingService(1);
+    await svc.finalizeStatement(1, 2025);
+
+    expect(mockSendUtilityStatementEmail).not.toHaveBeenCalled();
+    expect(mockStatementItemUpdateMany).not.toHaveBeenCalled();
   });
 
   it("deletes an existing document for the same tenant/year before creating the replacement", async () => {

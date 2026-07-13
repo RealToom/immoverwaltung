@@ -3,11 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, ChevronRight, Settings, Send, AlertTriangle, Leaf, Building2, Flame, Download, Plus, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, Settings, Send, AlertTriangle, Leaf, Building2, Flame, Download, Plus, X, CalendarClock } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useProperties } from "@/hooks/api/useProperties";
-import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement } from "@/hooks/api/useUtilityBilling";
+import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement, useStatementDeadlines } from "@/hooks/api/useUtilityBilling";
 import type { UtilityStatementTransaction, FinalizedStatementItem } from "@/hooks/api/useUtilityBilling";
 import { useUpdateTransaction } from "@/hooks/api/useFinance";
 import { useDownloadDocument } from "@/hooks/api/useDocuments";
@@ -35,6 +35,8 @@ export default function UtilityBillingWizard() {
   const updateDisputeStatus = useUpdateDisputeStatus();
   const finalizeStatement = useFinalizeStatement();
   const downloadDocument = useDownloadDocument();
+  const { data: deadlinesRes } = useStatementDeadlines();
+  const deadlines = deadlinesRes?.data ?? [];
   const [finalizedItems, setFinalizedItems] = useState<FinalizedStatementItem[] | null>(null);
 
   const regenerate = () => {
@@ -137,6 +139,63 @@ export default function UtilityBillingWizard() {
         {/* ─── Tab 1: Konfiguration ─── */}
         <TabsContent value="config">
           <div className="space-y-4">
+            {deadlines.length > 0 && (
+              <Card className="border-amber-200 dark:border-amber-900">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                    <CalendarClock className="w-5 h-5" />
+                    Offene Abrechnungsfristen (§ 556 Abs. 3 BGB)
+                  </CardTitle>
+                  <CardDescription>
+                    Die Betriebskostenabrechnung muss dem Mieter binnen 12 Monaten nach Ende des Abrechnungszeitraums zugehen —
+                    danach sind Nachforderungen ausgeschlossen.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {deadlines.map((d) => (
+                    <div
+                      key={`${d.propertyId}-${d.year}`}
+                      className={`flex items-center justify-between p-3 rounded-lg border text-sm ${
+                        d.overdue
+                          ? "border-red-300 bg-red-50 dark:bg-red-950/30 dark:border-red-800"
+                          : d.daysRemaining <= 60
+                          ? "border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800"
+                          : "border-slate-200 dark:border-slate-700"
+                      }`}
+                    >
+                      <div>
+                        <span className="font-medium">{d.propertyName}</span>
+                        <span className="text-muted-foreground ml-2">Abrechnung {d.year}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-muted-foreground">
+                          Frist: {new Date(d.deadline).toLocaleDateString("de-DE")}
+                        </span>
+                        {d.overdue ? (
+                          <Badge variant="destructive">Frist überschritten</Badge>
+                        ) : (
+                          <Badge variant="outline" className={d.daysRemaining <= 60 ? "border-amber-500 text-amber-600" : ""}>
+                            noch {d.daysRemaining} Tage
+                          </Badge>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => {
+                            setPropertyId(d.propertyId);
+                            setYear(d.year);
+                          }}
+                        >
+                          Jetzt abrechnen
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle>Immobilie & Abrechnungsjahr</CardTitle>
