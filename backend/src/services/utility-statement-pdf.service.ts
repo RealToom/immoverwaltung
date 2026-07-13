@@ -24,7 +24,12 @@ export interface TenantStatementPdfInput {
   totalCosts: number;
   categories: TenantCategoryLine[];
   co2: { landlordPercentage: number; landlordShare: number; tenantShare: number; energyClass: string | null } | null;
-  heating: { consumptionBased: boolean; consumptionSharePercent?: number | null; warning?: string } | null;
+  heating: {
+    consumptionBased: boolean;
+    consumptionSharePercent?: number | null;
+    warning?: string;
+    estimationNotice?: string;
+  } | null;
   vacancyDeduction: number;
 }
 
@@ -115,6 +120,12 @@ export async function generateTenantStatementPdf(
   if (input.heating?.warning) {
     doc.fontSize(10).font("Helvetica-Bold").fillColor("#8a6d00").text("Hinweis zur Heizkostenverteilung");
     doc.font("Helvetica").text(input.heating.warning);
+    doc.fillColor("#000000").moveDown();
+  }
+
+  if (input.heating?.estimationNotice) {
+    doc.fontSize(10).font("Helvetica-Bold").fillColor("#8a6d00").text("Hinweis zur Verbrauchsschätzung");
+    doc.font("Helvetica").text(input.heating.estimationNotice);
     doc.fillColor("#000000").moveDown();
   }
 

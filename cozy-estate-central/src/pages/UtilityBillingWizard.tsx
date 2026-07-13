@@ -279,6 +279,21 @@ export default function UtilityBillingWizard() {
                       <p>
                         Heiz-/Warmwasserkosten: <strong>{formatEur(statement.heating.totalCosts)}</strong>
                       </p>
+                      {statement.heating.warmWater && (
+                        <p className="text-blue-800 dark:text-blue-300">
+                          Davon Warmwasser (§ 9 HeizkostenV, getrennt erfasst): <strong>{formatEur(statement.heating.warmWater.totalCosts)}</strong>
+                          {" — "}
+                          {statement.heating.warmWater.consumptionBased
+                            ? "verbrauchsabhängig über Warmwasserzähler"
+                            : "mangels Warmwasserzähler nach Wohnfläche verteilt"}.
+                        </p>
+                      )}
+                      {statement.heating.estimated && (
+                        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-amber-900 dark:text-amber-200">
+                          <p className="font-semibold">ℹ Verbrauchsschätzung (§ 9b HeizkostenV)</p>
+                          <p className="mt-1">{statement.heating.estimationNotice}</p>
+                        </div>
+                      )}
                       {statement.heating.consumptionBased ? (
                         <p className="text-blue-800 dark:text-blue-300">
                           Verteilung: <strong>{statement.heating.consumptionSharePercent} % nach gemessenem Verbrauch</strong> (Wärme-/Gaszähler),{" "}

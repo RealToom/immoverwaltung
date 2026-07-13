@@ -1,4 +1,4 @@
-import { PrismaClient, Contract, RentPayment, Transaction, Unit } from "@prisma/client";
+import { PrismaClient, Contract, RentPayment, Transaction, Unit, MeterType } from "@prisma/client";
 import { AppError } from "../lib/errors.js";
 import { prisma } from "../lib/prisma.js";
 import { differenceInDays, isLeapYear, getDaysInMonth, endOfMonth, isBefore, isAfter, max, min, startOfMonth, addDays } from "date-fns";
@@ -335,20 +335,30 @@ export class UtilityBillingService {
   /** BetrKV categories that fall under the HeizkostenV consumption-split rules. */
   private static readonly HEATING_CATEGORIES = ["HEIZUNG", "WARMWASSER"];
 
+  /** Meter types used per heating pool (§ 9 HeizkostenV: Warmwasser separat erfassen). */
+  private static readonly HEATING_POOLS: { category: string; label: string; meterTypes: MeterType[] }[] = [
+    { category: "HEIZUNG", label: "Heizung", meterTypes: ["WAERME", "GAS"] },
+    { category: "WARMWASSER", label: "Warmwasser", meterTypes: ["WARMWASSER"] },
+  ];
+
   /** Share of heating costs allocated by metered consumption (§ 7 HeizkostenV: 50–70%). */
   private static readonly HEATING_CONSUMPTION_SHARE = 0.7;
 
   /**
-   * Reads per-unit heating consumption for a billing year from WAERME/GAS
-   * meters assigned to units. A meter contributes max(reading) - min(reading)
+   * Reads per-unit consumption for a billing year from meters of the given
+   * types assigned to units. A meter contributes max(reading) - min(reading)
    * within the year (needs at least two readings).
    */
-  private async getHeatingConsumptionByUnit(propertyId: number, year: number): Promise<Map<number, number>> {
+  private async getConsumptionByUnit(
+    propertyId: number,
+    year: number,
+    meterTypes: MeterType[]
+  ): Promise<Map<number, number>> {
     const meters = await prisma.meter.findMany({
       where: {
         propertyId,
         companyId: this.companyId,
-        type: { in: ["WAERME", "GAS"] },
+        type: { in: meterTypes },
         unitId: { not: null },
       },
       include: {
@@ -367,6 +377,54 @@ export class UtilityBillingService {
       byUnit.set(meter.unitId, (byUnit.get(meter.unitId) ?? 0) + delta);
     }
     return byUnit;
+  }
+
+  /**
+   * Allocates a single heating pool (Heizung or Warmwasser) 70% by metered
+   * consumption / 30% as base cost by area (VDI-2067-weighted over the
+   * occupancy period). Consumption metered per unit is split by VDI weight
+   * when several contracts share a unit within the year (§ 9b Schätzung).
+   * Returns per-contract shares, the owner's (vacancy) remainder, and whether
+   * any unit's consumption had to be estimated across a tenant change.
+   */
+  private allocateHeatingPool(
+    pool: number,
+    consumptionByUnit: Map<number, number>,
+    contractWeights: { contract: { id: number; unit: { id: number; area: number } }; vdiFraction: number }[],
+    totalArea: number
+  ): { byContract: Map<number, number>; ownerShare: number; estimated: boolean } {
+    const byContract = new Map<number, number>();
+    const totalConsumption = [...consumptionByUnit.values()].reduce((a, b) => a + b, 0);
+    if (totalConsumption <= 0) return { byContract, ownerShare: 0, estimated: false };
+
+    const basePool = pool * (1 - UtilityBillingService.HEATING_CONSUMPTION_SHARE);
+    const consPool = pool * UtilityBillingService.HEATING_CONSUMPTION_SHARE;
+
+    const vdiSumByUnit = new Map<number, number>();
+    const contractsPerUnit = new Map<number, number>();
+    for (const w of contractWeights) {
+      vdiSumByUnit.set(w.contract.unit.id, (vdiSumByUnit.get(w.contract.unit.id) ?? 0) + w.vdiFraction);
+      contractsPerUnit.set(w.contract.unit.id, (contractsPerUnit.get(w.contract.unit.id) ?? 0) + 1);
+    }
+
+    let allocated = 0;
+    let estimated = false;
+    for (const w of contractWeights) {
+      const baseShare = totalArea > 0 ? basePool * ((w.contract.unit.area * w.vdiFraction) / totalArea) : 0;
+      const unitConsumption = consumptionByUnit.get(w.contract.unit.id) ?? 0;
+      const unitVdiSum = vdiSumByUnit.get(w.contract.unit.id) ?? 0;
+      const consShare =
+        unitConsumption > 0 && unitVdiSum > 0
+          ? consPool * (unitConsumption / totalConsumption) * (w.vdiFraction / unitVdiSum)
+          : 0;
+      // § 9b: a metered unit shared by more than one contract in the year had
+      // its consumption apportioned by VDI weight — that portion is estimated.
+      if (unitConsumption > 0 && (contractsPerUnit.get(w.contract.unit.id) ?? 0) > 1) estimated = true;
+      const share = baseShare + consShare;
+      byContract.set(w.contract.id, (byContract.get(w.contract.id) ?? 0) + share);
+      allocated += share;
+    }
+    return { byContract, ownerShare: pool - allocated, estimated };
   }
 
   /**
@@ -399,16 +457,16 @@ export class UtilityBillingService {
       tx.betrkvCategory != null && UtilityBillingService.HEATING_CATEGORIES.includes(tx.betrkvCategory);
 
     // CO2-Stufenmodell per transaction; landlord share is deducted from the
-    // pool the transaction belongs to (heating vs. other).
-    let heatingCo2Landlord = 0;
-    let otherCo2Landlord = 0;
+    // pool the transaction belongs to (Heizung / Warmwasser / sonstige).
+    const poolKeyOf = (tx: Transaction) =>
+      tx.betrkvCategory === "HEIZUNG" ? "HEIZUNG" : tx.betrkvCategory === "WARMWASSER" ? "WARMWASSER" : "OTHER";
+    const co2LandlordByPool: Record<string, number> = { HEIZUNG: 0, WARMWASSER: 0, OTHER: 0 };
     let totalCo2TenantShare = 0;
     let landlordPercentage = 0;
     for (const tx of transactions) {
       if (tx.co2TaxAmount && tx.co2TaxAmount > 0) {
         const split = await this.applyCO2Stufenmodell(propertyId, tx.co2TaxAmount);
-        if (isHeatingTx(tx)) heatingCo2Landlord += split.landlordShare;
-        else otherCo2Landlord += split.landlordShare;
+        co2LandlordByPool[poolKeyOf(tx)] += split.landlordShare;
         totalCo2TenantShare += split.tenantShare;
         landlordPercentage = split.landlordPercentage;
       }
@@ -419,15 +477,9 @@ export class UtilityBillingService {
     const grossCosts = transactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
     const heatingGross = transactions.filter(isHeatingTx).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
     const otherGross = grossCosts - heatingGross;
-    const heatingPool = heatingGross - heatingCo2Landlord;
-    const otherPool = otherGross - otherCo2Landlord;
-    const totalCo2LandlordShare = heatingCo2Landlord + otherCo2Landlord;
-
-    // HeizkostenV: split heating costs by metered consumption when possible.
-    const consumptionByUnit =
-      heatingPool > 0 ? await this.getHeatingConsumptionByUnit(propertyId, year) : new Map<number, number>();
-    const totalConsumption = [...consumptionByUnit.values()].reduce((a, b) => a + b, 0);
-    const consumptionBased = heatingPool > 0 && totalConsumption > 0;
+    const otherPool = otherGross - co2LandlordByPool.OTHER;
+    const totalCo2LandlordShare =
+      co2LandlordByPool.HEIZUNG + co2LandlordByPool.WARMWASSER + co2LandlordByPool.OTHER;
 
     const allUnits = await prisma.unit.findMany({
       where: { propertyId, property: { companyId: this.companyId } },
@@ -440,14 +492,7 @@ export class UtilityBillingService {
         },
       },
     });
-
-    // Vacancy deduction applies to the area-allocated pool. In consumption
-    // mode that's only the non-heating pool (the heating base-cost remainder
-    // for vacant periods is routed to the owner separately below).
-    const vacancyPool = consumptionBased ? otherPool : otherPool + heatingPool;
-    const vacancyResult = await this.calculateVacancyDeduction(propertyId, year, vacancyPool, allUnits);
-    const vacancyDeduction = vacancyResult?.amount ?? 0;
-    const netAllocatable = vacancyPool - vacancyDeduction;
+    const totalArea = allUnits.reduce((sum, u) => sum + u.area, 0);
 
     const contracts = await prisma.contract.findMany({
       where: {
@@ -472,39 +517,54 @@ export class UtilityBillingService {
       0
     );
 
-    // Heating shares per contract (consumption mode only).
+    // HeizkostenV: each heating pool (Heizung, Warmwasser) is split 70/30 by
+    // its own metered consumption (§ 9 verlangt getrennte Warmwassererfassung).
+    // Pools without usable meter data fall back into the area-allocated pool
+    // and raise the § 12 Kürzungsrecht warning.
     const heatingByContract = new Map<number, number>();
     let heatingOwnerShare = 0;
-    if (consumptionBased) {
-      const basePool = heatingPool * (1 - UtilityBillingService.HEATING_CONSUMPTION_SHARE);
-      const consPool = heatingPool * UtilityBillingService.HEATING_CONSUMPTION_SHARE;
+    let heatingAreaFallbackPool = 0;
+    let anyEstimated = false;
+    let anyFallbackToArea = false;
+    let anyConsumption = false;
+    const poolDetail: Record<string, { totalCosts: number; consumptionBased: boolean; ownerShare: number }> = {};
 
-      // Base costs: by area, VDI-2067-weighted over the occupancy period.
-      // Denominator is the full property area so vacant periods stay with the owner.
-      const totalArea = allUnits.reduce((sum, u) => sum + u.area, 0);
+    for (const def of UtilityBillingService.HEATING_POOLS) {
+      const gross = transactions
+        .filter((tx) => tx.betrkvCategory === def.category)
+        .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+      if (gross <= 0) continue;
+      const pool = gross - (co2LandlordByPool[def.category] ?? 0);
+      const consumptionByUnit = await this.getConsumptionByUnit(propertyId, year, def.meterTypes);
+      const totalConsumption = [...consumptionByUnit.values()].reduce((a, b) => a + b, 0);
 
-      // Consumption is metered per unit; when several contracts share a unit
-      // within the year, split the unit's consumption by VDI weight.
-      const vdiSumByUnit = new Map<number, number>();
-      for (const w of contractWeights) {
-        vdiSumByUnit.set(w.contract.unit.id, (vdiSumByUnit.get(w.contract.unit.id) ?? 0) + w.vdiFraction);
+      if (totalConsumption > 0) {
+        const { byContract, ownerShare, estimated } = this.allocateHeatingPool(
+          pool,
+          consumptionByUnit,
+          contractWeights,
+          totalArea
+        );
+        for (const [cid, share] of byContract) {
+          heatingByContract.set(cid, (heatingByContract.get(cid) ?? 0) + share);
+        }
+        heatingOwnerShare += ownerShare;
+        anyEstimated = anyEstimated || estimated;
+        anyConsumption = true;
+        poolDetail[def.category] = { totalCosts: gross, consumptionBased: true, ownerShare };
+      } else {
+        heatingAreaFallbackPool += pool;
+        anyFallbackToArea = true;
+        poolDetail[def.category] = { totalCosts: gross, consumptionBased: false, ownerShare: 0 };
       }
-
-      let allocated = 0;
-      for (const w of contractWeights) {
-        const baseShare = totalArea > 0 ? basePool * ((w.contract.unit.area * w.vdiFraction) / totalArea) : 0;
-        const unitConsumption = consumptionByUnit.get(w.contract.unit.id) ?? 0;
-        const unitVdiSum = vdiSumByUnit.get(w.contract.unit.id) ?? 0;
-        const consShare =
-          unitConsumption > 0 && unitVdiSum > 0
-            ? consPool * (unitConsumption / totalConsumption) * (w.vdiFraction / unitVdiSum)
-            : 0;
-        const share = baseShare + consShare;
-        heatingByContract.set(w.contract.id, share);
-        allocated += share;
-      }
-      heatingOwnerShare = heatingPool - allocated;
     }
+
+    // Vacancy deduction applies to the area-allocated pool: the non-heating
+    // costs plus any heating pool that had to fall back to area allocation.
+    const vacancyPool = otherPool + heatingAreaFallbackPool;
+    const vacancyResult = await this.calculateVacancyDeduction(propertyId, year, vacancyPool, allUnits);
+    const vacancyDeduction = vacancyResult?.amount ?? 0;
+    const netAllocatable = vacancyPool - vacancyDeduction;
 
     const items = [];
     for (const { contract, occupancyFraction } of contractWeights) {
@@ -529,8 +589,6 @@ export class UtilityBillingService {
       });
     }
 
-    const totalArea = allUnits.reduce((sum, u) => sum + u.area, 0);
-
     return {
       year,
       propertyId,
@@ -548,14 +606,26 @@ export class UtilityBillingService {
         heatingGross > 0
           ? {
               totalCosts: Math.round(heatingGross * 100) / 100,
-              consumptionBased,
-              consumptionSharePercent: consumptionBased ? UtilityBillingService.HEATING_CONSUMPTION_SHARE * 100 : null,
+              consumptionBased: anyConsumption && !anyFallbackToArea,
+              consumptionSharePercent: anyConsumption ? UtilityBillingService.HEATING_CONSUMPTION_SHARE * 100 : null,
               ownerShare: Math.round(heatingOwnerShare * 100) / 100,
-              warning: consumptionBased
-                ? undefined
-                : "Heizkosten wurden mangels Verbrauchsdaten (Wärme-/Gaszähler pro Einheit) nach Wohnfläche verteilt. " +
+              warning: anyFallbackToArea
+                ? "Heizkosten wurden mangels Verbrauchsdaten (Wärme-/Gas-/Warmwasserzähler pro Einheit) nach Wohnfläche verteilt. " +
                   "Die HeizkostenV verlangt eine überwiegend verbrauchsabhängige Abrechnung — Mieter haben sonst ein " +
-                  "Kürzungsrecht von 15 % (§ 12 HeizkostenV).",
+                  "Kürzungsrecht von 15 % (§ 12 HeizkostenV)."
+                : undefined,
+              estimated: anyEstimated,
+              estimationNotice: anyEstimated
+                ? "Bei unterjährigem Nutzerwechsel wurde der gemessene Verbrauch mangels Zwischenablesung nach " +
+                  "Gradtagstabelle (VDI 2067) geschätzt (§ 9b HeizkostenV)."
+                : undefined,
+              warmWater: poolDetail.WARMWASSER
+                ? {
+                    totalCosts: Math.round(poolDetail.WARMWASSER.totalCosts * 100) / 100,
+                    consumptionBased: poolDetail.WARMWASSER.consumptionBased,
+                    ownerShare: Math.round(poolDetail.WARMWASSER.ownerShare * 100) / 100,
+                  }
+                : null,
             }
           : null,
       vacancy: vacancyResult
@@ -661,6 +731,7 @@ export class UtilityBillingService {
                 consumptionBased: statement.heating.consumptionBased,
                 consumptionSharePercent: statement.heating.consumptionSharePercent,
                 warning: statement.heating.warning,
+                estimationNotice: statement.heating.estimationNotice,
               }
             : null,
           vacancyDeduction: statement.vacancy?.amount ?? 0,

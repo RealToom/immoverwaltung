@@ -363,6 +363,87 @@ describe("UtilityBillingService", () => {
       expect(result.items[0].heatingAmount).toBeCloseTo(675, 1);
     });
 
+    it("bills warm water as its own § 9 HeizkostenV pool from WARMWASSER meters", async () => {
+      // HEIZUNG 1000 (WAERME meters 300/100) + WARMWASSER 400 (WW meters 100/100).
+      //   Heizung: base 300 area 150/150, cons 700 by 300:100 -> 525/175 => 675/325
+      //   Warmwasser: base 120 area 60/60, cons 280 by 100:100 -> 140/140 => 200/200
+      //   items: 875 / 525
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 40, description: "Heizkosten Gas", amount: -1000, betrkvCategory: "HEIZUNG", maintenanceWarning: null, co2TaxAmount: 0 },
+        { id: 41, description: "Warmwasser", amount: -400, betrkvCategory: "WARMWASSER", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "EG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+        { id: 2, number: "OG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, startDate: new Date(2025, 0, 1), endDate: null, unit: { id: 1, number: "EG", area: 50 }, tenant: { id: 7, name: "Mieter EG" } },
+        { id: 2, startDate: new Date(2025, 0, 1), endDate: null, unit: { id: 2, number: "OG", area: 50 }, tenant: { id: 8, name: "Mieter OG" } },
+      ]);
+      // First meter query: WAERME/GAS (heizung). Second: WARMWASSER (hot water).
+      mockMeterFindMany.mockResolvedValueOnce([
+        { id: 1, unitId: 1, type: "WAERME", readings: [{ value: 100, readAt: new Date(2026, 0, 2) }, { value: 400, readAt: new Date(2026, 11, 30) }] },
+        { id: 2, unitId: 2, type: "WAERME", readings: [{ value: 0, readAt: new Date(2026, 0, 2) }, { value: 100, readAt: new Date(2026, 11, 30) }] },
+      ]);
+      mockMeterFindMany.mockResolvedValueOnce([
+        { id: 3, unitId: 1, type: "WARMWASSER", readings: [{ value: 0, readAt: new Date(2026, 0, 2) }, { value: 100, readAt: new Date(2026, 11, 30) }] },
+        { id: 4, unitId: 2, type: "WARMWASSER", readings: [{ value: 0, readAt: new Date(2026, 0, 2) }, { value: 100, readAt: new Date(2026, 11, 30) }] },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 2, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      expect(result.heating?.totalCosts).toBeCloseTo(1400, 1);
+      expect(result.heating?.warmWater).not.toBeNull();
+      expect(result.heating?.warmWater?.totalCosts).toBeCloseTo(400, 1);
+      expect(result.heating?.warmWater?.consumptionBased).toBe(true);
+      expect(result.items[0].amount).toBeCloseTo(875, 1);
+      expect(result.items[1].amount).toBeCloseTo(525, 1);
+      expect(result.items[0].heatingAmount).toBeCloseTo(875, 1);
+    });
+
+    it("flags § 9b Schätzung when a metered unit has a mid-year tenant change", async () => {
+      // One unit, two consecutive contracts in 2026 (Nutzerwechsel without an
+      // interim reading) → the unit's metered consumption is VDI-estimated.
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 40, description: "Heizkosten Gas", amount: -1000, betrkvCategory: "HEIZUNG", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        {
+          id: 1, number: "EG", area: 50,
+          contracts: [
+            { startDate: new Date(2026, 0, 1), endDate: new Date(2026, 5, 30) },
+            { startDate: new Date(2026, 6, 1), endDate: null },
+          ],
+        },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, startDate: new Date(2026, 0, 1), endDate: new Date(2026, 5, 30), unit: { id: 1, number: "EG", area: 50 }, tenant: { id: 7, name: "Mieter A" } },
+        { id: 2, startDate: new Date(2026, 6, 1), endDate: null, unit: { id: 1, number: "EG", area: 50 }, tenant: { id: 8, name: "Mieter B" } },
+      ]);
+      mockMeterFindMany.mockResolvedValueOnce([
+        { id: 1, unitId: 1, type: "WAERME", readings: [{ value: 0, readAt: new Date(2026, 0, 2) }, { value: 300, readAt: new Date(2026, 11, 30) }] },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 2, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      expect(result.heating?.estimated).toBe(true);
+      expect(result.heating?.estimationNotice).toMatch(/9b HeizkostenV|Schätzung/i);
+    });
+
     it("falls back to area allocation with a § 12 HeizkostenV warning when no heat meters exist", async () => {
       mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });
       mockTransactionFindMany.mockResolvedValueOnce([

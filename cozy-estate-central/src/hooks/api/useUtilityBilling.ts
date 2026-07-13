@@ -46,6 +46,9 @@ export interface UtilityStatement {
     consumptionSharePercent: number | null;
     ownerShare: number;
     warning?: string;
+    estimated: boolean;
+    estimationNotice?: string;
+    warmWater: { totalCosts: number; consumptionBased: boolean; ownerShare: number } | null;
   } | null;
   vacancy: { amount: number; vacancyDays: number; affectedUnits: string[] } | null;
   items: UtilityStatementItem[];
