@@ -44,21 +44,26 @@ export class UtilityBillingService {
     moveInDate: Date,
     moveOutDate: Date | null
   ): number {
-    const startOfYear = new Date(billingYear, 0, 1);
-    const endOfYear = new Date(billingYear, 11, 31);
-    
-    // Determine the actual period the tenant lived in the unit during the billing year
-    const tenantStart = max([startOfYear, moveInDate]);
-    const tenantEnd = min([endOfYear, moveOutDate || endOfYear]);
+    return totalCosts * this.proRataFraction(new Date(billingYear, 0, 1), new Date(billingYear, 11, 31), moveInDate, moveOutDate);
+  }
 
-    if (isAfter(tenantStart, tenantEnd)) {
-      return 0; // Tenant did not live in the unit during this year
-    }
+  /** Resolves a billing period from its start month (§ abweichendes Wirtschaftsjahr). */
+  private resolvePeriod(year: number, startMonth: number | null | undefined) {
+    const m = Math.min(Math.max(startMonth || 1, 1), 12) - 1;
+    const periodStart = new Date(year, m, 1);
+    const periodEnd = addDays(new Date(year + 1, m, 1), -1);
+    const daysInPeriod = differenceInDays(periodEnd, periodStart) + 1;
+    return { periodStart, periodEnd, daysInPeriod };
+  }
 
+  /** Fraction (0..1) of a billing period a tenant occupied the unit. */
+  private proRataFraction(periodStart: Date, periodEnd: Date, moveInDate: Date, moveOutDate: Date | null): number {
+    const tenantStart = max([periodStart, moveInDate]);
+    const tenantEnd = min([periodEnd, moveOutDate || periodEnd]);
+    if (isAfter(tenantStart, tenantEnd)) return 0;
     const tenantDays = differenceInDays(tenantEnd, tenantStart) + 1;
-    const daysInYear = isLeapYear(startOfYear) ? 366 : 365;
-
-    return totalCosts * (tenantDays / daysInYear);
+    const periodDays = differenceInDays(periodEnd, periodStart) + 1;
+    return tenantDays / periodDays;
   }
 
   /**
@@ -70,18 +75,16 @@ export class UtilityBillingService {
     moveInDate: Date,
     moveOutDate: Date | null
   ): number {
-    const startOfYear = new Date(billingYear, 0, 1);
-    const endOfYear = new Date(billingYear, 11, 31);
-    
-    const tenantStart = max([startOfYear, moveInDate]);
-    const tenantEnd = min([endOfYear, moveOutDate || endOfYear]);
+    return this.heatingBaseFraction(new Date(billingYear, 0, 1), new Date(billingYear, 11, 31), moveInDate, moveOutDate) * 100;
+  }
 
-    if (isAfter(tenantStart, tenantEnd)) {
-      return 0;
-    }
+  /** VDI-2067-weighted fraction (0..1) of the heating base cost for a period. */
+  private heatingBaseFraction(periodStart: Date, periodEnd: Date, moveInDate: Date, moveOutDate: Date | null): number {
+    const tenantStart = max([periodStart, moveInDate]);
+    const tenantEnd = min([periodEnd, moveOutDate || periodEnd]);
+    if (isAfter(tenantStart, tenantEnd)) return 0;
 
     let totalPromille = 0;
-
     let current = new Date(tenantStart);
     while (isBefore(current, tenantEnd) || current.getTime() === tenantEnd.getTime()) {
       const currentMonth = current.getMonth();
@@ -90,21 +93,15 @@ export class UtilityBillingService {
 
       const overlapStart = max([monthStart, tenantStart]);
       const overlapEnd = min([monthEnd, tenantEnd]);
-      
+
       const daysInCurrentMonth = getDaysInMonth(current);
       const daysInOverlap = differenceInDays(overlapEnd, overlapStart) + 1;
 
-      // If full month, use full promille, otherwise proportional
-      const promilleForMonth = this.VDI_2067[currentMonth];
-      const actualPromille = promilleForMonth * (daysInOverlap / daysInCurrentMonth);
-      
-      totalPromille += actualPromille;
-
-      // Move to next month
+      totalPromille += this.VDI_2067[currentMonth] * (daysInOverlap / daysInCurrentMonth);
       current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
     }
 
-    return totalPromille / 10; // Convert per mille (Promille) to percentage
+    return totalPromille / 1000; // per mille → fraction
   }
 
   /**
@@ -163,10 +160,12 @@ export class UtilityBillingService {
     propertyId: number,
     billingYear: number,
     totalFixedCosts: number,
-    preloadedUnits?: { number: string; area: number; contracts: { startDate: Date; endDate: Date | null }[] }[]
+    preloadedUnits?: { number: string; area: number; contracts: { startDate: Date; endDate: Date | null }[] }[],
+    period?: { periodStart: Date; periodEnd: Date; daysInPeriod: number }
   ) {
-    const startOfYear = new Date(billingYear, 0, 1);
-    const endOfYear = new Date(billingYear, 11, 31);
+    const startOfYear = period?.periodStart ?? new Date(billingYear, 0, 1);
+    const endOfYear = period?.periodEnd ?? new Date(billingYear, 11, 31);
+    const daysInYear = period?.daysInPeriod ?? (isLeapYear(startOfYear) ? 366 : 365);
 
     const units = preloadedUnits ?? await prisma.unit.findMany({
       where: { propertyId, property: { companyId: this.companyId } },
@@ -186,7 +185,6 @@ export class UtilityBillingService {
     let totalVacancyDays = 0;
     let vacantAreaDays = 0;
     const affectedUnits: string[] = [];
-    const daysInYear = isLeapYear(startOfYear) ? 366 : 365;
 
     for (const unit of units) {
       let unitVacancyDays = 0;
@@ -351,7 +349,8 @@ export class UtilityBillingService {
    */
   private async getConsumptionByUnit(
     propertyId: number,
-    year: number,
+    periodStart: Date,
+    periodEndExclusive: Date,
     meterTypes: MeterType[]
   ): Promise<Map<number, number>> {
     const meters = await prisma.meter.findMany({
@@ -363,7 +362,7 @@ export class UtilityBillingService {
       },
       include: {
         readings: {
-          where: { readAt: { gte: new Date(year, 0, 1), lt: new Date(year + 1, 0, 1) } },
+          where: { readAt: { gte: periodStart, lt: periodEndExclusive } },
         },
       },
     });
@@ -439,9 +438,14 @@ export class UtilityBillingService {
     });
     if (!property) throw new AppError(404, "Immobilie nicht gefunden");
 
-    const startDate = new Date(year, 0, 1);
-    const endDate = new Date(year + 1, 0, 1);
-    const daysInYear = isLeapYear(startDate) ? 366 : 365;
+    // Abrechnungszeitraum kann vom Kalenderjahr abweichen (Property.billingPeriodStartMonth).
+    const { periodStart, periodEnd, daysInPeriod } = this.resolvePeriod(
+      year,
+      (property as { billingPeriodStartMonth?: number }).billingPeriodStartMonth
+    );
+    const startDate = periodStart;
+    const endDate = addDays(periodEnd, 1); // exclusive upper bound
+    const daysInYear = daysInPeriod;
 
     const transactions = await prisma.transaction.findMany({
       where: {
@@ -506,7 +510,7 @@ export class UtilityBillingService {
       include: {
         contracts: {
           where: {
-            startDate: { lte: new Date(year, 11, 31) },
+            startDate: { lte: periodEnd },
             OR: [{ endDate: null }, { endDate: { gte: startDate } }],
           },
         },
@@ -529,8 +533,8 @@ export class UtilityBillingService {
 
     const contractWeights = contracts.map((contract) => ({
       contract,
-      occupancyFraction: this.calculateProRataFixedCosts(1, year, contract.startDate, contract.endDate),
-      vdiFraction: this.calculateHeatingBaseCostPercentage(year, contract.startDate, contract.endDate) / 100,
+      occupancyFraction: this.proRataFraction(periodStart, periodEnd, contract.startDate, contract.endDate),
+      vdiFraction: this.heatingBaseFraction(periodStart, periodEnd, contract.startDate, contract.endDate),
     }));
     const totalWeight = contractWeights.reduce(
       (sum, w) => sum + w.contract.unit.area * w.occupancyFraction,
@@ -562,7 +566,7 @@ export class UtilityBillingService {
         .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
       if (gross <= 0) continue;
       const pool = gross - (co2LandlordByPool[def.category] ?? 0);
-      const consumptionByUnit = await this.getConsumptionByUnit(propertyId, year, def.meterTypes);
+      const consumptionByUnit = await this.getConsumptionByUnit(propertyId, periodStart, endDate, def.meterTypes);
       const totalConsumption = [...consumptionByUnit.values()].reduce((a, b) => a + b, 0);
 
       if (totalConsumption > 0) {
@@ -589,7 +593,11 @@ export class UtilityBillingService {
     // Vacancy deduction applies to the area-allocated pool: the non-heating
     // costs plus any heating pool that had to fall back to area allocation.
     const vacancyPool = otherPool + heatingAreaFallbackPool;
-    const vacancyResult = await this.calculateVacancyDeduction(propertyId, year, vacancyPool, allUnits);
+    const vacancyResult = await this.calculateVacancyDeduction(propertyId, year, vacancyPool, allUnits, {
+      periodStart,
+      periodEnd,
+      daysInPeriod,
+    });
     const vacancyDeduction = vacancyResult?.amount ?? 0;
     const netAllocatable = vacancyPool - vacancyDeduction;
 
@@ -660,6 +668,8 @@ export class UtilityBillingService {
     return {
       year,
       propertyId,
+      periodStart,
+      periodEnd,
       daysInYear,
       totalArea,
       totalCosts: Math.round(grossCosts * 100) / 100,
@@ -728,8 +738,9 @@ export class UtilityBillingService {
   public async finalizeStatement(propertyId: number, year: number) {
     const statement = await this.generateStatement(propertyId, year);
 
-    const startOfYear = new Date(year, 0, 1);
-    const endOfYear = new Date(year, 11, 31);
+    // Abrechnungszeitraum (ggf. abweichend vom Kalenderjahr) aus dem Statement.
+    const startOfYear = statement.periodStart;
+    const endOfYear = statement.periodEnd;
 
     // Idempotent: always clear any prior run's vacancy entry first.
     await prisma.transaction.deleteMany({
@@ -786,6 +797,8 @@ export class UtilityBillingService {
           tenantName: item.tenantName,
           unitNumber: item.unitNumber,
           year,
+          periodStart: statement.periodStart,
+          periodEnd: statement.periodEnd,
           amount: item.amount,
           balance: item.balance,
           isRefund: item.isRefund,

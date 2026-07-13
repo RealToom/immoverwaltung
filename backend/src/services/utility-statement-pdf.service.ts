@@ -8,6 +8,9 @@ export interface TenantStatementPdfInput {
   tenantName: string;
   unitNumber: string;
   year: number;
+  /** Billing period (may differ from the calendar year). ISO strings or Dates. */
+  periodStart?: string | Date;
+  periodEnd?: string | Date;
   /** Tenant's total allocated cost share. */
   amount: number;
   /** totalPrepaid - amount (positive = refund). */
@@ -66,11 +69,14 @@ export async function generateTenantStatementPdf(
 ): Promise<{ filePath: string; fileSizeBytes: number }> {
   const { doc, done } = createPdfFile(outputPath);
 
+  const fmtDate = (d: string | Date) => new Date(d).toLocaleDateString("de-DE");
+  const periodLabel =
+    input.periodStart && input.periodEnd
+      ? `${fmtDate(input.periodStart)} – ${fmtDate(input.periodEnd)}`
+      : `01.01.${input.year} – 31.12.${input.year}`;
+
   doc.fontSize(18).font("Helvetica-Bold").text("Nebenkostenabrechnung", { align: "center" });
-  doc.fontSize(11).font("Helvetica").text(
-    `Abrechnungszeitraum: 01.01.${input.year} – 31.12.${input.year}`,
-    { align: "center" }
-  );
+  doc.fontSize(11).font("Helvetica").text(`Abrechnungszeitraum: ${periodLabel}`, { align: "center" });
   doc.moveDown(1.5);
 
   doc.fontSize(11).text(`Vermieter/Verwalter: ${input.companyName}`);

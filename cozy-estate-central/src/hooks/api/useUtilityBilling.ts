@@ -48,6 +48,8 @@ export function useApplyPrepaymentAdjustment() {
 export interface UtilityStatement {
   year: number;
   propertyId: number;
+  periodStart: string;
+  periodEnd: string;
   daysInYear: number;
   totalArea: number;
   totalCosts: number;

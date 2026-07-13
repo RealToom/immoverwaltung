@@ -647,6 +647,39 @@ describe("UtilityBillingService", () => {
       // 1200 / 12 = 100
       expect(result.items[0].suggestedPrepayment).toBeCloseTo(100, 2);
     });
+  });
+
+  describe("Abweichende Abrechnungszeiträume (billingPeriodStartMonth)", () => {
+    it("computes a July–June period and full-period pro-rata when start month is 7", async () => {
+      // billingPeriodStartMonth 7 → period 01.07.2025 – 30.06.2026 (365 days).
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1, billingPeriodStartMonth: 7 });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 90, description: "Betriebskosten", amount: -1200, betrkvCategory: "SONSTIGES", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "EG", area: 50, contracts: [{ startDate: new Date(2024, 0, 1), endDate: null }] },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, type: "WOHNRAUM", startDate: new Date(2024, 0, 1), endDate: null, occupantsCount: 1, unit: { id: 1, number: "EG", area: 50 }, tenant: { id: 7, name: "Mieter" } },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2025);
+
+      expect(result.periodStart).toEqual(new Date(2025, 6, 1));
+      expect(result.periodEnd).toEqual(new Date(2026, 5, 30));
+      expect(result.daysInYear).toBe(365);
+      // The tenant occupies the whole period → full 1200.
+      expect(result.items[0].amount).toBeCloseTo(1200, 1);
+      expect(result.items[0].occupancyDays).toBe(365);
+      // The transaction query window must span the shifted period.
+      const where = mockTransactionFindMany.mock.calls[0][0].where;
+      expect(where.date.gte).toEqual(new Date(2025, 6, 1));
+      expect(where.date.lt).toEqual(new Date(2026, 6, 1));
+    });
 
     it("applyPrepaymentAdjustment writes the new prepayment onto the contract", async () => {
       mockContractFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1 });

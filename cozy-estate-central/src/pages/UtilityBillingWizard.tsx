@@ -267,6 +267,15 @@ export default function UtilityBillingWizard() {
                     {generateStatement.isPending ? "Berechne..." : "Kosten berechnen"}
                   </Button>
                 </div>
+                {statement && (
+                  <p className="text-sm text-muted-foreground">
+                    Abrechnungszeitraum:{" "}
+                    <strong>
+                      {new Date(statement.periodStart).toLocaleDateString("de-DE")} – {new Date(statement.periodEnd).toLocaleDateString("de-DE")}
+                    </strong>{" "}
+                    ({statement.daysInYear} Tage)
+                  </p>
+                )}
               </CardContent>
             </Card>
 
