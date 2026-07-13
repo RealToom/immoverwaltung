@@ -479,6 +479,77 @@ export async function getDisputes(tenantUser: TenantUser) {
   );
 }
 
+// ─── Belegeinsicht (§ 259 BGB) ──────────────────────────────────────────────────
+
+/**
+ * Lists the receipts (Belege) backing the allocatable costs of the tenant's
+ * property for a billing year, so the tenant can exercise their inspection
+ * right under § 259 BGB / § 556 BGB.
+ */
+export async function getReceipts(tenantUser: TenantUser, year?: number) {
+  const targetYear = year ?? new Date().getFullYear() - 1;
+  const contract = await getContractForYear(tenantUser, targetYear);
+
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      companyId: tenantUser.companyId,
+      propertyId: contract.propertyId,
+      type: "AUSGABE",
+      allocatable: true,
+      receiptDocumentId: { not: null },
+      date: { gte: new Date(targetYear, 0, 1), lt: new Date(targetYear + 1, 0, 1) },
+    },
+    select: {
+      id: true,
+      description: true,
+      amount: true,
+      date: true,
+      betrkvCategory: true,
+      receiptDocument: { select: { id: true, name: true, fileType: true, fileSize: true } },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  return {
+    year: targetYear,
+    receipts: transactions
+      .filter((t) => t.receiptDocument)
+      .map((t) => ({
+        transactionId: t.id,
+        description: t.description,
+        amount: t.amount,
+        date: t.date,
+        betrkvCategory: t.betrkvCategory,
+        document: t.receiptDocument,
+      })),
+  };
+}
+
+/**
+ * Authorizes and returns a receipt document for download: the document must be
+ * attached as a receipt to an allocatable transaction on a property where this
+ * tenant holds (or held) a contract.
+ */
+export async function downloadReceipt(tenantUser: TenantUser, documentId: number) {
+  const contracts = await prisma.contract.findMany({
+    where: { tenantId: tenantUser.tenantId, companyId: tenantUser.companyId },
+    select: { propertyId: true },
+  });
+  const propertyIds = [...new Set(contracts.map((c) => c.propertyId))];
+
+  const tx = await prisma.transaction.findFirst({
+    where: {
+      companyId: tenantUser.companyId,
+      receiptDocumentId: documentId,
+      allocatable: true,
+      propertyId: { in: propertyIds },
+    },
+    select: { receiptDocument: true },
+  });
+  if (!tx || !tx.receiptDocument) throw new NotFoundError("Beleg", documentId);
+  return tx.receiptDocument;
+}
+
 // ─── Admin functions ───────────────────────────────────────────────────────────
 
 export async function adminReplyToTenant(

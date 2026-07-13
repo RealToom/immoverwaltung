@@ -61,6 +61,12 @@ router.get("/finances", ctrl.getFinances);
 
 // ─── Utility Billing ────────────────────────────────────────────────────────────
 router.get("/utility", validate({ query: utilityQuerySchema }), ctrl.getUtility);
+router.get("/utility/receipts", validate({ query: utilityQuerySchema }), ctrl.getReceipts);
+router.get(
+  "/utility/receipts/:id/download",
+  validate({ params: tenantPortalIdParamSchema }),
+  ctrl.downloadReceipt
+);
 router.get("/meters", ctrl.getMeters);
 router.post(
   "/meters/:id/readings",

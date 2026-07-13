@@ -111,6 +111,34 @@ export function tenantApi<T>(slug: string, path: string, options: RequestOptions
   return api<T>(`/api/tenant/${slug}${path}`, options);
 }
 
+/** Downloads an authenticated file (blob) and triggers a browser save dialog. */
+export async function tenantDownload(slug: string, path: string, filename: string): Promise<void> {
+  _currentSlug = slug;
+  const url = `/api/tenant/${slug}${path}`;
+  const headers: Record<string, string> = {};
+  if (_accessToken) headers["Authorization"] = `Bearer ${_accessToken}`;
+
+  let res = await fetch(url, { headers, credentials: "include" });
+  if (res.status === 401 && _accessToken) {
+    const newToken = await refreshToken();
+    if (newToken) {
+      headers["Authorization"] = `Bearer ${newToken}`;
+      res = await fetch(url, { headers, credentials: "include" });
+    }
+  }
+  if (!res.ok) throw new ApiError(res.status, `HTTP ${res.status}`);
+
+  const blob = await res.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
 /** Schließt den 2FA-Login ab. mfaToken wird als Authorization-Header gesendet. */
 export async function verify2fa(
   slug: string,

@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
-import { CreditCard, ListChecks } from "lucide-react";
-import { useTenantUtility } from "@/hooks/api/useTenantUtility";
+import { CreditCard, ListChecks, FileText, Download } from "lucide-react";
+import { useTenantUtility, useTenantReceipts, downloadReceipt } from "@/hooks/api/useTenantUtility";
 
 function formatEur(n: number): string {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(n);
@@ -9,6 +9,8 @@ function formatEur(n: number): string {
 export default function UtilityTransparency() {
   const { slug } = useParams<{ slug: string }>();
   const { data, isLoading } = useTenantUtility(slug!);
+  const { data: receiptsData } = useTenantReceipts(slug!, data?.year);
+  const receipts = receiptsData?.receipts ?? [];
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 pb-20">
@@ -66,6 +68,39 @@ export default function UtilityTransparency() {
                 </div>
               )}
             </div>
+
+            {receipts.length > 0 && (
+              <div className="bg-white border rounded-2xl p-4">
+                <h2 className="flex items-center gap-2 font-semibold mb-1">
+                  <FileText className="w-5 h-5" />
+                  Belegeinsicht (§ 259 BGB)
+                </h2>
+                <p className="text-sm text-gray-500 mb-3">
+                  Die Rechnungen und Belege zu deiner Abrechnung — du kannst sie hier einsehen und herunterladen.
+                </p>
+                <div className="space-y-2">
+                  {receipts.map((r) => (
+                    <div key={r.transactionId} className="flex justify-between items-center py-2 border-b last:border-0 text-sm">
+                      <div className="min-w-0">
+                        <p className="truncate">{r.description}</p>
+                        <p className="text-xs text-gray-500">
+                          {new Date(r.date).toLocaleDateString("de-DE")} — {formatEur(Math.abs(r.amount))}
+                        </p>
+                      </div>
+                      {r.document && (
+                        <button
+                          onClick={() => downloadReceipt(slug!, r.document!.id, r.document!.name)}
+                          className="flex items-center gap-1 text-blue-600 shrink-0 ml-3"
+                        >
+                          <Download className="w-4 h-4" />
+                          Beleg
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

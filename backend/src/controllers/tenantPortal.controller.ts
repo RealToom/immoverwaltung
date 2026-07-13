@@ -143,6 +143,38 @@ export async function getMeters(req: Request, res: Response): Promise<void> {
   res.json({ data });
 }
 
+export async function getReceipts(req: Request, res: Response): Promise<void> {
+  const year = req.query.year ? Number(req.query.year) : undefined;
+  const data = await svc.getReceipts(req.tenantUser!, year);
+  res.json({ data });
+}
+
+export async function downloadReceipt(req: Request, res: Response): Promise<void> {
+  const doc = await svc.downloadReceipt(req.tenantUser!, Number(req.params.id));
+
+  if (!doc.filePath) {
+    res.status(400).json({ error: "Keine Datei vorhanden" });
+    return;
+  }
+
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+
+  if (doc.isEncrypted) {
+    const decrypted = decryptFile(doc.filePath);
+    const ext = getOriginalExt(doc.filePath);
+    const mime = MIME_MAP[ext] || "application/octet-stream";
+    const safeName = sanitizeName(doc.name);
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Content-Length", decrypted.length);
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}"`);
+    res.send(decrypted);
+    return;
+  }
+
+  res.download(doc.filePath, sanitizeName(doc.name));
+}
+
 export async function addMeterReading(req: Request, res: Response): Promise<void> {
   const data = await svc.addOwnMeterReading(
     req.tenantUser!,
