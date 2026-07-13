@@ -7,11 +7,11 @@ import { CheckCircle2, ChevronRight, Settings, Send, AlertTriangle, Leaf, Buildi
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useProperties } from "@/hooks/api/useProperties";
-import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement, useStatementDeadlines } from "@/hooks/api/useUtilityBilling";
+import { useGenerateUtilityStatement, useUtilityDisputes, useUpdateDisputeStatus, useFinalizeStatement, useStatementDeadlines, useSetDistributionKeys } from "@/hooks/api/useUtilityBilling";
 import type { UtilityStatementTransaction, FinalizedStatementItem } from "@/hooks/api/useUtilityBilling";
 import { useUpdateTransaction } from "@/hooks/api/useFinance";
 import { useDownloadDocument } from "@/hooks/api/useDocuments";
-import { BETRKV_LABELS, mapBetrkvCategory, mapDisputeStatus } from "@/lib/mappings";
+import { BETRKV_LABELS, mapBetrkvCategory, mapDisputeStatus, DISTRIBUTION_KEY_LABELS } from "@/lib/mappings";
 
 const BETRKV_CATEGORIES = Object.keys(BETRKV_LABELS);
 
@@ -37,6 +37,7 @@ export default function UtilityBillingWizard() {
   const downloadDocument = useDownloadDocument();
   const { data: deadlinesRes } = useStatementDeadlines();
   const deadlines = deadlinesRes?.data ?? [];
+  const setDistributionKeys = useSetDistributionKeys();
   const [finalizedItems, setFinalizedItems] = useState<FinalizedStatementItem[] | null>(null);
 
   const regenerate = () => {
@@ -67,6 +68,12 @@ export default function UtilityBillingWizard() {
 
   const handleAllocatableToggle = (txId: number, allocatable: boolean) => {
     updateTransaction.mutate({ id: txId, data: { allocatable } }, { onSuccess: regenerate });
+  };
+
+  const handleKeyChange = (category: string, key: string) => {
+    if (!propertyId || !statement) return;
+    const costConfiguration = { ...statement.distributionKeys, [category]: key };
+    setDistributionKeys.mutate({ propertyId, costConfiguration }, { onSuccess: regenerate });
   };
 
   const handleFinalize = () => {
@@ -389,6 +396,21 @@ export default function UtilityBillingWizard() {
                                 onBlur={(e) => handleTagUpdate(tx, "co2TaxAmount", e.target.value)}
                                 className="h-7 w-28 text-xs rounded border border-input px-2"
                               />
+                              {tx.betrkvCategory && (
+                                <Select
+                                  value={statement?.distributionKeys?.[tx.betrkvCategory] ?? "WOHNFLAECHE"}
+                                  onValueChange={(v) => handleKeyChange(tx.betrkvCategory!, v)}
+                                >
+                                  <SelectTrigger className="h-7 text-xs w-[150px]" title="Verteilerschlüssel">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {Object.entries(DISTRIBUTION_KEY_LABELS).map(([k, label]) => (
+                                      <SelectItem key={k} value={k}>{label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              )}
                               {tx.co2TaxAmount != null && tx.co2TaxAmount > 0 && (
                                 <Badge className="text-xs bg-green-100 text-green-800 border-green-300">
                                   <Leaf className="w-3 h-3 mr-1" />

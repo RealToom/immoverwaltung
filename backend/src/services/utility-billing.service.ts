@@ -474,12 +474,32 @@ export class UtilityBillingService {
 
     const passport = await prisma.energyPassport.findUnique({ where: { propertyId } });
 
+    // Verteilerschlüssel je BetrKV-Kategorie (§ 556a: WOHNFLAECHE als
+    // gesetzlicher Standard, PERSONEN oder WOHNEINHEIT per Konfiguration).
+    const config = (property.costConfiguration ?? {}) as Record<string, string>;
+    const keyFor = (cat: string | null) => (cat && config[cat]) || "WOHNFLAECHE";
+
     const grossCosts = transactions.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
     const heatingGross = transactions.filter(isHeatingTx).reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
     const otherGross = grossCosts - heatingGross;
-    const otherPool = otherGross - co2LandlordByPool.OTHER;
+    const nonHeating = transactions.filter((tx) => !isHeatingTx(tx));
+    const personGross = nonHeating
+      .filter((tx) => keyFor(tx.betrkvCategory) === "PERSONEN")
+      .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    const unitGross = nonHeating
+      .filter((tx) => keyFor(tx.betrkvCategory) === "WOHNEINHEIT")
+      .reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    // Only the WOHNFLAECHE-keyed remainder flows through the area pool (and
+    // absorbs vacancy). Person-/unit-keyed costs are allocated in full to the
+    // occupying tenants below.
+    const otherPool = otherGross - personGross - unitGross - co2LandlordByPool.OTHER;
     const totalCo2LandlordShare =
       co2LandlordByPool.HEIZUNG + co2LandlordByPool.WARMWASSER + co2LandlordByPool.OTHER;
+
+    const distributionKeys: Record<string, string> = {};
+    for (const tx of nonHeating) {
+      if (tx.betrkvCategory) distributionKeys[tx.betrkvCategory] = keyFor(tx.betrkvCategory);
+    }
 
     const allUnits = await prisma.unit.findMany({
       where: { propertyId, property: { companyId: this.companyId } },
@@ -516,6 +536,13 @@ export class UtilityBillingService {
       (sum, w) => sum + w.contract.unit.area * w.occupancyFraction,
       0
     );
+    // Denominators for the alternative distribution keys (occupancy-weighted).
+    const personWeightTotal =
+      personGross > 0
+        ? contractWeights.reduce((sum, w) => sum + (w.contract.occupantsCount ?? 1) * w.occupancyFraction, 0)
+        : 0;
+    const unitWeightTotal =
+      unitGross > 0 ? contractWeights.reduce((sum, w) => sum + w.occupancyFraction, 0) : 0;
 
     // HeizkostenV: each heating pool (Heizung, Warmwasser) is split 70/30 by
     // its own metered consumption (§ 9 verlangt getrennte Warmwassererfassung).
@@ -571,7 +598,12 @@ export class UtilityBillingService {
       const weight = contract.unit.area * occupancyFraction;
       const areaShare = totalWeight > 0 ? netAllocatable * (weight / totalWeight) : 0;
       const heatingShare = heatingByContract.get(contract.id) ?? 0;
-      const share = areaShare + heatingShare;
+      const personShare =
+        personGross > 0 && personWeightTotal > 0
+          ? personGross * (((contract.occupantsCount ?? 1) * occupancyFraction) / personWeightTotal)
+          : 0;
+      const unitShare = unitGross > 0 && unitWeightTotal > 0 ? unitGross * (occupancyFraction / unitWeightTotal) : 0;
+      const share = areaShare + heatingShare + personShare + unitShare;
       const balance = await this.calculateBalance(contract.id, year, share);
       items.push({
         contractId: contract.id,
@@ -595,6 +627,7 @@ export class UtilityBillingService {
       daysInYear,
       totalArea,
       totalCosts: Math.round(grossCosts * 100) / 100,
+      distributionKeys,
       co2: {
         energyClass: passport?.energyClass ?? null,
         co2Emissions: passport?.co2Emissions ?? null,
@@ -725,6 +758,7 @@ export class UtilityBillingService {
           daysInYear: statement.daysInYear,
           totalCosts: statement.totalCosts,
           categories,
+          distributionKeys: statement.distributionKeys,
           co2: statement.co2.landlordShare > 0 ? statement.co2 : null,
           heating: statement.heating
             ? {
@@ -878,6 +912,22 @@ export class UtilityBillingService {
     }
 
     return deadlines.sort((a, b) => a.daysRemaining - b.daysRemaining);
+  }
+
+  /**
+   * Persists the per-category distribution keys (Verteilerschlüssel) for a
+   * property. Format: { GRUNDSTEUER: "WOHNFLAECHE", HAUSWART: "WOHNEINHEIT" }.
+   */
+  public async setDistributionKeys(propertyId: number, costConfiguration: Record<string, string>) {
+    const property = await prisma.property.findFirst({
+      where: { id: propertyId, companyId: this.companyId },
+    });
+    if (!property) throw new AppError(404, "Immobilie nicht gefunden");
+    return prisma.property.update({
+      where: { id: propertyId },
+      data: { costConfiguration },
+      select: { id: true, costConfiguration: true },
+    });
   }
 
   /** Lists persisted statement snapshots (newest first). */

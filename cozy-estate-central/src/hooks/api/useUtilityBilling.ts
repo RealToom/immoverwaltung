@@ -51,9 +51,20 @@ export interface UtilityStatement {
     warmWater: { totalCosts: number; consumptionBased: boolean; ownerShare: number } | null;
   } | null;
   vacancy: { amount: number; vacancyDays: number; affectedUnits: string[] } | null;
+  distributionKeys: Record<string, string>;
   items: UtilityStatementItem[];
   transactions: UtilityStatementTransaction[];
   unallocatedTransactions: UnallocatedTransaction[];
+}
+
+export function useSetDistributionKeys() {
+  return useMutation({
+    mutationFn: ({ propertyId, costConfiguration }: { propertyId: number; costConfiguration: Record<string, string> }) =>
+      api(`/utility-billing/properties/${propertyId}/distribution-keys`, {
+        method: "PATCH",
+        body: { costConfiguration },
+      }),
+  });
 }
 
 export interface StatementDeadline {

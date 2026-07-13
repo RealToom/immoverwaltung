@@ -204,3 +204,11 @@ export const DISPUTE_STATUS_LABELS: Record<string, string> = {
   ABGELEHNT: "Abgelehnt",
 };
 export const mapDisputeStatus = (s: string) => DISPUTE_STATUS_LABELS[s] ?? s;
+
+// ─── Verteilerschlüssel (Umlagemaßstab) ─────────────────────
+export const DISTRIBUTION_KEY_LABELS: Record<string, string> = {
+  WOHNFLAECHE: "Wohnfläche",
+  PERSONEN: "Personenzahl",
+  WOHNEINHEIT: "Wohneinheit",
+};
+export const mapDistributionKey = (s: string) => DISTRIBUTION_KEY_LABELS[s] ?? s;

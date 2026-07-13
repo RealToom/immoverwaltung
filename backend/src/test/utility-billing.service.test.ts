@@ -473,4 +473,62 @@ describe("UtilityBillingService", () => {
       expect(result.items[1].amount).toBeCloseTo(500, 1);
     });
   });
+
+  describe("Verteilerschlüssel pro Kategorie (costConfiguration)", () => {
+    it("distributes a PERSONEN-keyed category by occupantsCount", async () => {
+      // HAUSREINIGUNG 400 keyed to PERSONEN. Contract A has 3 occupants,
+      // contract B has 1 → 3:1 split = 300 / 100.
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1, costConfiguration: { HAUSREINIGUNG: "PERSONEN" } });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 50, description: "Treppenhausreinigung", amount: -400, betrkvCategory: "HAUSREINIGUNG", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "EG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+        { id: 2, number: "OG", area: 50, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, startDate: new Date(2025, 0, 1), endDate: null, occupantsCount: 3, unit: { id: 1, number: "EG", area: 50 }, tenant: { id: 7, name: "Familie" } },
+        { id: 2, startDate: new Date(2025, 0, 1), endDate: null, occupantsCount: 1, unit: { id: 2, number: "OG", area: 50 }, tenant: { id: 8, name: "Single" } },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 2, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      expect(result.items[0].amount).toBeCloseTo(300, 1);
+      expect(result.items[1].amount).toBeCloseTo(100, 1);
+      expect(result.distributionKeys).toMatchObject({ HAUSREINIGUNG: "PERSONEN" });
+    });
+
+    it("distributes a WOHNEINHEIT-keyed category equally per unit, ignoring area", async () => {
+      // HAUSWART 200 keyed to WOHNEINHEIT: 100 / 100 despite 30/70 m² areas.
+      mockPropertyFindFirst.mockResolvedValueOnce({ id: 1, companyId: 1, costConfiguration: { HAUSWART: "WOHNEINHEIT" } });
+      mockTransactionFindMany.mockResolvedValueOnce([
+        { id: 51, description: "Hausmeister", amount: -200, betrkvCategory: "HAUSWART", maintenanceWarning: null, co2TaxAmount: 0 },
+      ]);
+      mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
+      mockUnitFindMany.mockResolvedValueOnce([
+        { id: 1, number: "EG", area: 30, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+        { id: 2, number: "OG", area: 70, contracts: [{ startDate: new Date(2025, 0, 1), endDate: null }] },
+      ]);
+      mockContractFindMany.mockResolvedValueOnce([
+        { id: 1, startDate: new Date(2025, 0, 1), endDate: null, occupantsCount: 1, unit: { id: 1, number: "EG", area: 30 }, tenant: { id: 7, name: "A" } },
+        { id: 2, startDate: new Date(2025, 0, 1), endDate: null, occupantsCount: 1, unit: { id: 2, number: "OG", area: 70 }, tenant: { id: 8, name: "B" } },
+      ]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 1, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+      mockContractFindUnique.mockResolvedValueOnce({ id: 2, companyId: 1, monthlyRent: 800, utilityPrepayment: 0 });
+      mockRentPaymentFindMany.mockResolvedValueOnce([]);
+
+      const svc = new UtilityBillingService(1);
+      const result = await svc.generateStatement(1, 2026);
+
+      expect(result.items[0].amount).toBeCloseTo(100, 1);
+      expect(result.items[1].amount).toBeCloseTo(100, 1);
+    });
+  });
 });

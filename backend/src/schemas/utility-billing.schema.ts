@@ -18,3 +18,7 @@ export const listStatementsQuerySchema = z.object({
 export const updateDisputeStatusSchema = z.object({
   status: z.enum(DISPUTE_STATUSES),
 });
+
+export const distributionKeysSchema = z.object({
+  costConfiguration: z.record(z.string(), z.enum(["WOHNFLAECHE", "PERSONEN", "WOHNEINHEIT"])),
+});

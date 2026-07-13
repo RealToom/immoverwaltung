@@ -23,6 +23,8 @@ export interface TenantStatementPdfInput {
   /** Property-level gross allocatable costs. */
   totalCosts: number;
   categories: TenantCategoryLine[];
+  /** Per-category distribution key (Verteilerschlüssel), e.g. { GRUNDSTEUER: "WOHNFLAECHE" }. */
+  distributionKeys?: Record<string, string>;
   co2: { landlordPercentage: number; landlordShare: number; tenantShare: number; energyClass: string | null } | null;
   heating: {
     consumptionBased: boolean;
@@ -32,6 +34,12 @@ export interface TenantStatementPdfInput {
   } | null;
   vacancyDeduction: number;
 }
+
+const DISTRIBUTION_KEY_LABELS: Record<string, string> = {
+  WOHNFLAECHE: "Wohnfläche",
+  PERSONEN: "Personenzahl",
+  WOHNEINHEIT: "Wohneinheit",
+};
 
 function formatEur(n: number): string {
   return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(n);
@@ -88,8 +96,10 @@ export async function generateTenantStatementPdf(
     doc.text("Keine kategorisierten Kosten vorhanden.");
   } else {
     for (const c of input.categories) {
+      const key = input.distributionKeys?.[c.category];
+      const keyLabel = key ? ` [${DISTRIBUTION_KEY_LABELS[key] ?? key}]` : "";
       doc.text(
-        `${c.label}  —  Gesamtkosten: ${formatEur(c.propertyTotal)}, Ihr Anteil: ${formatEur(c.tenantShare)}`
+        `${c.label}${keyLabel}  —  Gesamtkosten: ${formatEur(c.propertyTotal)}, Ihr Anteil: ${formatEur(c.tenantShare)}`
       );
     }
     doc.moveDown(0.5);

@@ -20,6 +20,13 @@ export async function finalizeStatement(req: Request, res: Response): Promise<vo
   res.json({ data });
 }
 
+export async function setDistributionKeys(req: Request, res: Response): Promise<void> {
+  const { costConfiguration } = req.body as { costConfiguration: Record<string, string> };
+  const svc = new UtilityBillingService(req.companyId!);
+  const data = await svc.setDistributionKeys(Number(req.params.id), costConfiguration);
+  res.json({ data });
+}
+
 export async function getStatementDeadlines(req: Request, res: Response): Promise<void> {
   const svc = new UtilityBillingService(req.companyId!);
   const data = await svc.getStatementDeadlines();

@@ -3,6 +3,7 @@ import { validate } from "../middleware/validate.js";
 import { requireRole } from "../middleware/requireRole.js";
 import { idParamSchema } from "../schemas/common.schema.js";
 import {
+  distributionKeysSchema,
   generateStatementSchema,
   listDisputesQuerySchema,
   listStatementsQuerySchema,
@@ -23,6 +24,12 @@ router.post(
   requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
   validate({ body: generateStatementSchema }),
   ctrl.finalizeStatement
+);
+router.patch(
+  "/properties/:id/distribution-keys",
+  requireRole("ADMIN", "VERWALTER", "BUCHHALTER"),
+  validate({ params: idParamSchema, body: distributionKeysSchema }),
+  ctrl.setDistributionKeys
 );
 router.get("/statements/deadlines", ctrl.getStatementDeadlines);
 router.get("/statements", validate({ query: listStatementsQuerySchema }), ctrl.listStatements);
