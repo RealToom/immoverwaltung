@@ -55,6 +55,22 @@
 
 ## Changelog
 
+### 2026-07-13: Nebenkostenabrechnung — Ausbau zur rechtssicheren Vollversion (11 Features)
+
+Aufbauend auf F6 wurden elf Erweiterungen für eine gerichtsfeste Betriebskostenabrechnung umgesetzt (Backend 242 Tests grün, alle Frontends tsc-sauber + Build ok):
+
+1. **Snapshot-Modell** (`UtilityStatement`/`UtilityStatementItem`): Finalisierte Abrechnungen werden als unveränderliche Momentaufnahme persistiert; erneutes Finalisieren erzeugt eine Korrekturabrechnung (`KORRIGIERT` + `supersededById`). Portal & PDF zeigen stets die zugestellten Zahlen.
+2. **Fristverfolgung § 556 + Zustellung**: `getStatementDeadlines()` (GET `/utility-billing/statements/deadlines`) listet offene Perioden mit Zustellfrist (Periodenende + 12 Monate) und Resttagen; Finalisieren mailt Portal-Mieter (`sendUtilityStatementEmail`) und stempelt `deliveredAt`. Wizard-Fristenkarte.
+3. **Warmwasser-Trennung § 9/§ 9b HeizkostenV**: Heizung und Warmwasser sind eigene 70/30-Verbrauchspools (WAERME/GAS vs. WARMWASSER-Zähler); Pools ohne Zähler fallen mit §-12-Warnung auf Fläche zurück. Nutzerwechsel ohne Zwischenablesung → §-9b-Schätzungsausweis.
+4. **Verteilerschlüssel pro Kategorie** (`Property.costConfiguration`): WOHNFLAECHE (Standard), PERSONEN (`Contract.occupantsCount`), WOHNEINHEIT. PATCH `/utility-billing/properties/:id/distribution-keys`; Wizard-Selektor + PDF-Ausweis.
+5. **Vorwegabzug Gewerbe § 556a**: `vorwegabzug`-Block quantifiziert den auf GEWERBE-Verträge entfallenden Anteil; PDF-Hinweis auf Wohnmieter-Abrechnungen, Wizard-Karte.
+6. **§ 35a EStG-Bescheinigung**: `Transaction.laborCostAmount` → anteiliger Lohnkostenausweis je Mieter (`laborCostShare`) mit 20-%-Abzugshinweis im PDF; Wizard-Spalte.
+7. **Vorauszahlungs-Anpassung § 560 Abs. 4**: `suggestedPrepayment` (1/12 des Kostenanteils) auf Live-Items; PATCH `/utility-billing/contracts/:id/prepayment` + Ein-Klick-"Übernehmen".
+8. **Belegeinsicht im Portal § 259 BGB**: `getReceipts`/`downloadReceipt` (GET `/tenant/:slug/utility/receipts`) liefern die Belege (`Transaction.receiptDocument`) der eigenen Immobilie/Periode; Portal-Downloadliste.
+9. **Zahlungsabwicklung**: `settlementStatus` (OFFEN/BEZAHLT/VERRECHNET) + `settledAt`; PATCH `/utility-billing/statements/items/:id/settlement`; Admin-Badge + "Bezahlt", Portal-Status.
+10. **Abweichende Abrechnungszeiträume** (`Property.billingPeriodStartMonth`): periodenbasierte Berechnung (Pro-rata, VDI, Leerstand, Verbrauchsfenster) statt Kalenderjahr; PDF/Wizard zeigen den realen Zeitraum.
+11. **Plausibilitätsprüfung**: `runPlausibilityChecks` (GET `/utility-billing/plausibility`) meldet Kategorien mit >25 % Vorjahresabweichung und €/m²/Monat gegen den Betriebskostenspiegel; Wizard-Karte.
+
 ### 2026-06-12: Code-Review + Security-Fixes (Webhook, Superadmin, Banking)
 
 Vollständiger Review-Durchlauf (Backend 141 Tests grün, beide Frontends tsc-sauber) mit anschließenden Fixes:
