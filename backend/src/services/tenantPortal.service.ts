@@ -537,16 +537,19 @@ export async function getReceipts(tenantUser: TenantUser, year?: number) {
 export async function downloadReceipt(tenantUser: TenantUser, documentId: number) {
   const contracts = await prisma.contract.findMany({
     where: { tenantId: tenantUser.tenantId, companyId: tenantUser.companyId },
-    select: { propertyId: true },
+    select: { propertyId: true, startDate: true, endDate: true },
   });
-  const propertyIds = [...new Set(contracts.map((c) => c.propertyId))];
+  if (contracts.length === 0) throw new NotFoundError("Beleg", documentId);
 
   const tx = await prisma.transaction.findFirst({
     where: {
       companyId: tenantUser.companyId,
       receiptDocumentId: documentId,
       allocatable: true,
-      propertyId: { in: propertyIds },
+      OR: contracts.map((c) => ({
+        propertyId: c.propertyId,
+        date: { gte: c.startDate, ...(c.endDate ? { lte: c.endDate } : {}) },
+      })),
     },
     select: { receiptDocument: true },
   });
