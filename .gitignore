@@ -27,3 +27,6 @@ nul
 # Uploads (user data, not source code)
 backend/uploads/
 .worktrees/
+
+# Nested standalone prototype (has its own git repo)
+Nebenkosten abrechnung/
