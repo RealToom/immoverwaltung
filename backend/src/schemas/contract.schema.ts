@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { paginationSchema } from "./common.schema.js";
+import { isKautionValid, MAX_KAUTION_MONATE } from "../lib/mietrecht.js";
 
 export const contractQuerySchema = paginationSchema.extend({
   status: z.enum(["AKTIV", "GEKUENDIGT", "AUSLAUFEND", "ENTWURF"]).optional(),
@@ -7,7 +8,7 @@ export const contractQuerySchema = paginationSchema.extend({
   propertyId: z.coerce.number().int().positive().optional(),
 });
 
-export const createContractSchema = z.object({
+const contractObject = z.object({
   type: z.enum(["WOHNRAUM", "GEWERBE", "STAFFEL", "INDEX"]),
   startDate: z.coerce.date(),
   endDate: z.coerce.date().nullable().default(null),
@@ -23,4 +24,14 @@ export const createContractSchema = z.object({
   unitId: z.number().int().positive(),
 });
 
-export const updateContractSchema = createContractSchema.partial();
+// § 551 Abs. 1 BGB: Kaution höchstens drei Nettokaltmieten. Greift nur, wenn
+// beide Werte vorliegen (bei Teil-Updates dürfen einzelne Felder fehlen).
+const kautionRefinement = (d: { deposit?: number; monthlyRent?: number }) =>
+  d.deposit == null || d.monthlyRent == null || isKautionValid(d.deposit, d.monthlyRent);
+const kautionError = {
+  message: `Die Kaution darf höchstens ${MAX_KAUTION_MONATE} Nettokaltmieten betragen (§ 551 Abs. 1 BGB).`,
+  path: ["deposit"],
+};
+
+export const createContractSchema = contractObject.refine(kautionRefinement, kautionError);
+export const updateContractSchema = contractObject.partial().refine(kautionRefinement, kautionError);

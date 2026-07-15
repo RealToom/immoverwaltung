@@ -80,7 +80,7 @@ describe("UtilityBillingService", () => {
       mockEnergyPassportFindUnique.mockResolvedValueOnce({ co2Emissions: 10 });
       const svc = new UtilityBillingService(1);
       const result = await svc.applyCO2Stufenmodell(1, 200);
-      expect(result).toEqual({ tenantShare: 200, landlordShare: 0, landlordPercentage: 0 });
+      expect(result).toEqual({ tenantShare: 200, landlordShare: 0, landlordPercentage: 0, dataMissing: false });
     });
 
     it("applies 60% landlord share in the 37-42 kg CO2/m2/a tier", async () => {
@@ -96,7 +96,7 @@ describe("UtilityBillingService", () => {
       mockEnergyPassportFindUnique.mockResolvedValueOnce(null);
       const svc = new UtilityBillingService(1);
       const result = await svc.applyCO2Stufenmodell(1, 100);
-      expect(result).toEqual({ tenantShare: 50, landlordShare: 50, landlordPercentage: 50 });
+      expect(result).toEqual({ tenantShare: 50, landlordShare: 50, landlordPercentage: 50, dataMissing: true });
     });
   });
 

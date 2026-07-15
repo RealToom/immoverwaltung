@@ -113,19 +113,26 @@ export class UtilityBillingService {
   public async applyCO2Stufenmodell(
     propertyId: number,
     co2TaxTotal: number
-  ): Promise<{ tenantShare: number; landlordShare: number; landlordPercentage: number }> {
-    if (co2TaxTotal <= 0) return { tenantShare: 0, landlordShare: 0, landlordPercentage: 0 };
+  ): Promise<{ tenantShare: number; landlordShare: number; landlordPercentage: number; dataMissing: boolean }> {
+    if (co2TaxTotal <= 0) return { tenantShare: 0, landlordShare: 0, landlordPercentage: 0, dataMissing: false };
 
     const passport = await prisma.energyPassport.findUnique({
       where: { propertyId }
     });
 
-    // Fallback: Wenn kein Ausweis da ist, pauschal 50% / 50% als gesetzliche Strafe/Ersatzwert
+    // Vorläufiger Fallback ohne CO2-Emissionsdaten: 50/50. ACHTUNG — das ist KEINE
+    // gesetzliche Regel für Wohngebäude, sondern nur die Übergangsregel für
+    // Nichtwohngebäude (§ 8 CO2KostAufG). Für Wohngebäude ist zwingend das
+    // Stufenmodell (§ 5) anzuwenden; die CO2-Emissionen pro m²/Jahr müssen aus dem
+    // Energieausweis bzw. der Brennstoffrechnung (§ 3 CO2KostAufG) stammen. Der
+    // 50/50-Wert dient nur, damit die Abrechnung nicht blockiert — der Aufrufer
+    // MUSS über `dataMissing` einen Warnhinweis ausgeben.
     if (!passport || !passport.co2Emissions) {
       return {
         tenantShare: co2TaxTotal * 0.5,
         landlordShare: co2TaxTotal * 0.5,
-        landlordPercentage: 50
+        landlordPercentage: 50,
+        dataMissing: true
       };
     }
 
@@ -147,7 +154,7 @@ export class UtilityBillingService {
     const landlordShare = (co2TaxTotal * landlordPercentage) / 100;
     const tenantShare = co2TaxTotal - landlordShare;
 
-    return { tenantShare, landlordShare, landlordPercentage };
+    return { tenantShare, landlordShare, landlordPercentage, dataMissing: false };
   }
 
   /**
@@ -339,7 +346,13 @@ export class UtilityBillingService {
     { category: "WARMWASSER", label: "Warmwasser", meterTypes: ["WARMWASSER"] },
   ];
 
-  /** Share of heating costs allocated by metered consumption (§ 7 HeizkostenV: 50–70%). */
+  /**
+   * Verbrauchsabhängiger Anteil der Heiz-/Warmwasserkosten (§ 7 Abs. 1 HeizkostenV).
+   * Zulässig sind 50–70 %; 70 % ist die verbrauchsstärkste Variante und für Gebäude
+   * mit überwiegend gedämmten Leitungen bzw. bestimmte Neubauten sogar vorgeschrieben,
+   * für alle anderen frei wählbar. 70 % ist daher der sichere Standard. Wenn dies
+   * je Objekt konfigurierbar werden soll, ist ein Feld am Property + Migration nötig.
+   */
   private static readonly HEATING_CONSUMPTION_SHARE = 0.7;
 
   /**
@@ -467,12 +480,14 @@ export class UtilityBillingService {
     const co2LandlordByPool: Record<string, number> = { HEIZUNG: 0, WARMWASSER: 0, OTHER: 0 };
     let totalCo2TenantShare = 0;
     let landlordPercentage = 0;
+    let co2DataMissing = false;
     for (const tx of transactions) {
       if (tx.co2TaxAmount && tx.co2TaxAmount > 0) {
         const split = await this.applyCO2Stufenmodell(propertyId, tx.co2TaxAmount);
         co2LandlordByPool[poolKeyOf(tx)] += split.landlordShare;
         totalCo2TenantShare += split.tenantShare;
         landlordPercentage = split.landlordPercentage;
+        if (split.dataMissing) co2DataMissing = true;
       }
     }
 
@@ -682,6 +697,12 @@ export class UtilityBillingService {
         landlordPercentage,
         tenantShare: Math.round(totalCo2TenantShare * 100) / 100,
         landlordShare: Math.round(totalCo2LandlordShare * 100) / 100,
+        warning: co2DataMissing
+          ? "Für dieses Gebäude sind keine CO₂-Emissionsdaten hinterlegt (Energieausweis bzw. Ausweisung " +
+            "auf der Brennstoffrechnung gem. § 3 CO2KostAufG). Die CO₂-Kosten wurden vorläufig 50/50 geteilt. " +
+            "Für Wohngebäude ist jedoch das Stufenmodell (§ 5 CO2KostAufG) verbindlich — bitte die CO₂-Emissionen " +
+            "pro m²/Jahr hinterlegen, damit der Vermieteranteil korrekt (0–95 %) berechnet wird."
+          : undefined,
       },
       heating:
         heatingGross > 0

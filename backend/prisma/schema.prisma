@@ -753,12 +753,13 @@ enum RecurringInterval {
 
 // ─── DunningRecord (Mahnung) ─────────────────────────────────
 model DunningRecord {
-  id          Int           @id @default(autoincrement())
-  level       Int
-  sentAt      DateTime      @map("sent_at")
-  dueDate     DateTime      @map("due_date")
-  totalAmount Float         @map("total_amount")
-  status      DunningStatus @default(OFFEN)
+  id             Int           @id @default(autoincrement())
+  level          Int
+  sentAt         DateTime      @map("sent_at")
+  dueDate        DateTime      @map("due_date")
+  totalAmount    Float         @map("total_amount")
+  interestAmount Float         @default(0) @map("interest_amount") // Verzugszinsen § 288 BGB
+  status         DunningStatus @default(OFFEN)
   contractId  Int           @map("contract_id")
   companyId   Int           @map("company_id")
   createdAt   DateTime      @default(now()) @map("created_at")

@@ -3,6 +3,7 @@ import { NotFoundError } from "../lib/errors.js";
 import { paginationMeta } from "../schemas/common.schema.js";
 import { notifyContractStatusChange } from "./email.service.js";
 import { logger } from "../lib/logger.js";
+import { landlordNoticePeriodMonths } from "../lib/mietrecht.js";
 import type { ContractStatus, ContractType, ReminderType, Prisma } from "@prisma/client";
 
 interface ContractQuery {
@@ -64,7 +65,14 @@ export async function listContracts(companyId: number, params: ContractQuery) {
     prisma.contract.count({ where }),
   ]);
 
-  return { data: contracts, meta: paginationMeta(total, page, limit) };
+  // noticePeriod ist die ordentliche Mieter-Frist (§ 573c Abs. 1 S. 1, i. d. R. 3 Monate).
+  // Für vermieterseitige Kündigungen zusätzlich die gestaffelte Frist (3/6/9 Monate) ausweisen.
+  const enriched = contracts.map((c) => ({
+    ...c,
+    landlordNoticePeriodMonths: landlordNoticePeriodMonths(c.startDate),
+  }));
+
+  return { data: enriched, meta: paginationMeta(total, page, limit) };
 }
 
 export async function getContract(companyId: number, id: number) {
@@ -77,7 +85,7 @@ export async function getContract(companyId: number, id: number) {
     },
   });
   if (!contract) throw new NotFoundError("Vertrag", id);
-  return contract;
+  return { ...contract, landlordNoticePeriodMonths: landlordNoticePeriodMonths(contract.startDate) };
 }
 
 export async function createContract(companyId: number, data: CreateContractData) {

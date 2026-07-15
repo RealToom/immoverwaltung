@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import { AppError } from "../lib/errors.js";
 import { logger } from "../lib/logger.js";
 import { isEmailEnabled, sendMailForCompany } from "../config/email.js";
+import { computeVerzugszinsen, verzugszinssatzPa } from "../lib/mietrecht.js";
 
 export async function listDunning(companyId: number, contractId?: number) {
   return prisma.dunningRecord.findMany({
@@ -42,14 +43,27 @@ export async function sendDunning(companyId: number, contractId: number) {
 
   const level = lastLevel + 1;
   const daysUntilDue = [14, 7, 5][level - 1];
-  const dueDate = new Date(Date.now() + daysUntilDue * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const dueDate = new Date(now.getTime() + daysUntilDue * 24 * 60 * 60 * 1000);
+
+  // Verzugszinsen (§ 288 Abs. 1 BGB): 5 %-Punkte über Basiszinssatz, taggenau ab
+  // Fälligkeit der jeweiligen Zahlung bis heute. Mieter sind Verbraucher.
+  const zinssatzPa = verzugszinssatzPa();
+  const interestAmount =
+    Math.round(
+      contract.rentPayments.reduce(
+        (sum, p) => sum + computeVerzugszinsen(p.amountDue - p.amountPaid, p.dueDate, now, zinssatzPa),
+        0,
+      ) * 100,
+    ) / 100;
 
   const record = await prisma.dunningRecord.create({
     data: {
       level,
-      sentAt: new Date(),
+      sentAt: now,
       dueDate,
       totalAmount: overdueAmount,
+      interestAmount,
       contractId,
       companyId,
     },
@@ -57,6 +71,11 @@ export async function sendDunning(companyId: number, contractId: number) {
 
   if (isEmailEnabled) {
     const levelLabels = ["", "Erste Mahnung", "Zweite Mahnung", "Letzte Mahnung"];
+    const interestLine =
+      interestAmount > 0
+        ? `<p>Hinzu kommen Verzugszinsen in Höhe von <strong>${interestAmount.toFixed(2)} €</strong>
+      (${(zinssatzPa * 100).toFixed(2)} % p. a. = Basiszinssatz + 5 %-Punkte gemäß § 288 BGB).</p>`
+        : "";
     await sendMailForCompany(
       companyId,
       contract.tenant.email,
@@ -64,9 +83,10 @@ export async function sendDunning(companyId: number, contractId: number) {
       `<p>Sehr geehrte/r ${contract.tenant.name},</p>
       <p>wir weisen Sie darauf hin, dass ein Betrag von <strong>${overdueAmount.toFixed(2)} €</strong>
       für ${contract.property.name} noch aussteht.</p>
+      ${interestLine}
       <p>Bitte begleichen Sie den Betrag bis zum ${dueDate.toLocaleDateString("de-DE")}.</p>`,
     );
-    logger.info({ contractId, level, amount: overdueAmount }, "[MAHNWESEN] Mahnung versendet");
+    logger.info({ contractId, level, amount: overdueAmount, interestAmount }, "[MAHNWESEN] Mahnung versendet");
   }
 
   return record;
