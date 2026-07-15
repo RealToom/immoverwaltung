@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+/* Fonts are self-hosted via @fontsource, imported in main.tsx (DSGVO-conform, CSP-safe). */
 
 @tailwind base;
 @tailwind components;
