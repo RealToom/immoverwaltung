@@ -174,3 +174,51 @@ export async function saveDashboardLayout(
   });
   return row.widgets as LayoutItem[];
 }
+
+export async function getRevenueSeries(
+  companyId: number,
+): Promise<{ month: string; label: string; total: number }[]> {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+
+  const txns = await prisma.transaction.findMany({
+    where: { companyId, type: "EINNAHME", date: { gte: start } },
+    select: { date: true, amount: true },
+  });
+
+  const MONTHS = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+  const buckets: { month: string; label: string; total: number }[] = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    buckets.push({ month: key, label: MONTHS[d.getMonth()], total: 0 });
+  }
+  const index = new Map(buckets.map((b, i) => [b.month, i]));
+  for (const tx of txns) {
+    const key = `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, "0")}`;
+    const i = index.get(key);
+    if (i !== undefined) buckets[i].total += tx.amount;
+  }
+  return buckets;
+}
+
+export async function getExpiringCertificates(
+  companyId: number,
+): Promise<{ id: number; propertyName: string; energyClass: string; validUntil: string }[]> {
+  const horizon = new Date();
+  horizon.setDate(horizon.getDate() + 365); // ablaufend innerhalb 12 Monaten
+
+  const rows = await prisma.energyPassport.findMany({
+    where: { property: { companyId }, validUntil: { lte: horizon } },
+    orderBy: { validUntil: "asc" },
+    take: 10,
+    include: { property: { select: { name: true } } },
+  });
+
+  return rows.map((r) => ({
+    id: r.id,
+    propertyName: r.property.name,
+    energyClass: r.energyClass,
+    validUntil: r.validUntil.toISOString(),
+  }));
+}
