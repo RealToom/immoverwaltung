@@ -98,8 +98,23 @@ model User {
   refreshTokens RefreshToken[]
   customRole    CustomRole?    @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
   notifications Notification[]
+  dashboardLayout DashboardLayout?
 
   @@map("users")
+}
+
+// ─── DashboardLayout ─────────────────────────────────────────
+model DashboardLayout {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique @map("user_id")
+  companyId Int      @map("company_id")
+  widgets   Json     @default("[]")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("dashboard_layouts")
 }
 
 // ─── RefreshToken ────────────────────────────────────────────
