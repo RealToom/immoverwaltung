@@ -1,4 +1,9 @@
 import { prisma } from "../lib/prisma.js";
+import {
+  DEFAULT_LAYOUT,
+  filterLayoutForRole,
+  type LayoutItem,
+} from "../lib/dashboardWidgets.js";
 
 interface ActivityItem {
   type: "payment" | "tenant" | "maintenance";
@@ -144,4 +149,28 @@ export async function getDashboardStats(companyId: number) {
       anthropicSet: !!process.env.ANTHROPIC_API_KEY,
     }
   };
+}
+
+export async function getDashboardLayout(
+  companyId: number,
+  userId: number,
+  role: string,
+): Promise<LayoutItem[]> {
+  const row = await prisma.dashboardLayout.findUnique({ where: { userId } });
+  const stored = (row?.widgets as LayoutItem[] | undefined) ?? [];
+  const base = stored.length > 0 ? stored : DEFAULT_LAYOUT;
+  return filterLayoutForRole(base, role);
+}
+
+export async function saveDashboardLayout(
+  companyId: number,
+  userId: number,
+  widgets: LayoutItem[],
+): Promise<LayoutItem[]> {
+  const row = await prisma.dashboardLayout.upsert({
+    where: { userId },
+    create: { userId, companyId, widgets },
+    update: { widgets },
+  });
+  return row.widgets as LayoutItem[];
 }
