@@ -9,47 +9,47 @@ datasource db {
 
 // ─── Company (Hausverwaltung) ───────────────────────────────
 model Company {
-  id        Int      @id @default(autoincrement())
-  name      String
-  slug      String   @unique
-  address   String   @default("")
-  taxNumber String   @default("") @map("tax_number")
-  website   String   @default("")
-  currency    String   @default("EUR")
-  language    String   @default("de")
-  dateFormat  String   @default("DD.MM.YYYY") @map("date_format")
-  itemsPerPage Int     @default(25) @map("items_per_page")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id           Int      @id @default(autoincrement())
+  name         String
+  slug         String   @unique
+  address      String   @default("")
+  taxNumber    String   @default("") @map("tax_number")
+  website      String   @default("")
+  currency     String   @default("EUR")
+  language     String   @default("de")
+  dateFormat   String   @default("DD.MM.YYYY") @map("date_format")
+  itemsPerPage Int      @default(25) @map("items_per_page")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  stripeCustomerId      String?            @map("stripe_customer_id")
-  stripeSubscriptionId  String?            @map("stripe_subscription_id")
-  subscriptionStatus    SubscriptionStatus @map("subscription_status")
-  planType              PlanType           @map("plan_type")
-  trialEndsAt           DateTime?          @map("trial_ends_at")
-  currentPeriodEnd      DateTime?          @map("current_period_end")
-  manualOverride        Boolean            @default(false) @map("manual_override")
-  logoUrl               String?            @map("logo_url")
-  primaryColor          String             @default("#2563eb") @map("primary_color")
+  stripeCustomerId     String?            @map("stripe_customer_id")
+  stripeSubscriptionId String?            @map("stripe_subscription_id")
+  subscriptionStatus   SubscriptionStatus @map("subscription_status")
+  planType             PlanType           @map("plan_type")
+  trialEndsAt          DateTime?          @map("trial_ends_at")
+  currentPeriodEnd     DateTime?          @map("current_period_end")
+  manualOverride       Boolean            @default(false) @map("manual_override")
+  logoUrl              String?            @map("logo_url")
+  primaryColor         String             @default("#2563eb") @map("primary_color")
 
-  users              User[]
-  properties         Property[]
-  tenants            Tenant[]
-  contracts          Contract[]
-  maintenanceTickets MaintenanceTicket[]
-  transactions       Transaction[]
-  rentPayments       RentPayment[]
-  bankAccounts       BankAccount[]
-  documents          Document[]
-  calendarEvents        CalendarEvent[]
-  emailAccounts         EmailAccount[]
-  emailMessages         EmailMessage[]
-  emailAttachments      EmailAttachment[]
-  meters                Meter[]
-  meterReadings         MeterReading[]
-  recurringTransactions RecurringTransaction[]
-  dunningRecords        DunningRecord[]
-  handoverProtocols     HandoverProtocol[]
+  users                   User[]
+  properties              Property[]
+  tenants                 Tenant[]
+  contracts               Contract[]
+  maintenanceTickets      MaintenanceTicket[]
+  transactions            Transaction[]
+  rentPayments            RentPayment[]
+  bankAccounts            BankAccount[]
+  documents               Document[]
+  calendarEvents          CalendarEvent[]
+  emailAccounts           EmailAccount[]
+  emailMessages           EmailMessage[]
+  emailAttachments        EmailAttachment[]
+  meters                  Meter[]
+  meterReadings           MeterReading[]
+  recurringTransactions   RecurringTransaction[]
+  dunningRecords          DunningRecord[]
+  handoverProtocols       HandoverProtocol[]
   maintenanceSchedules    MaintenanceSchedule[]
   documentTemplates       DocumentTemplate[]
   bankTransactions        BankTransaction[]
@@ -68,6 +68,7 @@ model Company {
   trustedDevices          TrustedDevice[]
   notifications           Notification[]
   utilityStatements       UtilityStatement[]
+  dashboardLayouts        DashboardLayout[]
 
   @@map("companies")
 }
@@ -94,10 +95,10 @@ model User {
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  refreshTokens RefreshToken[]
-  customRole    CustomRole?    @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
-  notifications Notification[]
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  refreshTokens   RefreshToken[]
+  customRole      CustomRole?      @relation(fields: [customRoleId], references: [id], onDelete: SetNull)
+  notifications   Notification[]
   dashboardLayout DashboardLayout?
 
   @@map("users")
@@ -111,7 +112,8 @@ model DashboardLayout {
   widgets   Json     @default("[]")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@index([companyId])
   @@map("dashboard_layouts")
@@ -148,15 +150,15 @@ model CustomRole {
 
 // ─── CompanySmtpSettings (Pro-Firma SMTP) ────────────────────
 model CompanySmtpSettings {
-  id            Int     @id @default(autoincrement())
-  companyId     Int     @unique @map("company_id")
+  id            Int      @id @default(autoincrement())
+  companyId     Int      @unique @map("company_id")
   host          String
-  port          Int     @default(587)
-  secure        Boolean @default(false)
+  port          Int      @default(587)
+  secure        Boolean  @default(false)
   user          String
-  encryptedPass String  @map("encrypted_pass")
-  fromAddress   String  @map("from_address")
-  fromName      String  @map("from_name")
+  encryptedPass String   @map("encrypted_pass")
+  fromAddress   String   @map("from_address")
+  fromName      String   @map("from_name")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -200,26 +202,28 @@ model Property {
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
-  company               Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  units                 Unit[]
-  documents             Document[]
-  contracts             Contract[]
-  maintenanceTickets    MaintenanceTicket[]
-  transactions          Transaction[]
-  meters                Meter[]
-  recurringTransactions RecurringTransaction[]
-  maintenanceSchedules  MaintenanceSchedule[]
-  insurancePolicies     InsurancePolicy[]
-  maintenanceBudgets    MaintenanceBudget[]
-  energyPassport        EnergyPassport?
-  emailMessages          EmailMessage[] @relation("EmailMessageProperty")
-  suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedProperty")
+  company                Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  units                  Unit[]
+  documents              Document[]
+  contracts              Contract[]
+  maintenanceTickets     MaintenanceTicket[]
+  transactions           Transaction[]
+  meters                 Meter[]
+  recurringTransactions  RecurringTransaction[]
+  maintenanceSchedules   MaintenanceSchedule[]
+  insurancePolicies      InsurancePolicy[]
+  maintenanceBudgets     MaintenanceBudget[]
+  energyPassport         EnergyPassport?
+  emailMessages          EmailMessage[]         @relation("EmailMessageProperty")
+  suggestedEmailMessages EmailMessage[]         @relation("EmailMessageSuggestedProperty")
   calendarEvents         CalendarEvent[]
   utilityStatements      UtilityStatement[]
 
-  costConfiguration    Json?       @map("cost_configuration") // Format: { "GRUNDSTEUER": "WOHNFLAECHE", "HAUSWART": "WOHNEINHEIT" }
-  /** Beginn des Abrechnungszeitraums (Monat 1-12, default Kalenderjahr) */
-  billingPeriodStartMonth Int      @default(1) @map("billing_period_start_month")
+  costConfiguration       Json? @map("cost_configuration") // Format: { "GRUNDSTEUER": "WOHNFLAECHE", "HAUSWART": "WOHNEINHEIT" }
+  /**
+   * Beginn des Abrechnungszeitraums (Monat 1-12, default Kalenderjahr)
+   */
+  billingPeriodStartMonth Int   @default(1) @map("billing_period_start_month")
 
   @@map("properties")
 }
@@ -243,9 +247,9 @@ model Unit {
   createdAt  DateTime   @default(now()) @map("created_at")
   updatedAt  DateTime   @updatedAt @map("updated_at")
 
-  sqm                  Float       @default(0) // Wohnfläche für m²-Verteilung
-  coownershipShare     Float?      @map("coownership_share") // Miteigentumsanteil (MEA) für WEG-Abrechnungen
-  currentInhabitants   Int         @default(1) @map("current_inhabitants") // Für personenschlüsselbasierte Verteilung
+  sqm                Float  @default(0) // Wohnfläche für m²-Verteilung
+  coownershipShare   Float? @map("coownership_share") // Miteigentumsanteil (MEA) für WEG-Abrechnungen
+  currentInhabitants Int    @default(1) @map("current_inhabitants") // Für personenschlüsselbasierte Verteilung
 
   property           Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   tenant             Tenant?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
@@ -281,12 +285,12 @@ model Tenant {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  company                Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company                Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   units                  Unit[]
   contracts              Contract[]
   documents              Document[]
-  emailMessages          EmailMessage[] @relation("EmailMessageTenant")
-  suggestedEmailMessages EmailMessage[] @relation("EmailMessageSuggestedTenant")
+  emailMessages          EmailMessage[]  @relation("EmailMessageTenant")
+  suggestedEmailMessages EmailMessage[]  @relation("EmailMessageSuggestedTenant")
   tenantUsers            TenantUser[]
   calendarEvents         CalendarEvent[]
 
@@ -295,39 +299,41 @@ model Tenant {
 
 // ─── Contract (Vertrag) ─────────────────────────────────────
 model Contract {
-  id           Int            @id @default(autoincrement())
-  type         ContractType
-  startDate    DateTime       @map("start_date")
-  endDate      DateTime?      @map("end_date")
-  noticePeriod Int            @map("notice_period")
-  monthlyRent  Float          @map("monthly_rent")
-  utilityPrepayment Float     @default(0) @map("utility_prepayment")
-  /** Anzahl Bewohner (fuer Verteilerschluessel PERSONEN) */
-  occupantsCount Int          @default(1) @map("occupants_count")
-  deposit      Float          @default(0)
-  status       ContractStatus @default(ENTWURF)
-  nextReminder DateTime?      @map("next_reminder")
-  reminderType ReminderType?  @map("reminder_type")
-  notes        String?
-  tenantId     Int            @map("tenant_id")
-  propertyId   Int            @map("property_id")
-  unitId       Int            @map("unit_id")
-  companyId    Int            @map("company_id")
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  id                Int            @id @default(autoincrement())
+  type              ContractType
+  startDate         DateTime       @map("start_date")
+  endDate           DateTime?      @map("end_date")
+  noticePeriod      Int            @map("notice_period")
+  monthlyRent       Float          @map("monthly_rent")
+  utilityPrepayment Float          @default(0) @map("utility_prepayment")
+  /**
+   * Anzahl Bewohner (fuer Verteilerschluessel PERSONEN)
+   */
+  occupantsCount    Int            @default(1) @map("occupants_count")
+  deposit           Float          @default(0)
+  status            ContractStatus @default(ENTWURF)
+  nextReminder      DateTime?      @map("next_reminder")
+  reminderType      ReminderType?  @map("reminder_type")
+  notes             String?
+  tenantId          Int            @map("tenant_id")
+  propertyId        Int            @map("property_id")
+  unitId            Int            @map("unit_id")
+  companyId         Int            @map("company_id")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
 
-  signatureRequestId  String?          @map("signature_request_id")
-  signatureStatus     SignatureStatus?  @map("signature_status")
-  signedDocumentId    String?          @map("signed_document_id")
-  signedDocumentUrl   String?          @map("signed_document_url")
+  signatureRequestId String?          @map("signature_request_id")
+  signatureStatus    SignatureStatus? @map("signature_status")
+  signedDocumentId   String?          @map("signed_document_id")
+  signedDocumentUrl  String?          @map("signed_document_url")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  property     Property      @relation(fields: [propertyId], references: [id])
-  unit         Unit          @relation(fields: [unitId], references: [id])
-  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  rentPayments     RentPayment[]
-  dunningRecords   DunningRecord[]
-  billingDisputes  BillingDispute[]
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  property        Property         @relation(fields: [propertyId], references: [id])
+  unit            Unit             @relation(fields: [unitId], references: [id])
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  rentPayments    RentPayment[]
+  dunningRecords  DunningRecord[]
+  billingDisputes BillingDispute[]
 
   @@map("contracts")
 }
@@ -362,23 +368,23 @@ enum ReminderType {
 
 // ─── MaintenanceTicket (Wartungsauftrag) ─────────────────────
 model MaintenanceTicket {
-  id         Int                 @id @default(autoincrement())
-  title      String
-  description String             @default("")
-  category   MaintenanceCategory
-  priority   MaintenancePriority
-  status     MaintenanceStatus   @default(OFFEN)
-  unitLabel  String              @default("Allgemein") @map("unit_label")
-  reportedBy String              @map("reported_by")
-  assignedTo String?             @map("assigned_to")
-  dueDate    DateTime?           @map("due_date")
-  cost       Float?
-  notes      String?
-  propertyId Int                 @map("property_id")
-  unitId     Int?                @map("unit_id")
-  companyId  Int                 @map("company_id")
-  createdAt  DateTime            @default(now()) @map("created_at")
-  updatedAt  DateTime            @updatedAt @map("updated_at")
+  id          Int                 @id @default(autoincrement())
+  title       String
+  description String              @default("")
+  category    MaintenanceCategory
+  priority    MaintenancePriority
+  status      MaintenanceStatus   @default(OFFEN)
+  unitLabel   String              @default("Allgemein") @map("unit_label")
+  reportedBy  String              @map("reported_by")
+  assignedTo  String?             @map("assigned_to")
+  dueDate     DateTime?           @map("due_date")
+  cost        Float?
+  notes       String?
+  propertyId  Int                 @map("property_id")
+  unitId      Int?                @map("unit_id")
+  companyId   Int                 @map("company_id")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
 
   property Property @relation(fields: [propertyId], references: [id])
   unit     Unit?    @relation(fields: [unitId], references: [id])
@@ -412,28 +418,28 @@ enum MaintenanceStatus {
 
 // ─── Document (Dokument) ────────────────────────────────────
 model Document {
-  id             Int       @id @default(autoincrement())
-  name           String
-  fileType       String    @map("file_type")
-  fileSize       String    @map("file_size")
-  filePath       String?   @map("file_path")
-  propertyId     Int?      @map("property_id")
-  tenantId       Int?      @map("tenant_id")
-  companyId      Int       @map("company_id")
-  retentionUntil         DateTime?      @map("retention_until")  // DSGVO Art. 17 - Aufbewahrungsfrist
-  isEncrypted            Boolean        @default(false) @map("is_encrypted") // DSGVO Art. 32 - Verschluesselung
-  requiresSignature      Boolean        @default(false) @map("requires_signature")
-  signatureType          SignatureType? @map("signature_type")
-  signedAt               DateTime?      @map("signed_at")
-  signedByTenantUserId   Int?           @map("signed_by_tenant_user_id")
-  signatureData          String?        @map("signature_data")
-  createdAt              DateTime       @default(now()) @map("created_at")
-  updatedAt              DateTime       @updatedAt @map("updated_at")
+  id                   Int            @id @default(autoincrement())
+  name                 String
+  fileType             String         @map("file_type")
+  fileSize             String         @map("file_size")
+  filePath             String?        @map("file_path")
+  propertyId           Int?           @map("property_id")
+  tenantId             Int?           @map("tenant_id")
+  companyId            Int            @map("company_id")
+  retentionUntil       DateTime?      @map("retention_until") // DSGVO Art. 17 - Aufbewahrungsfrist
+  isEncrypted          Boolean        @default(false) @map("is_encrypted") // DSGVO Art. 32 - Verschluesselung
+  requiresSignature    Boolean        @default(false) @map("requires_signature")
+  signatureType        SignatureType? @map("signature_type")
+  signedAt             DateTime?      @map("signed_at")
+  signedByTenantUserId Int?           @map("signed_by_tenant_user_id")
+  signatureData        String?        @map("signature_data")
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @updatedAt @map("updated_at")
 
-  property           Property?   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  tenant             Tenant?     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company            Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  signedByTenantUser TenantUser? @relation("DocumentSignedBy", fields: [signedByTenantUserId], references: [id], onDelete: SetNull)
+  property              Property?     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  tenant                Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company               Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  signedByTenantUser    TenantUser?   @relation("DocumentSignedBy", fields: [signedByTenantUserId], references: [id], onDelete: SetNull)
   transactionsAsReceipt Transaction[] @relation("TransactionReceipt")
 
   @@map("documents")
@@ -441,28 +447,28 @@ model Document {
 
 // ─── Transaction (Transaktion) ──────────────────────────────
 model Transaction {
-  id            Int             @id @default(autoincrement())
-  date          DateTime
-  description   String
-  type          TransactionType
-  amount        Float
-  category      String          @default("")
-  allocatable   Boolean         @default(false)
-  betrkvCategory BetrkvCategory? @map("betrkv_category")
-  co2TaxAmount  Float?          @default(0) @map("co2_tax_amount")
-  laborCostAmount Float?        @default(0) @map("labor_cost_amount") // § 35a EStG: enthaltener Lohnanteil
-  maintenanceWarning String?    @map("maintenance_warning")
-  propertyId    Int?            @map("property_id")
-  bankAccountId Int?            @map("bank_account_id") // Optional: Verknuepfung mit echtem Bankkonto
-  receiptDocumentId Int?        @map("receipt_document_id") // Beleg fuer Belegeinsicht (§ 259 BGB)
-  companyId     Int             @map("company_id")
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
+  id                 Int             @id @default(autoincrement())
+  date               DateTime
+  description        String
+  type               TransactionType
+  amount             Float
+  category           String          @default("")
+  allocatable        Boolean         @default(false)
+  betrkvCategory     BetrkvCategory? @map("betrkv_category")
+  co2TaxAmount       Float?          @default(0) @map("co2_tax_amount")
+  laborCostAmount    Float?          @default(0) @map("labor_cost_amount") // § 35a EStG: enthaltener Lohnanteil
+  maintenanceWarning String?         @map("maintenance_warning")
+  propertyId         Int?            @map("property_id")
+  bankAccountId      Int?            @map("bank_account_id") // Optional: Verknuepfung mit echtem Bankkonto
+  receiptDocumentId  Int?            @map("receipt_document_id") // Beleg fuer Belegeinsicht (§ 259 BGB)
+  companyId          Int             @map("company_id")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
 
-  property        Property?       @relation(fields: [propertyId], references: [id])
-  bankAccount     BankAccount?    @relation(fields: [bankAccountId], references: [id])
-  receiptDocument Document?       @relation("TransactionReceipt", fields: [receiptDocumentId], references: [id], onDelete: SetNull)
-  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  property        Property?        @relation(fields: [propertyId], references: [id])
+  bankAccount     BankAccount?     @relation(fields: [bankAccountId], references: [id])
+  receiptDocument Document?        @relation("TransactionReceipt", fields: [receiptDocumentId], references: [id], onDelete: SetNull)
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   bankTransaction BankTransaction?
 
   @@map("transactions")
@@ -475,21 +481,27 @@ enum UtilityStatementStatus {
 }
 
 model UtilityStatement {
-  id           Int                    @id @default(autoincrement())
-  propertyId   Int                    @map("property_id")
-  companyId    Int                    @map("company_id")
-  year         Int
-  periodStart  DateTime               @map("period_start")
-  periodEnd    DateTime               @map("period_end")
-  /** Zustellfrist § 556 Abs. 3 BGB: periodEnd + 12 Monate */
-  deliveryDeadline DateTime           @map("delivery_deadline")
-  status       UtilityStatementStatus @default(FINALISIERT)
-  totalCosts   Float                  @map("total_costs")
-  /** Vollstaendiger Statement-Payload zum Zeitpunkt der Finalisierung */
-  data         Json
-  finalizedAt  DateTime               @default(now()) @map("finalized_at")
-  /** Verweis auf die Korrekturabrechnung, die diese ersetzt hat */
-  supersededById Int?                 @map("superseded_by_id")
+  id               Int                    @id @default(autoincrement())
+  propertyId       Int                    @map("property_id")
+  companyId        Int                    @map("company_id")
+  year             Int
+  periodStart      DateTime               @map("period_start")
+  periodEnd        DateTime               @map("period_end")
+  /**
+   * Zustellfrist § 556 Abs. 3 BGB: periodEnd + 12 Monate
+   */
+  deliveryDeadline DateTime               @map("delivery_deadline")
+  status           UtilityStatementStatus @default(FINALISIERT)
+  totalCosts       Float                  @map("total_costs")
+  /**
+   * Vollstaendiger Statement-Payload zum Zeitpunkt der Finalisierung
+   */
+  data             Json
+  finalizedAt      DateTime               @default(now()) @map("finalized_at")
+  /**
+   * Verweis auf die Korrekturabrechnung, die diese ersetzt hat
+   */
+  supersededById   Int?                   @map("superseded_by_id")
 
   property     Property               @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -508,29 +520,33 @@ enum SettlementStatus {
 }
 
 model UtilityStatementItem {
-  id           Int              @id @default(autoincrement())
-  statementId  Int              @map("statement_id")
-  companyId    Int              @map("company_id")
-  contractId   Int              @map("contract_id")
-  tenantId     Int              @map("tenant_id")
-  unitId       Int              @map("unit_id")
-  tenantName   String           @map("tenant_name")
-  unitNumber   String           @map("unit_number")
-  amount       Float
-  heatingAmount Float           @default(0) @map("heating_amount")
-  totalPrepaid Float            @default(0) @map("total_prepaid")
-  balance      Float
-  isRefund     Boolean          @map("is_refund")
-  documentId   Int?             @map("document_id")
-  /** § 560 Abs. 4: vorgeschlagene neue monatliche Vorauszahlung */
-  suggestedPrepayment Float?    @map("suggested_prepayment")
-  /** Zustellung: E-Mail-Versand bzw. erster Portal-Abruf */
-  deliveredAt  DateTime?        @map("delivered_at")
-  viewedAt     DateTime?        @map("viewed_at")
-  settlementStatus SettlementStatus @default(OFFEN) @map("settlement_status")
-  settledAt    DateTime?        @map("settled_at")
+  id                  Int              @id @default(autoincrement())
+  statementId         Int              @map("statement_id")
+  companyId           Int              @map("company_id")
+  contractId          Int              @map("contract_id")
+  tenantId            Int              @map("tenant_id")
+  unitId              Int              @map("unit_id")
+  tenantName          String           @map("tenant_name")
+  unitNumber          String           @map("unit_number")
+  amount              Float
+  heatingAmount       Float            @default(0) @map("heating_amount")
+  totalPrepaid        Float            @default(0) @map("total_prepaid")
+  balance             Float
+  isRefund            Boolean          @map("is_refund")
+  documentId          Int?             @map("document_id")
+  /**
+   * § 560 Abs. 4: vorgeschlagene neue monatliche Vorauszahlung
+   */
+  suggestedPrepayment Float?           @map("suggested_prepayment")
+  /**
+   * Zustellung: E-Mail-Versand bzw. erster Portal-Abruf
+   */
+  deliveredAt         DateTime?        @map("delivered_at")
+  viewedAt            DateTime?        @map("viewed_at")
+  settlementStatus    SettlementStatus @default(OFFEN) @map("settlement_status")
+  settledAt           DateTime?        @map("settled_at")
 
-  statement    UtilityStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  statement UtilityStatement @relation(fields: [statementId], references: [id], onDelete: Cascade)
 
   @@index([companyId, tenantId])
   @@map("utility_statement_items")
@@ -553,7 +569,7 @@ model BankAccount {
   createdAt         DateTime     @default(now()) @map("created_at")
   updatedAt         DateTime     @updatedAt @map("updated_at")
 
-  company          Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   transactions     Transaction[]
   bankTransactions BankTransaction[]
 
@@ -644,7 +660,7 @@ model DatevExportLog {
   txCount   Int      @map("tx_count")
   fileName  String   @map("file_name")
   companyId Int      @map("company_id")
-  createdBy Int?     @map("created_by")  // No FK — intentional (AuditLog pattern: log survives user deletion)
+  createdBy Int?     @map("created_by") // No FK — intentional (AuditLog pattern: log survives user deletion)
   createdAt DateTime @default(now()) @map("created_at")
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -661,7 +677,7 @@ enum TransactionType {
 // ─── RentPayment (Mietzahlung) ──────────────────────────────
 model RentPayment {
   id         Int               @id @default(autoincrement())
-  month      DateTime          // 1. des Monats (z.B. 2026-01-01)
+  month      DateTime // 1. des Monats (z.B. 2026-01-01)
   amountDue  Float             @map("amount_due")
   amountPaid Float             @default(0) @map("amount_paid")
   status     RentPaymentStatus @default(AUSSTEHEND)
@@ -697,14 +713,14 @@ model Meter {
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  interfaceType        MeterInterfaceType @default(MANUAL) @map("interface_type")
-  mqttTopic            String?            @map("mqtt_topic")
-  modbusRegister       Int?               @map("modbus_register")
-  knxGroupAddress      String?            @map("knx_group_address")
+  interfaceType   MeterInterfaceType @default(MANUAL) @map("interface_type")
+  mqttTopic       String?            @map("mqtt_topic")
+  modbusRegister  Int?               @map("modbus_register")
+  knxGroupAddress String?            @map("knx_group_address")
 
-  unit     Unit?         @relation(fields: [unitId], references: [id], onDelete: SetNull)
-  property Property      @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  company  Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  unit     Unit?          @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  property Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  company  Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   readings MeterReading[]
 
   @@map("meters")
@@ -775,10 +791,10 @@ model DunningRecord {
   totalAmount    Float         @map("total_amount")
   interestAmount Float         @default(0) @map("interest_amount") // Verzugszinsen § 288 BGB
   status         DunningStatus @default(OFFEN)
-  contractId  Int           @map("contract_id")
-  companyId   Int           @map("company_id")
-  createdAt   DateTime      @default(now()) @map("created_at")
-  updatedAt   DateTime      @updatedAt @map("updated_at")
+  contractId     Int           @map("contract_id")
+  companyId      Int           @map("company_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
 
   contract Contract @relation(fields: [contractId], references: [id])
   company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -858,7 +874,7 @@ model DocumentTemplate {
 // Keine FK-Constraints → Logs bleiben erhalten auch wenn User/Company gelöscht wird
 model AuditLog {
   id        Int      @id @default(autoincrement())
-  action    String   // DOCUMENT_UPLOAD, DOCUMENT_DOWNLOAD, DOCUMENT_DELETE, PASSWORD_CHANGE, etc.
+  action    String // DOCUMENT_UPLOAD, DOCUMENT_DOWNLOAD, DOCUMENT_DELETE, PASSWORD_CHANGE, etc.
   userId    Int?     @map("user_id")
   companyId Int?     @map("company_id")
   ip        String?
@@ -872,31 +888,31 @@ model AuditLog {
 
 // ─── CalendarEvent (Kalender) ────────────────────────────────
 model CalendarEvent {
-  id              Int               @id @default(autoincrement())
-  title           String
-  description     String?
-  start           DateTime
-  end             DateTime?
-  allDay          Boolean           @default(false) @map("all_day")
-  type            CalendarEventType @default(MANUELL)
-  sourceId        Int?              @map("source_id")
-  color           String?
-  companyId       Int               @map("company_id")
-  createdByUserId Int?              @map("created_by_user_id")
+  id                 Int               @id @default(autoincrement())
+  title              String
+  description        String?
+  start              DateTime
+  end                DateTime?
+  allDay             Boolean           @default(false) @map("all_day")
+  type               CalendarEventType @default(MANUELL)
+  sourceId           Int?              @map("source_id")
+  color              String?
+  companyId          Int               @map("company_id")
+  createdByUserId    Int?              @map("created_by_user_id")
   // Wiederholung (einfache Presets, server-seitig expandiert)
-  recurrenceFreq     RecurrenceFreq? @map("recurrence_freq")
-  recurrenceInterval Int             @default(1) @map("recurrence_interval")
-  recurrenceUntil    DateTime?       @map("recurrence_until")
+  recurrenceFreq     RecurrenceFreq?   @map("recurrence_freq")
+  recurrenceInterval Int               @default(1) @map("recurrence_interval")
+  recurrenceUntil    DateTime?         @map("recurrence_until")
   // Erinnerung
-  reminderMinutes Int?      @map("reminder_minutes")
-  reminderSentFor DateTime? @map("reminder_sent_for")
+  reminderMinutes    Int?              @map("reminder_minutes")
+  reminderSentFor    DateTime?         @map("reminder_sent_for")
   // Verknuepfungen
-  propertyId     Int?    @map("property_id")
-  tenantId       Int?    @map("tenant_id")
-  visitorName    String? @map("visitor_name")
-  visitorContact String? @map("visitor_contact")
-  createdAt       DateTime          @default(now()) @map("created_at")
-  updatedAt       DateTime          @updatedAt @map("updated_at")
+  propertyId         Int?              @map("property_id")
+  tenantId           Int?              @map("tenant_id")
+  visitorName        String?           @map("visitor_name")
+  visitorContact     String?           @map("visitor_contact")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
 
   company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   property Property? @relation(fields: [propertyId], references: [id], onDelete: SetNull)
@@ -1007,34 +1023,34 @@ model EmailAccount {
 
 // ─── EmailMessage (Posteingang-Cache) ────────────────────────
 model EmailMessage {
-  id               Int            @id @default(autoincrement())
-  messageId        String         @unique @map("message_id")
-  fromAddress      String         @map("from_address")
-  fromName         String?        @map("from_name")
-  toAddress        String         @map("to_address")
-  subject          String
-  bodyText         String?        @map("body_text")
-  bodyHtml         String?        @map("body_html")
-  receivedAt       DateTime       @map("received_at")
-  isRead           Boolean        @default(false) @map("is_read")
-  isInquiry        Boolean        @default(false) @map("is_inquiry")
-  inquiryStatus    InquiryStatus? @map("inquiry_status")
+  id                  Int            @id @default(autoincrement())
+  messageId           String         @unique @map("message_id")
+  fromAddress         String         @map("from_address")
+  fromName            String?        @map("from_name")
+  toAddress           String         @map("to_address")
+  subject             String
+  bodyText            String?        @map("body_text")
+  bodyHtml            String?        @map("body_html")
+  receivedAt          DateTime       @map("received_at")
+  isRead              Boolean        @default(false) @map("is_read")
+  isInquiry           Boolean        @default(false) @map("is_inquiry")
+  inquiryStatus       InquiryStatus? @map("inquiry_status")
   suggestedEventId    Int?           @map("suggested_event_id")
   suggestedTenantId   Int?           @map("suggested_tenant_id")
   suggestedPropertyId Int?           @map("suggested_property_id")
   tenantId            Int?           @map("tenant_id")
   propertyId          Int?           @map("property_id")
-  emailAccountId   Int            @map("email_account_id")
-  companyId        Int            @map("company_id")
-  createdAt        DateTime       @default(now()) @map("created_at")
+  emailAccountId      Int            @map("email_account_id")
+  companyId           Int            @map("company_id")
+  createdAt           DateTime       @default(now()) @map("created_at")
 
   emailAccount      EmailAccount      @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
   company           Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   attachments       EmailAttachment[]
-  suggestedTenant   Tenant?           @relation("EmailMessageSuggestedTenant",   fields: [suggestedTenantId],   references: [id], onDelete: SetNull)
-  tenant            Tenant?           @relation("EmailMessageTenant",            fields: [tenantId],            references: [id], onDelete: SetNull)
+  suggestedTenant   Tenant?           @relation("EmailMessageSuggestedTenant", fields: [suggestedTenantId], references: [id], onDelete: SetNull)
+  tenant            Tenant?           @relation("EmailMessageTenant", fields: [tenantId], references: [id], onDelete: SetNull)
   suggestedProperty Property?         @relation("EmailMessageSuggestedProperty", fields: [suggestedPropertyId], references: [id], onDelete: SetNull)
-  property          Property?         @relation("EmailMessageProperty",          fields: [propertyId],          references: [id], onDelete: SetNull)
+  property          Property?         @relation("EmailMessageProperty", fields: [propertyId], references: [id], onDelete: SetNull)
 
   @@index([companyId, isRead])
   @@index([companyId, isInquiry])
@@ -1052,14 +1068,14 @@ enum InquiryStatus {
 
 // ─── EmailAttachment (Anhänge) ───────────────────────────────
 model EmailAttachment {
-  id             Int          @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   filename       String
-  mimeType       String       @map("mime_type")
+  mimeType       String   @map("mime_type")
   size           Int
-  storedPath     String?      @map("stored_path")
-  emailMessageId Int          @map("email_message_id")
-  companyId      Int          @map("company_id")
-  createdAt      DateTime     @default(now()) @map("created_at")
+  storedPath     String?  @map("stored_path")
+  emailMessageId Int      @map("email_message_id")
+  companyId      Int      @map("company_id")
+  createdAt      DateTime @default(now()) @map("created_at")
 
   emailMessage EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
   company      Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1165,13 +1181,13 @@ enum TenantMessageDirection {
 }
 
 model TenantUser {
-  id              Int       @id @default(autoincrement())
-  email           String
-  passwordHash    String    @map("password_hash")
-  tenantId        Int       @map("tenant_id")
-  companyId       Int       @map("company_id")
-  inviteToken     String?   @map("invite_token")
-  inviteExpiresAt DateTime? @map("invite_expires_at")
+  id                     Int       @id @default(autoincrement())
+  email                  String
+  passwordHash           String    @map("password_hash")
+  tenantId               Int       @map("tenant_id")
+  companyId              Int       @map("company_id")
+  inviteToken            String?   @map("invite_token")
+  inviteExpiresAt        DateTime? @map("invite_expires_at")
   refreshToken           String?   @map("refresh_token")
   lastLoginAt            DateTime? @map("last_login_at")
   twoFactorEnabled       Boolean   @default(false) @map("two_factor_enabled")
@@ -1180,11 +1196,11 @@ model TenantUser {
   failedLoginAttempts    Int       @default(0) @map("failed_login_attempts")
   lockedUntil            DateTime? @map("locked_until")
   createdAt              DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
 
-  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company         Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  signedDocuments Document[]     @relation("DocumentSignedBy")
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  signedDocuments Document[]      @relation("DocumentSignedBy")
   messages        TenantMessage[]
   uploads         TenantUpload[]
   trustedDevices  TrustedDevice[]
@@ -1227,33 +1243,33 @@ model TenantUpload {
 }
 
 model TrustedDevice {
-  id            Int        @id @default(autoincrement())
-  tenantUserId  Int        @map("tenant_user_id")
-  companyId     Int        @map("company_id")
-  tokenHash     String     @unique @map("token_hash")
-  expiresAt     DateTime   @map("expires_at")
-  createdAt     DateTime   @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  tenantUserId Int      @map("tenant_user_id")
+  companyId    Int      @map("company_id")
+  tokenHash    String   @unique @map("token_hash")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  tenantUser    TenantUser @relation(fields: [tenantUserId], references: [id], onDelete: Cascade)
-  company       Company    @relation(fields: [companyId], references: [id])
+  tenantUser TenantUser @relation(fields: [tenantUserId], references: [id], onDelete: Cascade)
+  company    Company    @relation(fields: [companyId], references: [id])
 
   @@map("trusted_devices")
 }
 
 // ─── BillingDispute (Widerspruchs-Management) ──────────────────
 model BillingDispute {
-  id          Int      @id @default(autoincrement())
-  contractId  Int      @map("contract_id")
-  companyId   Int      @map("company_id")
-  reason      String
-  status      String   @default("OFFEN")
-  year        Int?
-  amount      Float?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id         Int      @id @default(autoincrement())
+  contractId Int      @map("contract_id")
+  companyId  Int      @map("company_id")
+  reason     String
+  status     String   @default("OFFEN")
+  year       Int?
+  amount     Float?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
-  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@map("billing_disputes")
 }
