@@ -55,6 +55,16 @@
 
 ## Changelog
 
+### 2026-07-19: Anpassbares Dashboard (Widget-System)
+
+Das bisher feste Dashboard (`pages/Index.tsx`) wurde zu einem pro Nutzer frei konfigurierbaren Widget-Dashboard umgebaut (Backend + Frontend tsc-sauber, Frontend 13 Tests grün + Build ok):
+
+1. **Persistenz pro Nutzer** (`DashboardLayout`): Neue Prisma-Tabelle mit einer Zeile pro Nutzer (`userId` unique), `widgets` als JSON-Array von `{ key, x, y, w, h }`, `company`- + `user`-Relation (onDelete Cascade). Migrationen `add_dashboard_layout` + `add_dashboard_layout_company_fk`.
+2. **Endpunkte** (`/api/dashboard`, requireAuth + tenantGuard + subscriptionGuard): `GET /layout` (liefert bei fehlender Konfiguration das rollengefilterte Standard-Layout), `PUT /layout` (Zod-validiert gegen bekannte Widget-Keys + Größen-Grenzen; `userId` an JWT gebunden — IDOR-sicher), `GET /revenue-series` (12-Monats-Einnahmen für das Chart-Widget), `GET /expiring-certificates` (ablaufende/abgelaufene Energieausweise ~12 Monate).
+3. **Server-Widget-Katalog** (`backend/src/lib/dashboardWidgets.ts`): `WIDGET_KEYS`, `WIDGET_MIN_ROLE`, `DEFAULT_LAYOUT`, `canSeeWidget`/`filterLayoutForRole` (RBAC-Ränge READONLY<BUCHHALTER<VERWALTER<ADMIN). Byte-identisch zum Frontend-Register gehalten.
+4. **Frontend-Widget-System** (`cozy-estate-central/src/components/dashboard/`): Zentrales `WIDGET_REGISTRY` (registry.tsx) als Single Source of Truth (17 Widgets); `DashboardGrid` (react-grid-layout: Drag & Drop + Größe ziehen, responsiv lg/md/sm, Edit-Modus nur auf lg); `WidgetLibrary` (Shadcn-Sheet zum Hinzufügen); `WidgetRenderer`; `widgets/` (parametrisierbares `KpiWidget`, `RoiWidget`, `RevenueChartWidget`, `WidgetListPrimitive` + 7 Listen-Adapter für Mahnwesen/Verträge/Versicherungen/Wartung/Tickets/Termine/Energie, Wrapper für bestehende Komponenten).
+5. **Edit-Modus** (`pages/Index.tsx`): Bearbeiten/Speichern/Abbrechen/Standard-wiederherstellen + „+ Widget"; Draft-State getrennt vom gespeicherten Stand (kein Überschreiben bei Refetch während des Bearbeitens); Empty-State; ADMIN-Setup-Warnungen bleiben erhalten. Neue Abhängigkeit: `react-grid-layout`.
+
 ### 2026-07-13: Nebenkostenabrechnung — Ausbau zur rechtssicheren Vollversion (11 Features)
 
 Aufbauend auf F6 wurden elf Erweiterungen für eine gerichtsfeste Betriebskostenabrechnung umgesetzt (Backend 242 Tests grün, alle Frontends tsc-sauber + Build ok):
@@ -1254,6 +1264,7 @@ Jeweils: GET /, GET /:id, POST /, PATCH /:id, DELETE /:id
 | 2026-07-12 | Transaktions-Vorzeichen normalisiert: AUSGABE immer negativ, EINNAHME positiv (createTransaction, RecurringTransactions, Datenmigration für Bestandsdaten) |
 | 2026-07-12 | Nebenkosten-Assistent: nicht-umlagefähige Ausgaben direkt übernehmbar, deutsche BetrKV-Labels, PDF-Download-Links nach Finalisierung, Heizkosten-Karte, Vorauszahlungs-Spalte |
 | 2026-07-12 | Seed erweitert: umlagefähige Betriebskosten (BetrKV+CO2), utilityPrepayment auf Verträgen, 2 Energieausweise, 4 Wärmezähler mit Jahresablesungen — Nebenkosten-Feature out-of-the-box demonstrierbar |
+| 2026-07-19 | Anpassbares Dashboard: DashboardLayout-Tabelle (pro Nutzer), GET/PUT /dashboard/layout + /revenue-series + /expiring-certificates, Widget-Register (17 Widgets), react-grid-layout (Drag & Drop + Resize), WidgetLibrary, Edit-Modus in Index.tsx |
 
 ---
 

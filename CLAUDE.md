@@ -103,3 +103,4 @@ npm test                      # Unit-Tests ausfuehren (vitest)
 - Production-Readiness: Abgeschlossen - docker-compose Haertung, GitHub Actions CI, backup.sh, E-Mail Passwort-Reset, DEPLOYMENT.md Checkliste
 - Passwort-Aendern: Abgeschlossen - PATCH /api/auth/me/password + Settings Sicherheit-Tab
 - DATEV Export + PSD2 Banking (Nordigen): Abgeschlossen (2026-02-25)
+- Anpassbares Dashboard: Abgeschlossen (2026-07-19) - pro Nutzer konfigurierbares Widget-System (react-grid-layout, Drag & Drop + Resize), DashboardLayout-Tabelle, GET/PUT /dashboard/layout + /revenue-series + /expiring-certificates, zentrales Widget-Register (17 Widgets), WidgetLibrary, Edit-Modus in Index.tsx
