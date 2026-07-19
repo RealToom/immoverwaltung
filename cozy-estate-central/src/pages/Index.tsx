@@ -32,9 +32,9 @@ const Index = () => {
     if (layoutRes?.data) {
       const norm = normalizeLayout(layoutRes.data, role);
       setSaved(norm);
-      setDraft(norm);
+      if (!editMode) setDraft(norm);
     }
-  }, [layoutRes, role]);
+  }, [layoutRes, role, editMode]);
 
   const items = editMode ? draft : saved;
 
@@ -114,10 +114,13 @@ const Index = () => {
                 <li><strong>KI-Funktionen:</strong> Beleg-Scan und intelligente E-Mail-Analyse sind deaktiviert.</li>
               )}
             </ul>
+            <p className="text-[10px] text-amber-600 mt-2 italic">
+              Bitte bearbeiten Sie die <code className="bg-amber-100 px-1 rounded">.env</code> Datei im Backend-Verzeichnis.
+            </p>
           </div>
         )}
 
-        {isLoading ? (
+        {isLoading || !layoutRes ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
