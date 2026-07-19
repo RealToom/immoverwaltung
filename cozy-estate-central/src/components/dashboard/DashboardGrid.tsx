@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Responsive, WidthProvider, type Layout } from "react-grid-layout";
 import { GripVertical, X } from "lucide-react";
 import { WidgetRenderer } from "./WidgetRenderer";
@@ -19,6 +19,7 @@ interface Props {
 
 export function DashboardGrid({ items, editMode, onLayoutChange, onRemove }: Props) {
   const [breakpoint, setBreakpoint] = useState<string>("lg");
+  const breakpointRef = useRef<string>("lg");
 
   const rglLayout: Layout[] = items.map((it) => {
     const def = WIDGET_REGISTRY[it.key];
@@ -42,9 +43,9 @@ export function DashboardGrid({ items, editMode, onLayoutChange, onRemove }: Pro
         isDraggable={canEdit}
         isResizable={canEdit}
         draggableHandle=".widget-drag-handle"
-        onBreakpointChange={setBreakpoint}
+        onBreakpointChange={(bp) => { breakpointRef.current = bp; setBreakpoint(bp); }}
         onLayoutChange={(current) => {
-          if (!canEdit) return;
+          if (!(editMode && breakpointRef.current === "lg")) return;
           onLayoutChange(current.map((l) => ({ key: l.i, x: l.x, y: l.y, w: l.w, h: l.h })));
         }}
       >
