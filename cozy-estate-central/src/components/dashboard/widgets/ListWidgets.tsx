@@ -1,6 +1,6 @@
 import { AlertCircle, FileClock, ShieldAlert, Wrench, Ticket, CalendarClock, Leaf } from "lucide-react";
 import { WidgetListPrimitive, type ListRow } from "./WidgetListPrimitive";
-import { formatCurrency } from "@/lib/mappings";
+import { formatCurrency, mapMaintenancePriority } from "@/lib/mappings";
 import { useDunning } from "@/hooks/api/useDunning";
 import { useContracts } from "@/hooks/api/useContracts";
 import { useInsurancePolicies } from "@/hooks/api/useInsurance";
@@ -14,6 +14,8 @@ const fmtDate = (iso?: string | null) =>
 
 const daysUntil = (iso?: string | null) =>
   iso ? Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000) : Infinity;
+
+const PRIORITY_RANK: Record<string, number> = { DRINGEND: 0, HOCH: 1, MITTEL: 2, NIEDRIG: 3 };
 
 export function OverdueWidget() {
   const { data, isLoading } = useDunning();
@@ -86,12 +88,12 @@ export function OpenTicketsWidget() {
   const { data, isLoading } = useMaintenanceTickets();
   const rows: ListRow[] = (data?.data ?? [])
     .filter((t) => t.status !== "ERLEDIGT")
-    .sort((a, b) => (a.priority === "DRINGEND" || a.priority === "HOCH" ? -1 : 1))
+    .sort((a, b) => (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9))
     .map((t) => ({
       id: t.id,
       primary: t.title,
       secondary: `${t.property.name}${t.unit ? ` · ${t.unit.number}` : ""}`,
-      badge: t.priority,
+      badge: mapMaintenancePriority(t.priority),
     }));
   return (
     <WidgetListPrimitive title="Offene Tickets" icon={Ticket} rows={rows}
