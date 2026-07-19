@@ -158,7 +158,7 @@ export async function getDashboardLayout(
 ): Promise<LayoutItem[]> {
   const row = await prisma.dashboardLayout.findUnique({ where: { userId } });
   const stored = (row?.widgets as LayoutItem[] | undefined) ?? [];
-  const base = stored.length > 0 ? stored : DEFAULT_LAYOUT;
+  const base = row ? stored : DEFAULT_LAYOUT;
   return filterLayoutForRole(base, role);
 }
 

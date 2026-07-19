@@ -22,6 +22,12 @@ describe("dashboard layout service", () => {
     expect(out.some((i) => i.key === "kpi-properties")).toBe(true);
   });
 
+  it("returns empty layout when stored layout is empty (does not fall back to default)", async () => {
+    mockFindUnique.mockResolvedValueOnce({ widgets: [] });
+    const out = await getDashboardLayout(1, 7, "READONLY");
+    expect(out).toEqual([]);
+  });
+
   it("returns stored layout filtered by role", async () => {
     mockFindUnique.mockResolvedValueOnce({
       widgets: [{ key: "roi", x: 0, y: 0, w: 1, h: 1 }, { key: "kpi-tenants", x: 1, y: 0, w: 1, h: 1 }],
